@@ -189,6 +189,8 @@ export interface CreateCarPayload {
   loggedUser: string
   name: string
   licensePlate?: string
+  traccarDeviceId?: number | null
+  traccarUniqueId?: string | null
   supplier: string
   minimumAge: number
   locations: string[]
@@ -468,6 +470,8 @@ export interface Car {
   _id: string
   name: string
   licensePlate?: string
+  traccarDeviceId?: number | null
+  traccarUniqueId?: string | null
   supplier: User
   minimumAge: number
   locations: Location[]
@@ -634,6 +638,46 @@ export interface UpdateSettingsPayload {
   minRentalHours: number
   minPickupDropoffHour: number
   maxPickupDropoffHour: number
+}
+
+export type TrackingStatus =
+  | 'ok'
+  | 'no_fix_yet'
+  | 'not_mapped'
+  | 'device_not_found'
+  | 'car_not_found'
+  | 'traccar_not_configured'
+  | 'traccar_error'
+  | 'rate_limited'
+
+export interface TrackedPosition {
+  lat: number
+  lon: number
+  speed?: number
+  course?: number
+  fixTime?: string | Date
+  address?: string
+}
+
+export interface TrackedCar {
+  carId: string
+  name: string
+  licensePlate?: string
+  traccarDeviceId?: number | null
+  traccarUniqueId?: string | null
+}
+
+export interface CarTrackingResponse {
+  status: TrackingStatus
+  car: TrackedCar | null
+  position?: TrackedPosition | null
+  pollAfterSeconds: number
+}
+
+export interface FleetTrackingResponse {
+  status: TrackingStatus
+  pollAfterSeconds: number
+  cars: Array<TrackedCar & { status: TrackingStatus; position?: TrackedPosition | null }>
 }
 
 // 

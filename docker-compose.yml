@@ -13,6 +13,16 @@ services:
       - mongodb_data:/data/db
       - mongodb_config:/data/configdb
 
+  traccar:
+    image: traccar/traccar:latest
+    restart: always
+    ports:
+      - 8082:8082
+      - 5027:5027
+    volumes:
+      - traccar_data:/opt/traccar/data
+      - traccar_logs:/opt/traccar/logs
+
   mongo-express:
     image: mongo-express:latest
     restart: always
@@ -35,6 +45,7 @@ services:
       - 4002:4002
     depends_on:
       - mongo
+      - traccar
     volumes:
       - cdn:/var/www/cdn/bookcars
       - backend_logs:/bookcars/backend/logs
@@ -65,3 +76,5 @@ volumes:
   mongodb_data:
   mongodb_config:
   backend_logs:
+  traccar_data:
+  traccar_logs:

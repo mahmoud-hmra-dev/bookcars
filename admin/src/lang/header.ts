@@ -19,6 +19,7 @@ const strings = new LocalizedStrings({
     COUNTRIES: 'Pays',
     BANK_DETAILS: 'Détails bancaires',
     PRICING: 'Tarification',
+    FLEET_TRACKING: 'Suivi flotte',
   },
   en: {
     DASHBOARD: 'Dashboard',
@@ -27,6 +28,7 @@ const strings = new LocalizedStrings({
     COMPANIES: 'Suppliers',
     LOCATIONS: 'Locations',
     CARS: 'Cars',
+    TRACKING: 'Fleet Tracking',
     USERS: 'Users',
     ABOUT: 'About',
     TOS: 'Terms of Service',
@@ -37,6 +39,7 @@ const strings = new LocalizedStrings({
     COUNTRIES: 'Countries',
     BANK_DETAILS: 'Bank Details',
     PRICING: 'Pricing',
+    FLEET_TRACKING: 'Fleet Tracking',
   },
   es: {
     DASHBOARD: 'Panel de control',
@@ -45,6 +48,7 @@ const strings = new LocalizedStrings({
     COMPANIES: 'Proveedores',
     LOCATIONS: 'Ubicaciones',
     CARS: 'Coches',
+    TRACKING: 'Seguimiento de flota',
     USERS: 'Usuarios',
     ABOUT: 'Acerca de',
     TOS: 'Términos de servicio',
@@ -55,6 +59,7 @@ const strings = new LocalizedStrings({
     COUNTRIES: 'Países',
     BANK_DETAILS: 'Detalles bancarios',
     PRICING: 'Precios',
+    FLEET_TRACKING: 'Seguimiento de flota',
   },
 })
 

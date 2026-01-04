@@ -15,6 +15,19 @@ const carSchema = new Schema<env.Car>(
       index: true,
       trim: true,
     },
+    traccarDeviceId: {
+      type: Number,
+      index: true,
+      unique: true,
+      sparse: true,
+    },
+    traccarUniqueId: {
+      type: String,
+      trim: true,
+      index: true,
+      unique: true,
+      sparse: true,
+    },
     supplier: {
       type: Schema.Types.ObjectId,
       required: [true, "can't be blank"],

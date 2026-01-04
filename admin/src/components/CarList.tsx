@@ -24,6 +24,7 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Info as InfoIcon,
+  GpsFixed as TrackIcon,
 } from '@mui/icons-material'
 import * as bookcarsTypes from ':bookcars-types'
 import * as bookcarsHelper from ':bookcars-helper'
@@ -31,6 +32,7 @@ import env from '@/config/env.config'
 import Const from '@/config/const'
 import { strings as commonStrings } from '@/lang/common'
 import { strings } from '@/lang/cars'
+import { strings as trackingStrings } from '@/lang/tracking'
 import * as helper from '@/utils/helper'
 import * as CarService from '@/services/CarService'
 import Pager from '@/components/Pager'
@@ -619,6 +621,13 @@ const CarList = ({
                     <div className="action">
                       {edit && (
                         <>
+                          {admin && (
+                            <Tooltip title={trackingStrings.CAR_TITLE}>
+                              <IconButton onClick={() => navigate(`/car-tracking?cr=${car._id}`)}>
+                                <TrackIcon />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                           <Tooltip title={strings.VIEW_CAR}>
                             <IconButton onClick={() => navigate(`/car?cr=${car._id}`)}>
                               <ViewIcon />

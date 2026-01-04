@@ -19,6 +19,43 @@ import NotificationCounter from '../models/NotificationCounter'
 import * as mailHelper from '../utils/mailHelper'
 import Location from '../models/Location'
 
+const TRACCAR_DEVICE_IN_USE = 'TRACCAR_DEVICE_IN_USE'
+const TRACCAR_UNIQUE_ID_IN_USE = 'TRACCAR_UNIQUE_ID_IN_USE'
+
+const parseOptionalNumber = (value?: unknown): number | undefined => {
+  if (value === undefined || value === null || value === '') {
+    return undefined
+  }
+  const num = Number(value)
+  return Number.isFinite(num) ? num : undefined
+}
+
+const normalizeTraccarUniqueId = (value?: string | null): string | undefined => {
+  if (!value) {
+    return undefined
+  }
+  const trimmed = value.trim()
+  return trimmed || undefined
+}
+
+const ensureTraccarMappingAvailable = async (deviceId?: number, uniqueId?: string, carId?: string) => {
+  const $neFilter = carId && helper.isValidObjectId(carId) ? { _id: { $ne: new mongoose.Types.ObjectId(carId) } } : {}
+
+  if (deviceId !== undefined) {
+    const existingDevice = await Car.exists({ traccarDeviceId: deviceId, ...$neFilter })
+    if (existingDevice) {
+      throw new Error(TRACCAR_DEVICE_IN_USE)
+    }
+  }
+
+  if (uniqueId) {
+    const existingUnique = await Car.exists({ traccarUniqueId: uniqueId, ...$neFilter })
+    if (existingUnique) {
+      throw new Error(TRACCAR_UNIQUE_ID_IN_USE)
+    }
+  }
+}
+
 /**
  * Create a Car.
  *
@@ -37,7 +74,17 @@ export const create = async (req: Request, res: Response) => {
     }
 
     // date based price
-    const { dateBasedPrices, ...carFields } = body
+    const {
+      dateBasedPrices,
+      traccarDeviceId: rawTraccarDeviceId,
+      traccarUniqueId: rawTraccarUniqueId,
+      ...carFields
+    } = body
+    const traccarDeviceId = parseOptionalNumber(rawTraccarDeviceId)
+    const traccarUniqueId = normalizeTraccarUniqueId(rawTraccarUniqueId)
+
+    await ensureTraccarMappingAvailable(traccarDeviceId, traccarUniqueId)
+
     const dateBasedPriceIds: string[] = []
     if (body.isDateBasedPrice) {
       for (const dateBasePrice of dateBasedPrices) {
@@ -48,6 +95,12 @@ export const create = async (req: Request, res: Response) => {
     }
 
     const car = new Car({ ...carFields, dateBasedPrices: dateBasedPriceIds })
+    if (traccarDeviceId !== undefined) {
+      car.traccarDeviceId = traccarDeviceId
+    }
+    if (traccarUniqueId) {
+      car.traccarUniqueId = traccarUniqueId
+    }
     await car.save()
 
     const image = path.join(env.CDN_TEMP_CARS, body.image)
@@ -117,6 +170,10 @@ ${i18n.t('REGARDS')}<br>
 
     res.json(car)
   } catch (err) {
+    if (err instanceof Error && [TRACCAR_DEVICE_IN_USE, TRACCAR_UNIQUE_ID_IN_USE].includes(err.message)) {
+      res.status(409).send({ message: err.message })
+      return
+    }
     logger.error(`[car.create] ${i18n.t('DB_ERROR')} ${JSON.stringify(body)}`, err)
     res.status(400).send(i18n.t('ERROR') + err)
   }
@@ -144,6 +201,8 @@ const createDateBasedPrice = async (dateBasedPrice: bookcarsTypes.DateBasedPrice
 export const update = async (req: Request, res: Response) => {
   const { body }: { body: bookcarsTypes.UpdateCarPayload } = req
   const { _id } = body
+  const traccarDeviceId = parseOptionalNumber(body.traccarDeviceId)
+  const traccarUniqueId = normalizeTraccarUniqueId(body.traccarUniqueId)
 
   try {
     if (!helper.isValidObjectId(_id)) {
@@ -152,6 +211,8 @@ export const update = async (req: Request, res: Response) => {
     const car = await Car.findById(_id)
 
     if (car) {
+      await ensureTraccarMappingAvailable(traccarDeviceId, traccarUniqueId, _id)
+
       const {
         supplier,
         name,
@@ -199,6 +260,8 @@ export const update = async (req: Request, res: Response) => {
       car.locations = locations.map((l) => new mongoose.Types.ObjectId(l))
       car.name = name
       car.licensePlate = licensePlate
+      car.traccarDeviceId = traccarDeviceId
+      car.traccarUniqueId = traccarUniqueId
       car.available = available
       car.fullyBooked = fullyBooked
       car.comingSoon = comingSoon
@@ -275,6 +338,10 @@ export const update = async (req: Request, res: Response) => {
     logger.error('[car.update] Car not found:', _id)
     res.sendStatus(204)
   } catch (err) {
+    if (err instanceof Error && [TRACCAR_DEVICE_IN_USE, TRACCAR_UNIQUE_ID_IN_USE].includes(err.message)) {
+      res.status(409).send({ message: err.message })
+      return
+    }
     logger.error(`[car.update] ${i18n.t('DB_ERROR')} ${_id}`, err)
     res.status(400).send(i18n.t('ERROR') + err)
   }

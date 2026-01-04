@@ -68,6 +68,8 @@ const CreateCar = () => {
     defaultValues: {
       name: '',
       licensePlate: '',
+      traccarDeviceId: '',
+      traccarUniqueId: '',
       supplier: undefined,
       minimumAge: String(env.MINIMUM_AGE),
       locations: [],
@@ -124,6 +126,9 @@ const CreateCar = () => {
   const fuelPolicy = useWatch({ control, name: 'fuelPolicy' })
   const aircon = useWatch({ control, name: 'aircon' })
 
+  const traccarDeviceLabel = strings.TRACCAR_DEVICE_ID || 'Traccar Device ID'
+  const traccarUniqueLabel = strings.TRACCAR_UNIQUE_ID || 'Traccar Unique ID / IMEI'
+
 
   const handleBeforeUpload = () => {
     setLoading(true)
@@ -174,6 +179,8 @@ const CreateCar = () => {
         loggedUser: user!._id!,
         name: data.name,
         licensePlate: data.licensePlate || '',
+        traccarDeviceId: data.traccarDeviceId ? Number(data.traccarDeviceId) : undefined,
+        traccarUniqueId: data.traccarUniqueId?.trim() || undefined,
         supplier: data.supplier?._id!,
         minimumAge: Number.parseInt(data.minimumAge, 10),
         locations: data.locations.map((l) => l._id),
@@ -221,8 +228,15 @@ const CreateCar = () => {
       } else {
         helper.error()
       }
-    } catch (err) {
-      helper.error(err)
+    } catch (err: any) {
+      const message = err?.response?.data?.message as string | undefined
+      if (message === 'TRACCAR_DEVICE_IN_USE') {
+        helper.error(null, strings.TRACCAR_DEVICE_IN_USE)
+      } else if (message === 'TRACCAR_UNIQUE_ID_IN_USE') {
+        helper.error(null, strings.TRACCAR_UNIQUE_IN_USE)
+      } else {
+        helper.error(err)
+      }
     }
   }
 
@@ -294,6 +308,31 @@ const CreateCar = () => {
               <Input
                 type="text"
                 {...register('licensePlate')}
+                autoComplete="off"
+              />
+            </FormControl>
+
+            <FormControl fullWidth margin="dense">
+              <TextField
+                label={traccarDeviceLabel}
+                {...register('traccarDeviceId')}
+                variant="standard"
+                autoComplete="off"
+                error={!!errors.traccarDeviceId}
+                helperText={errors.traccarDeviceId?.message}
+                onChange={() => {
+                  if (errors.traccarDeviceId) {
+                    clearErrors('traccarDeviceId')
+                  }
+                }}
+              />
+            </FormControl>
+
+            <FormControl fullWidth margin="dense">
+              <TextField
+                label={traccarUniqueLabel}
+                {...register('traccarUniqueId')}
+                variant="standard"
                 autoComplete="off"
               />
             </FormControl>

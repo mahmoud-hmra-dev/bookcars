@@ -20,6 +20,8 @@ export type DateBasedPrice = z.infer<typeof dateBasedPriceSchema>
 export const schema = z.object({
   name: z.string(),
   licensePlate: z.string().optional(),
+  traccarDeviceId: z.string().optional().refine((val) => !val || numberRegex.test(val), { message: commonStrings.FIELD_NOT_VALID }),
+  traccarUniqueId: z.string().optional(),
   supplier: supplierSchema.optional(),
   minimumAge: z.string()
     .refine((val) => !val || /^\d{2}$/.test(val), { message: commonStrings.FIELD_NOT_VALID })

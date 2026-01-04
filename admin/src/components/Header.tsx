@@ -34,6 +34,7 @@ import {
   CalendarMonth as SchedulerIcon,
   AccountBalance as BankDetailsIcon,
   MonetizationOn as PricingIcon,
+  Map as MapIcon,
 } from '@mui/icons-material'
 import { useNavigate } from 'react-router-dom'
 import * as bookcarsTypes from ':bookcars-types'
@@ -320,6 +321,17 @@ const Header = ({
                   <ListItemIcon><SchedulerIcon /></ListItemIcon>
                   <ListItemText primary={strings.SCHEDULER} />
                 </ListItem>
+                {helper.admin(currentUser) && (
+                  <ListItem
+                    onClick={() => {
+                      navigate('/fleet-tracking')
+                      handleSideMenuClose()
+                    }}
+                  >
+                    <ListItemIcon><MapIcon /></ListItemIcon>
+                    <ListItemText primary={strings.FLEET_TRACKING} />
+                  </ListItem>
+                )}
                 <ListItem
                   onClick={() => {
                     navigate('/suppliers')
@@ -355,6 +367,15 @@ const Header = ({
                 >
                   <ListItemIcon><CarsIcon /></ListItemIcon>
                   <ListItemText primary={strings.CARS} />
+                </ListItem>
+                <ListItem
+                  onClick={() => {
+                    navigate('/fleet-tracking')
+                    handleSideMenuClose()
+                  }}
+                >
+                  <ListItemIcon><MapIcon /></ListItemIcon>
+                  <ListItemText primary={strings.TRACKING} />
                 </ListItem>
                 <ListItem
                   onClick={() => {

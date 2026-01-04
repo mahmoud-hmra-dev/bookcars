@@ -71,6 +71,8 @@ const UpdateCar = () => {
     defaultValues: {
       name: '',
       licensePlate: '',
+      traccarDeviceId: '',
+      traccarUniqueId: '',
       supplier: undefined,
       minimumAge: String(env.MINIMUM_AGE),
       locations: [],
@@ -129,6 +131,9 @@ const UpdateCar = () => {
   const fuelPolicy = useWatch({ control, name: 'fuelPolicy' })
   const aircon = useWatch({ control, name: 'aircon' })
 
+  const traccarDeviceLabel = strings.TRACCAR_DEVICE_ID || 'Traccar Device ID'
+  const traccarUniqueLabel = strings.TRACCAR_UNIQUE_ID || 'Traccar Unique ID / IMEI'
+
   const handleBeforeUpload = () => {
     setLoading(true)
   }
@@ -183,6 +188,8 @@ const UpdateCar = () => {
         _id: car._id,
         name: data.name,
         licensePlate: data.licensePlate,
+        traccarDeviceId: data.traccarDeviceId ? Number(data.traccarDeviceId) : undefined,
+        traccarUniqueId: data.traccarUniqueId?.trim() || undefined,
         supplier: supplier._id!,
         minimumAge: Number.parseInt(data.minimumAge, 10),
         locations: data.locations.map((l) => l._id),
@@ -230,8 +237,15 @@ const UpdateCar = () => {
       } else {
         helper.error()
       }
-    } catch (err) {
-      helper.error(err)
+    } catch (err: any) {
+      const message = err?.response?.data?.message as string | undefined
+      if (message === 'TRACCAR_DEVICE_IN_USE') {
+        helper.error(null, strings.TRACCAR_DEVICE_IN_USE)
+      } else if (message === 'TRACCAR_UNIQUE_ID_IN_USE') {
+        helper.error(null, strings.TRACCAR_UNIQUE_IN_USE)
+      } else {
+        helper.error(err)
+      }
     }
   }
 
@@ -271,6 +285,8 @@ const UpdateCar = () => {
               setImageRequired(!_car.image)
               setValue('name', _car.name)
               setValue('licensePlate', _car.licensePlate || '')
+              setValue('traccarDeviceId', _car.traccarDeviceId ? _car.traccarDeviceId.toString() : '')
+              setValue('traccarUniqueId', _car.traccarUniqueId || '')
               setValue('supplier', _supplier)
               setValue('minimumAge', _car.minimumAge.toString())
               const lcs: Option[] = []
@@ -386,18 +402,43 @@ const UpdateCar = () => {
 
               <FormControl fullWidth margin="dense">
                 <InputLabel>{strings.LICENSE_PLATE}</InputLabel>
-                <Input
-                  type="text"
-                  {...register('licensePlate')}
-                  autoComplete="off"
-                />
-              </FormControl>
+              <Input
+                type="text"
+                {...register('licensePlate')}
+                autoComplete="off"
+              />
+            </FormControl>
 
-              {!isSupplier && (
-                <FormControl fullWidth margin="dense">
-                  <SupplierSelectList
-                    label={strings.SUPPLIER}
-                    required
+            <FormControl fullWidth margin="dense">
+              <TextField
+                label={traccarDeviceLabel}
+                {...register('traccarDeviceId')}
+                variant="standard"
+                autoComplete="off"
+                error={!!errors.traccarDeviceId}
+                helperText={errors.traccarDeviceId?.message}
+                onChange={() => {
+                  if (errors.traccarDeviceId) {
+                    clearErrors('traccarDeviceId')
+                  }
+                }}
+              />
+            </FormControl>
+
+            <FormControl fullWidth margin="dense">
+              <TextField
+                label={traccarUniqueLabel}
+                {...register('traccarUniqueId')}
+                variant="standard"
+                autoComplete="off"
+              />
+            </FormControl>
+
+            {!isSupplier && (
+              <FormControl fullWidth margin="dense">
+                <SupplierSelectList
+                  label={strings.SUPPLIER}
+                  required
                     value={supplier as bookcarsTypes.Option}
                     variant="standard"
                     onChange={(values) => setValue('supplier', values.length > 0 ? values[0] as Supplier : undefined)}

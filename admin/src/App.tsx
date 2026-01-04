@@ -43,6 +43,8 @@ const UpdateCountry = lazy(() => import('@/pages/UpdateCountry'))
 const Scheduler = lazy(() => import('@/pages/Scheduler'))
 const BankDetails = lazy(() => import('@/pages/BankDetails'))
 const Pricing = lazy(() => import('@/pages/Pricing'))
+const FleetTracking = lazy(() => import('@/pages/FleetTracking'))
+const CarTracking = lazy(() => import('@/pages/CarTracking'))
 
 const AppLayout = () => {
   const location = useLocation()
@@ -91,6 +93,8 @@ const router = createBrowserRouter([
       { path: 'car', element: <Car /> },
       { path: 'create-car', element: <CreateCar /> },
       { path: 'update-car', element: <UpdateCar /> },
+      { path: 'fleet-tracking', element: <FleetTracking /> },
+      { path: 'car-tracking', element: <CarTracking /> },
       { path: 'update-booking', element: <UpdateBooking /> },
       { path: 'create-booking', element: <CreateBooking /> },
       { path: 'users', element: <Users /> },

@@ -341,6 +341,35 @@ export const DEFAULT_LANGUAGE = __env__('BC_DEFAULT_LANGUAGE', false, 'en')
 export const MINIMUM_AGE = Number.parseInt(__env__('BC_MINIMUM_AGE', false, '21'), 10)
 
 /**
+ * Traccar base URL (internal network).
+ *
+ * @type {string}
+ */
+export const TRACCAR_BASE_URL = __env__('BC_TRACCAR_BASE_URL')
+
+/**
+ * Traccar username.
+ *
+ * @type {string}
+ */
+export const TRACCAR_USER = __env__('BC_TRACCAR_USER')
+
+/**
+ * Traccar password or token.
+ *
+ * @type {string}
+ */
+export const TRACCAR_PASS = __env__('BC_TRACCAR_PASS')
+
+/**
+ * Minimum polling interval (seconds) enforced for tracking endpoints.
+ *
+ * @type {number}
+ */
+const traccarMinPoll = Number.parseInt(__env__('BC_TRACCAR_MIN_POLL_INTERVAL', false, '5'), 10)
+export const TRACCAR_MIN_POLL_INTERVAL = Number.isFinite(traccarMinPoll) && traccarMinPoll > 0 ? traccarMinPoll : 5
+
+/**
  * Expo push access token.
  *
  * @type {string}
@@ -616,6 +645,8 @@ export interface DateBasedPrice extends Document {
 export interface Car extends Document {
   name: string
   licensePlate?: string
+  traccarDeviceId?: number | null
+  traccarUniqueId?: string | null
   supplier: Types.ObjectId
   minimumAge: number
   locations: Types.ObjectId[]
@@ -670,6 +701,8 @@ export interface Car extends Document {
 export interface CarInfo {
   _id?: Types.ObjectId
   name: string
+  traccarDeviceId?: number | null
+  traccarUniqueId?: string | null
   supplier: UserInfo
   minimumAge: number
   locations: Types.ObjectId[]
