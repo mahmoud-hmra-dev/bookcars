@@ -173,7 +173,7 @@ const CarTracking = () => {
                       :
                       {' '}
                       {Math.round(position.course)}
-                      °
+                      deg
                     </span>
                   )}
                   {position.fixTime && (
