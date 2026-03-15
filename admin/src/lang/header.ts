@@ -19,6 +19,7 @@ const strings = new LocalizedStrings({
     COUNTRIES: 'Pays',
     BANK_DETAILS: 'Détails bancaires',
     PRICING: 'Tarification',
+    ASSISTANT: 'Assistant',
   },
   en: {
     DASHBOARD: 'Dashboard',
@@ -37,6 +38,7 @@ const strings = new LocalizedStrings({
     COUNTRIES: 'Countries',
     BANK_DETAILS: 'Bank Details',
     PRICING: 'Pricing',
+    ASSISTANT: 'Assistant',
   },
   es: {
     DASHBOARD: 'Panel de control',
@@ -55,6 +57,7 @@ const strings = new LocalizedStrings({
     COUNTRIES: 'Países',
     BANK_DETAILS: 'Detalles bancarios',
     PRICING: 'Precios',
+    ASSISTANT: 'Asistente',
   },
 })
 

@@ -34,6 +34,7 @@ import {
   CalendarMonth as SchedulerIcon,
   AccountBalance as BankDetailsIcon,
   MonetizationOn as PricingIcon,
+  SmartToy as AssistantIcon,
 } from '@mui/icons-material'
 import { useNavigate } from 'react-router-dom'
 import * as bookcarsTypes from ':bookcars-types'
@@ -373,6 +374,15 @@ const Header = ({
                 >
                   <ListItemIcon><PricingIcon /></ListItemIcon>
                   <ListItemText primary={strings.PRICING} />
+                </ListItem>
+                <ListItem
+                  onClick={() => {
+                    navigate('/assistant')
+                    handleSideMenuClose()
+                  }}
+                >
+                  <ListItemIcon><AssistantIcon /></ListItemIcon>
+                  <ListItemText primary={strings.ASSISTANT} />
                 </ListItem>
                 {bankDetails?.showBankDetailsPage && (
                   <ListItem
