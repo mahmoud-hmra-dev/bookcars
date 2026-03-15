@@ -15,6 +15,8 @@ export interface AssistantResponse {
   intent: AssistantIntent
   status: AssistantStatus
   reply: string
+  replyLanguage: string
+  inputLanguage: string
   data?: Record<string, unknown>
   suggestedActions?: string[]
 }

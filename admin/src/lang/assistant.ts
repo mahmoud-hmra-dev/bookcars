@@ -21,6 +21,7 @@ const strings = new LocalizedStrings({
     NO_RESULT: 'Aucune donnée structurée renvoyée.',
     RETRY: 'Réessayer',
     EXAMPLES_TITLE: 'Exemples rapides',
+    LANGUAGE: 'Langue',
   },
   en: {
     TITLE: 'Admin Assistant',
@@ -41,6 +42,7 @@ const strings = new LocalizedStrings({
     NO_RESULT: 'No structured data returned.',
     RETRY: 'Retry',
     EXAMPLES_TITLE: 'Quick examples',
+    LANGUAGE: 'Language',
   },
   es: {
     TITLE: 'Asistente admin',
@@ -61,6 +63,7 @@ const strings = new LocalizedStrings({
     NO_RESULT: 'No se devolvieron datos estructurados.',
     RETRY: 'Reintentar',
     EXAMPLES_TITLE: 'Ejemplos rápidos',
+    LANGUAGE: 'Idioma',
   },
 })
 

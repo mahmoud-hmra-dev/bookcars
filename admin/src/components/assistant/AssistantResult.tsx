@@ -164,6 +164,7 @@ const AssistantResult = ({ response }: AssistantResultProps) => (
       <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 1 }}>
         <Chip label={`${strings.INTENT}: ${response.intent}`} size="small" />
         <Chip label={`${strings.STATUS}: ${response.status}`} size="small" variant="outlined" />
+        <Chip label={`${strings.LANGUAGE}: ${response.replyLanguage}`} size="small" variant="outlined" />
       </Stack>
       <Typography variant="body2">{response.reply}</Typography>
     </Alert>

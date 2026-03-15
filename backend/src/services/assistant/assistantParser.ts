@@ -13,6 +13,28 @@ const normalizeWhitespace = (value: string) => value.replace(/\s+/g, ' ').trim()
 
 export const normalizeAssistantText = (value: string) => normalizeWhitespace(normalizeArabic(value.toLowerCase()))
 
+const inferInputLanguage = (value: string) => {
+  const normalized = value.trim()
+
+  if (!normalized) {
+    return 'en'
+  }
+
+  if (/[\u0600-\u06FF]/.test(normalized)) {
+    return 'ar'
+  }
+
+  if (/[¿¡]/.test(normalized) || /\b(hola|buscar|reserva|reservas|coche|coches|proveedor|mañana|hoy|disponible|disponibles)\b/i.test(normalized)) {
+    return 'es'
+  }
+
+  if (/\b(bonjour|réservation|réservations|voiture|voitures|fournisseur|demain|aujourd'hui|disponible|disponibles)\b/i.test(normalized)) {
+    return 'fr'
+  }
+
+  return 'en'
+}
+
 export const getDayRange = (daysToAdd: number, label: AssistantDateRangeLabel): ParsedDateRange => {
   const start = new Date()
   start.setHours(0, 0, 0, 0)
@@ -60,12 +82,17 @@ const parseSearchTerm = (message: string, patterns: RegExp[]) => {
   return undefined
 }
 
+const shouldUseLlmForLanguage = (inputLanguage: string) => inputLanguage !== 'en'
+
 export const shouldFallbackToAssistantLlm = (parsed: ParsedAssistantIntent) => parsed.intent === 'unknown'
   || !!parsed.fallbackRecommended
+  || shouldUseLlmForLanguage(parsed.inputLanguage || 'en')
 
 export const parseAssistantMessage = (message: string): ParsedAssistantIntent => {
   const normalizedMessage = normalizeAssistantText(message || '')
   const dateRange = parseDateRange(normalizedMessage)
+  const inputLanguage = inferInputLanguage(message || '')
+  const replyLanguage = inputLanguage
 
   if (/^(send email|email)\b/.test(normalizedMessage)) {
     const email = normalizedMessage.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/)?.[0]
@@ -79,6 +106,8 @@ export const parseAssistantMessage = (message: string): ParsedAssistantIntent =>
       fallbackRecommended: !email,
       needsClarification: !email,
       clarificationQuestion: !email ? 'Who should receive the email?' : undefined,
+      inputLanguage,
+      replyLanguage,
     }
   }
 
@@ -103,6 +132,8 @@ export const parseAssistantMessage = (message: string): ParsedAssistantIntent =>
         : !dateRange
           ? 'When should I schedule the meeting?'
           : undefined,
+      inputLanguage,
+      replyLanguage,
     }
   }
 
@@ -127,6 +158,8 @@ export const parseAssistantMessage = (message: string): ParsedAssistantIntent =>
         : !locationQuery
           ? 'Which location should I search for available cars?'
           : undefined,
+      inputLanguage,
+      replyLanguage,
     }
   }
 
@@ -142,6 +175,8 @@ export const parseAssistantMessage = (message: string): ParsedAssistantIntent =>
       fallbackRecommended: !searchTerm,
       needsClarification: !searchTerm,
       clarificationQuestion: !searchTerm ? 'Which supplier should I look for?' : undefined,
+      inputLanguage,
+      replyLanguage,
     }
   }
 
@@ -157,6 +192,8 @@ export const parseAssistantMessage = (message: string): ParsedAssistantIntent =>
       fallbackRecommended: !searchTerm,
       needsClarification: !searchTerm,
       clarificationQuestion: !searchTerm ? 'Which booking should I look for?' : undefined,
+      inputLanguage,
+      replyLanguage,
     }
   }
 
@@ -173,6 +210,8 @@ export const parseAssistantMessage = (message: string): ParsedAssistantIntent =>
       confidence: 0.82,
       fallbackRecommended: false,
       needsClarification: false,
+      inputLanguage,
+      replyLanguage,
     }
   }
 
@@ -185,5 +224,7 @@ export const parseAssistantMessage = (message: string): ParsedAssistantIntent =>
     fallbackRecommended: true,
     needsClarification: true,
     clarificationQuestion: 'What would you like me to help with: bookings, suppliers, cars, email, or meetings?',
+    inputLanguage,
+    replyLanguage,
   }
 }

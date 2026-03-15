@@ -75,6 +75,8 @@ const Assistant = () => {
             intent: 'unknown',
             status: 'error',
             reply: strings.RETRY,
+            inputLanguage: 'en',
+            replyLanguage: 'en',
           },
         },
       ]))

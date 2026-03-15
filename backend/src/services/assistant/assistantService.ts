@@ -7,7 +7,7 @@ import LocationValue from '../../models/LocationValue'
 import User from '../../models/User'
 import * as logger from '../../utils/logger'
 import { normalizeAssistantText, parseAssistantMessage, shouldFallbackToAssistantLlm } from './assistantParser'
-import { resolveAssistantIntentWithLlm } from './assistantLlmResolver'
+import { localizeAssistantResponse, resolveAssistantIntentWithLlm } from './assistantLlmResolver'
 import { AssistantResponse, ParsedAssistantIntent } from './assistantTypes'
 
 const MAX_RESULTS = 10
@@ -40,6 +40,12 @@ const isObjectId = (value?: string) => !!(value && mongoose.Types.ObjectId.isVal
 const toObjectId = (value: string) => new mongoose.Types.ObjectId(value)
 
 const matchNormalized = (source: string | null | undefined, query: string) => normalizeAssistantText(source || '').includes(normalizeAssistantText(query))
+
+const withLanguageMetadata = (parsed: ParsedAssistantIntent, response: Omit<AssistantResponse, 'inputLanguage' | 'replyLanguage'>): AssistantResponse => ({
+  ...response,
+  inputLanguage: parsed.inputLanguage || 'en',
+  replyLanguage: parsed.replyLanguage || parsed.inputLanguage || 'en',
+})
 
 const findSuppliers = async (searchTerm: string) => {
   const regex = new RegExp(buildFlexibleNamePattern(searchTerm), 'i')
@@ -181,7 +187,7 @@ const summarizeBookings = async (parsed: ParsedAssistantIntent): Promise<Assista
   const total = await Booking.countDocuments(match)
   const summaryLabel = [parsed.filters?.unpaid ? 'unpaid' : null, parsed.dateRange?.label ?? null].filter(Boolean).join(' ')
 
-  return {
+  return withLanguageMetadata(parsed, {
     intent: 'booking_summary',
     status: 'success',
     reply: total > 0
@@ -218,22 +224,22 @@ const summarizeBookings = async (parsed: ParsedAssistantIntent): Promise<Assista
       resolutionSource: parsed.source,
     },
     suggestedActions: total > MAX_RESULTS ? ['Refine by driver, supplier, or exact date.'] : undefined,
-  }
+  })
 }
 
 const handleBookingSearch = async (parsed: ParsedAssistantIntent): Promise<AssistantResponse> => {
   if (!parsed.searchTerm) {
-    return {
+    return withLanguageMetadata(parsed, {
       intent: 'booking_search',
       status: 'needs_clarification',
       reply: parsed.clarificationQuestion || 'Tell me which booking to find by ID, driver name, supplier name, or email.',
       suggestedActions: ['Try: find booking Mahmoud'],
-    }
+    })
   }
 
   const bookings = await searchBookings(parsed.searchTerm)
 
-  return {
+  return withLanguageMetadata(parsed, {
     intent: 'booking_search',
     status: 'success',
     reply: bookings.length > 0
@@ -245,22 +251,22 @@ const handleBookingSearch = async (parsed: ParsedAssistantIntent): Promise<Assis
       resolutionSource: parsed.source,
     },
     suggestedActions: bookings.length === 0 ? ['Try a full name, email, or booking ID.'] : undefined,
-  }
+  })
 }
 
 const handleSupplierSearch = async (parsed: ParsedAssistantIntent): Promise<AssistantResponse> => {
   if (!parsed.searchTerm) {
-    return {
+    return withLanguageMetadata(parsed, {
       intent: 'supplier_search',
       status: 'needs_clarification',
       reply: parsed.clarificationQuestion || 'Tell me which supplier to find by full name or email.',
       suggestedActions: ['Try: find supplier Youssef'],
-    }
+    })
   }
 
   const suppliers = await findSuppliers(parsed.searchTerm)
 
-  return {
+  return withLanguageMetadata(parsed, {
     intent: 'supplier_search',
     status: 'success',
     reply: suppliers.length > 0
@@ -273,7 +279,7 @@ const handleSupplierSearch = async (parsed: ParsedAssistantIntent): Promise<Assi
       resolutionSource: parsed.source,
     },
     suggestedActions: suppliers.length === 0 ? ['Try a full name, Arabic spelling, or email address.'] : undefined,
-  }
+  })
 }
 
 const resolveLocationIds = async (locationQuery: string) => {
@@ -305,28 +311,28 @@ const resolveLocationIds = async (locationQuery: string) => {
 
 const handleCarAvailability = async (parsed: ParsedAssistantIntent): Promise<AssistantResponse> => {
   if (!parsed.dateRange) {
-    return {
+    return withLanguageMetadata(parsed, {
       intent: 'car_availability',
       status: 'needs_clarification',
       reply: parsed.clarificationQuestion || 'Tell me which date to check, for example today or tomorrow.',
       suggestedActions: ['Try: available cars tomorrow in Beirut'],
-    }
+    })
   }
 
   if (!parsed.locationQuery) {
-    return {
+    return withLanguageMetadata(parsed, {
       intent: 'car_availability',
       status: 'needs_clarification',
       reply: parsed.clarificationQuestion || 'Tell me which location to search.',
       suggestedActions: ['Try: available cars tomorrow in Beirut'],
-    }
+    })
   }
 
   const { locations } = await resolveLocationIds(parsed.locationQuery)
   const locationIds = locations.map((location) => location._id)
 
   if (locationIds.length === 0) {
-    return {
+    return withLanguageMetadata(parsed, {
       intent: 'car_availability',
       status: 'success',
       reply: `No locations matched "${parsed.locationQuery}".`,
@@ -336,7 +342,7 @@ const handleCarAvailability = async (parsed: ParsedAssistantIntent): Promise<Ass
         resolutionSource: parsed.source,
       },
       suggestedActions: ['Try another spelling or a broader city name.'],
-    }
+    })
   }
 
   const overlappingBookings = await Booking.find({
@@ -376,7 +382,7 @@ const handleCarAvailability = async (parsed: ParsedAssistantIntent): Promise<Ass
       blockOnPay: !!car.blockOnPay,
     }))
 
-  return {
+  return withLanguageMetadata(parsed, {
     intent: 'car_availability',
     status: 'success',
     reply: availableCars.length > 0
@@ -393,10 +399,10 @@ const handleCarAvailability = async (parsed: ParsedAssistantIntent): Promise<Ass
       resolutionSource: parsed.source,
     },
     suggestedActions: availableCars.length === 0 ? ['Try another location or date.'] : undefined,
-  }
+  })
 }
 
-const handleSendEmail = async (parsed: ParsedAssistantIntent): Promise<AssistantResponse> => ({
+const handleSendEmail = async (parsed: ParsedAssistantIntent): Promise<AssistantResponse> => withLanguageMetadata(parsed, {
   intent: 'send_email',
   status: 'needs_clarification',
   reply: parsed.email
@@ -409,7 +415,7 @@ const handleSendEmail = async (parsed: ParsedAssistantIntent): Promise<Assistant
   suggestedActions: ['Collect recipient, subject, and message body before enabling sending.'],
 })
 
-const handleCreateMeeting = async (parsed: ParsedAssistantIntent): Promise<AssistantResponse> => ({
+const handleCreateMeeting = async (parsed: ParsedAssistantIntent): Promise<AssistantResponse> => withLanguageMetadata(parsed, {
   intent: 'create_meeting',
   status: 'needs_clarification',
   reply: parsed.searchTerm
@@ -427,7 +433,7 @@ const handleCreateMeeting = async (parsed: ParsedAssistantIntent): Promise<Assis
   suggestedActions: ['Confirm attendees, exact time, timezone, and calendar before enabling creation.'],
 })
 
-const buildUnknownAssistantResponse = (parsed: ParsedAssistantIntent): AssistantResponse => ({
+const buildUnknownAssistantResponse = (parsed: ParsedAssistantIntent): AssistantResponse => withLanguageMetadata(parsed, {
   intent: 'unknown',
   status: 'needs_clarification',
   reply: parsed.clarificationQuestion || 'I can help with booking summaries, booking search, supplier search, car availability, email drafting, or meeting requests.',
@@ -456,22 +462,33 @@ const resolveAssistantIntent = async (message: string) => {
 export const processAssistantMessage = async (message: string): Promise<AssistantResponse> => {
   const parsed = await resolveAssistantIntent(message)
 
+  let response: AssistantResponse
+
   switch (parsed.intent) {
     case 'booking_summary':
-      return summarizeBookings(parsed)
+      response = await summarizeBookings(parsed)
+      break
     case 'booking_search':
-      return handleBookingSearch(parsed)
+      response = await handleBookingSearch(parsed)
+      break
     case 'supplier_search':
-      return handleSupplierSearch(parsed)
+      response = await handleSupplierSearch(parsed)
+      break
     case 'car_availability':
-      return handleCarAvailability(parsed)
+      response = await handleCarAvailability(parsed)
+      break
     case 'send_email':
-      return handleSendEmail(parsed)
+      response = await handleSendEmail(parsed)
+      break
     case 'create_meeting':
-      return handleCreateMeeting(parsed)
+      response = await handleCreateMeeting(parsed)
+      break
     default:
-      return buildUnknownAssistantResponse(parsed)
+      response = buildUnknownAssistantResponse(parsed)
+      break
   }
+
+  return localizeAssistantResponse(response, parsed)
 }
 
 export const safeProcessAssistantMessage = async (message: string): Promise<AssistantResponse> => {
@@ -486,6 +503,8 @@ export const safeProcessAssistantMessage = async (message: string): Promise<Assi
       intent: parsed.intent,
       status: 'error',
       reply: 'Something went wrong while processing the assistant request.',
+      inputLanguage: parsed.inputLanguage || 'en',
+      replyLanguage: parsed.replyLanguage || parsed.inputLanguage || 'en',
     }
   }
 }

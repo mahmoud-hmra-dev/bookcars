@@ -119,6 +119,8 @@ describe('POST /api/assistant/message', () => {
     expect(res.statusCode).toBe(200)
     expect(res.body.intent).toBe('booking_summary')
     expect(res.body.status).toBe('success')
+    expect(res.body.inputLanguage).toBe('en')
+    expect(res.body.replyLanguage).toBe('en')
     expect(res.body.data.total).toBeGreaterThanOrEqual(1)
   })
 
@@ -131,6 +133,7 @@ describe('POST /api/assistant/message', () => {
     expect(res.statusCode).toBe(200)
     expect(res.body.intent).toBe('booking_search')
     expect(res.body.status).toBe('success')
+    expect(res.body.replyLanguage).toBe('en')
     expect(res.body.data.bookings[0]._id).toBe(BOOKING_ID)
   })
 

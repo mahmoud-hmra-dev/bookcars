@@ -15,6 +15,8 @@ export interface AssistantResponse {
   intent: AssistantIntent
   status: AssistantStatus
   reply: string
+  replyLanguage: string
+  inputLanguage: string
   data?: Record<string, unknown>
   suggestedActions?: string[]
 }
@@ -41,6 +43,8 @@ export interface ParsedAssistantIntent {
   fallbackRecommended?: boolean
   needsClarification?: boolean
   clarificationQuestion?: string
+  inputLanguage?: string
+  replyLanguage?: string
 }
 
 export interface AssistantLlmResolution {
@@ -55,4 +59,6 @@ export interface AssistantLlmResolution {
   needsClarification: boolean
   clarificationQuestion?: string
   confidence?: number
+  inputLanguage?: string
+  replyLanguage?: string
 }
