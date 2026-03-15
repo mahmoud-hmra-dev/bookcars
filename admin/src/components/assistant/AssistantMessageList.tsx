@@ -14,6 +14,8 @@ export interface AssistantConversationMessage {
   id: string
   role: 'user' | 'assistant'
   text: string
+  transcript?: string
+  source?: 'text' | 'voice'
   response?: AssistantResponse
   suggestedActions?: string[]
 }
@@ -52,9 +54,14 @@ const AssistantMessageList = ({ messages, onSuggestedActionClick }: AssistantMes
             }}
           >
             <Stack spacing={1.5}>
-              <Typography variant="subtitle2" color="text.secondary">
-                {isUser ? strings.YOU : strings.ASSISTANT}
-              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                <Typography variant="subtitle2" color="text.secondary">
+                  {isUser ? strings.YOU : strings.ASSISTANT}
+                </Typography>
+                {isUser && message.source === 'voice' && (
+                  <Chip size="small" variant="outlined" label={strings.VOICE_TRANSCRIPT} />
+                )}
+              </Stack>
 
               <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                 {message.text}

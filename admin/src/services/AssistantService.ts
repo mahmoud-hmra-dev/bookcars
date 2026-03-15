@@ -25,6 +25,11 @@ interface AssistantMessagePayload {
   message: string
 }
 
+export interface AssistantVoiceResponse {
+  transcript: string
+  response: AssistantResponse
+}
+
 export const sendMessage = (message: string): Promise<AssistantResponse> => (
   axiosInstance
     .post(
@@ -34,3 +39,15 @@ export const sendMessage = (message: string): Promise<AssistantResponse> => (
     )
     .then((res) => res.data)
 )
+
+export const sendVoiceMessage = (audio: Blob, filename: string): Promise<AssistantVoiceResponse> => {
+  const formData = new FormData()
+  formData.append('audio', audio, filename)
+
+  return axiosInstance
+    .post('/api/assistant/voice/message', formData, {
+      withCredentials: true,
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    .then((res) => res.data)
+}

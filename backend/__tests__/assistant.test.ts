@@ -192,3 +192,15 @@ describe('POST /api/assistant/message', () => {
     expect(res.body.status).toBe('needs_clarification')
   })
 })
+
+describe('POST /api/assistant/voice/message', () => {
+  it('should require an audio file', async () => {
+    const res = await request(app)
+      .post('/api/assistant/voice/message')
+      .set(env.X_ACCESS_TOKEN, ADMIN_TOKEN)
+
+    expect(res.statusCode).toBe(400)
+    expect(res.body.intent).toBe('unknown')
+    expect(res.body.reply).toBe('Audio file is required.')
+  })
+})
