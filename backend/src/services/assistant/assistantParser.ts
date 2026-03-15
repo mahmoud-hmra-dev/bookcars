@@ -1,4 +1,4 @@
-import { ParsedAssistantIntent, ParsedDateRange } from './assistantTypes'
+import { AssistantDateRangeLabel, ParsedAssistantIntent, ParsedDateRange } from './assistantTypes'
 
 const normalizeArabic = (value: string) => value
   .normalize('NFKC')
@@ -13,7 +13,7 @@ const normalizeWhitespace = (value: string) => value.replace(/\s+/g, ' ').trim()
 
 export const normalizeAssistantText = (value: string) => normalizeWhitespace(normalizeArabic(value.toLowerCase()))
 
-const getDayRange = (daysToAdd: number, label: 'today' | 'tomorrow'): ParsedDateRange => {
+export const getDayRange = (daysToAdd: number, label: AssistantDateRangeLabel): ParsedDateRange => {
   const start = new Date()
   start.setHours(0, 0, 0, 0)
   start.setDate(start.getDate() + daysToAdd)
@@ -28,17 +28,25 @@ const getDayRange = (daysToAdd: number, label: 'today' | 'tomorrow'): ParsedDate
   }
 }
 
-const parseDateRange = (message: string) => {
-  if (message.includes('tomorrow')) {
+export const getDateRangeFromLabel = (label?: AssistantDateRangeLabel) => {
+  if (label === 'tomorrow') {
     return getDayRange(1, 'tomorrow')
   }
 
-  if (message.includes('today')) {
+  if (label === 'today') {
     return getDayRange(0, 'today')
   }
 
   return undefined
 }
+
+const parseDateRange = (message: string) => getDateRangeFromLabel(
+  message.includes('tomorrow')
+    ? 'tomorrow'
+    : message.includes('today')
+      ? 'today'
+      : undefined,
+)
 
 const parseSearchTerm = (message: string, patterns: RegExp[]) => {
   for (const pattern of patterns) {
@@ -52,6 +60,9 @@ const parseSearchTerm = (message: string, patterns: RegExp[]) => {
   return undefined
 }
 
+export const shouldFallbackToAssistantLlm = (parsed: ParsedAssistantIntent) => parsed.intent === 'unknown'
+  || !!parsed.fallbackRecommended
+
 export const parseAssistantMessage = (message: string): ParsedAssistantIntent => {
   const normalizedMessage = normalizeAssistantText(message || '')
   const dateRange = parseDateRange(normalizedMessage)
@@ -63,6 +74,11 @@ export const parseAssistantMessage = (message: string): ParsedAssistantIntent =>
       originalMessage: message,
       normalizedMessage,
       email,
+      source: 'parser',
+      confidence: email ? 0.85 : 0.55,
+      fallbackRecommended: !email,
+      needsClarification: !email,
+      clarificationQuestion: !email ? 'Who should receive the email?' : undefined,
     }
   }
 
@@ -78,6 +94,15 @@ export const parseAssistantMessage = (message: string): ParsedAssistantIntent =>
       normalizedMessage,
       searchTerm,
       dateRange,
+      source: 'parser',
+      confidence: searchTerm && dateRange ? 0.88 : 0.58,
+      fallbackRecommended: !searchTerm || !dateRange,
+      needsClarification: !searchTerm || !dateRange,
+      clarificationQuestion: !searchTerm
+        ? 'Who should the meeting be with?'
+        : !dateRange
+          ? 'When should I schedule the meeting?'
+          : undefined,
     }
   }
 
@@ -93,6 +118,15 @@ export const parseAssistantMessage = (message: string): ParsedAssistantIntent =>
       normalizedMessage,
       locationQuery,
       dateRange,
+      source: 'parser',
+      confidence: locationQuery && dateRange ? 0.92 : 0.45,
+      fallbackRecommended: !locationQuery || !dateRange,
+      needsClarification: !locationQuery || !dateRange,
+      clarificationQuestion: !dateRange
+        ? 'Which date should I check for car availability?'
+        : !locationQuery
+          ? 'Which location should I search for available cars?'
+          : undefined,
     }
   }
 
@@ -103,6 +137,11 @@ export const parseAssistantMessage = (message: string): ParsedAssistantIntent =>
       originalMessage: message,
       normalizedMessage,
       searchTerm,
+      source: 'parser',
+      confidence: searchTerm ? 0.9 : 0.45,
+      fallbackRecommended: !searchTerm,
+      needsClarification: !searchTerm,
+      clarificationQuestion: !searchTerm ? 'Which supplier should I look for?' : undefined,
     }
   }
 
@@ -113,6 +152,11 @@ export const parseAssistantMessage = (message: string): ParsedAssistantIntent =>
       originalMessage: message,
       normalizedMessage,
       searchTerm,
+      source: 'parser',
+      confidence: searchTerm ? 0.9 : 0.45,
+      fallbackRecommended: !searchTerm,
+      needsClarification: !searchTerm,
+      clarificationQuestion: !searchTerm ? 'Which booking should I look for?' : undefined,
     }
   }
 
@@ -125,6 +169,10 @@ export const parseAssistantMessage = (message: string): ParsedAssistantIntent =>
       filters: {
         unpaid: normalizedMessage.includes('unpaid'),
       },
+      source: 'parser',
+      confidence: 0.82,
+      fallbackRecommended: false,
+      needsClarification: false,
     }
   }
 
@@ -132,5 +180,10 @@ export const parseAssistantMessage = (message: string): ParsedAssistantIntent =>
     intent: 'unknown',
     originalMessage: message,
     normalizedMessage,
+    source: 'parser',
+    confidence: 0.1,
+    fallbackRecommended: true,
+    needsClarification: true,
+    clarificationQuestion: 'What would you like me to help with: bookings, suppliers, cars, email, or meetings?',
   }
 }

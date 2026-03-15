@@ -500,6 +500,27 @@ export const GOOGLE_CLIENT_ID = __env__('BC_GOOGLE_CLIENT_ID', false, 'GOOGLE_CL
 export const GOOGLE_MOBILE_CLIENT_ID = __env__('BC_GOOGLE_MOBILE_CLIENT_ID', false, 'GOOGLE_MOBILE_CLIENT_ID')
 
 /**
+ * Enables the assistant LLM fallback.
+ *
+ * @type {boolean}
+ */
+export const ASSISTANT_LLM_ENABLED = helper.StringToBoolean(__env__('BC_ASSISTANT_LLM_ENABLED', false, 'false'))
+
+/**
+ * OpenAI API key for the assistant LLM fallback.
+ *
+ * @type {string}
+ */
+export const OPENAI_API_KEY = __env__('BC_OPENAI_API_KEY', false)
+
+/**
+ * OpenAI model used by the assistant LLM fallback.
+ *
+ * @type {string}
+ */
+export const ASSISTANT_LLM_MODEL = __env__('BC_ASSISTANT_LLM_MODEL', false, 'gpt-4.1-mini')
+
+/**
  * Facebook App ID.
  *
  * @type {string}

@@ -8,6 +8,8 @@ export type AssistantIntent =
   | 'unknown'
 
 export type AssistantStatus = 'success' | 'needs_clarification' | 'error'
+export type AssistantSource = 'parser' | 'llm'
+export type AssistantDateRangeLabel = 'today' | 'tomorrow'
 
 export interface AssistantResponse {
   intent: AssistantIntent
@@ -18,7 +20,7 @@ export interface AssistantResponse {
 }
 
 export interface ParsedDateRange {
-  label: 'today' | 'tomorrow'
+  label: AssistantDateRangeLabel
   from: Date
   to: Date
 }
@@ -34,4 +36,23 @@ export interface ParsedAssistantIntent {
   filters?: {
     unpaid?: boolean
   }
+  source?: AssistantSource
+  confidence?: number
+  fallbackRecommended?: boolean
+  needsClarification?: boolean
+  clarificationQuestion?: string
+}
+
+export interface AssistantLlmResolution {
+  intent: AssistantIntent
+  searchTerm?: string
+  email?: string
+  locationQuery?: string
+  dateRangeLabel?: AssistantDateRangeLabel
+  filters?: {
+    unpaid?: boolean
+  }
+  needsClarification: boolean
+  clarificationQuestion?: string
+  confidence?: number
 }

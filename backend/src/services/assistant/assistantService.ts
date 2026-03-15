@@ -6,7 +6,8 @@ import Location from '../../models/Location'
 import LocationValue from '../../models/LocationValue'
 import User from '../../models/User'
 import * as logger from '../../utils/logger'
-import { normalizeAssistantText, parseAssistantMessage } from './assistantParser'
+import { normalizeAssistantText, parseAssistantMessage, shouldFallbackToAssistantLlm } from './assistantParser'
+import { resolveAssistantIntentWithLlm } from './assistantLlmResolver'
 import { AssistantResponse, ParsedAssistantIntent } from './assistantTypes'
 
 const MAX_RESULTS = 10
@@ -214,6 +215,7 @@ const summarizeBookings = async (parsed: ParsedAssistantIntent): Promise<Assista
           name: booking.car.name,
         } : null,
       })),
+      resolutionSource: parsed.source,
     },
     suggestedActions: total > MAX_RESULTS ? ['Refine by driver, supplier, or exact date.'] : undefined,
   }
@@ -224,7 +226,7 @@ const handleBookingSearch = async (parsed: ParsedAssistantIntent): Promise<Assis
     return {
       intent: 'booking_search',
       status: 'needs_clarification',
-      reply: 'Tell me which booking to find by ID, driver name, supplier name, or email.',
+      reply: parsed.clarificationQuestion || 'Tell me which booking to find by ID, driver name, supplier name, or email.',
       suggestedActions: ['Try: find booking Mahmoud'],
     }
   }
@@ -240,6 +242,7 @@ const handleBookingSearch = async (parsed: ParsedAssistantIntent): Promise<Assis
     data: {
       searchTerm: parsed.searchTerm,
       bookings,
+      resolutionSource: parsed.source,
     },
     suggestedActions: bookings.length === 0 ? ['Try a full name, email, or booking ID.'] : undefined,
   }
@@ -250,7 +253,7 @@ const handleSupplierSearch = async (parsed: ParsedAssistantIntent): Promise<Assi
     return {
       intent: 'supplier_search',
       status: 'needs_clarification',
-      reply: 'Tell me which supplier to find by full name or email.',
+      reply: parsed.clarificationQuestion || 'Tell me which supplier to find by full name or email.',
       suggestedActions: ['Try: find supplier Youssef'],
     }
   }
@@ -267,6 +270,7 @@ const handleSupplierSearch = async (parsed: ParsedAssistantIntent): Promise<Assi
       searchTerm: parsed.searchTerm,
       suppliers,
       matchingNotes: 'Current matching is practical MVP matching across fullName/email with Arabic normalization and a small Youssef/يوسف alias fallback.',
+      resolutionSource: parsed.source,
     },
     suggestedActions: suppliers.length === 0 ? ['Try a full name, Arabic spelling, or email address.'] : undefined,
   }
@@ -304,7 +308,7 @@ const handleCarAvailability = async (parsed: ParsedAssistantIntent): Promise<Ass
     return {
       intent: 'car_availability',
       status: 'needs_clarification',
-      reply: 'Tell me which date to check, for example today or tomorrow.',
+      reply: parsed.clarificationQuestion || 'Tell me which date to check, for example today or tomorrow.',
       suggestedActions: ['Try: available cars tomorrow in Beirut'],
     }
   }
@@ -313,7 +317,7 @@ const handleCarAvailability = async (parsed: ParsedAssistantIntent): Promise<Ass
     return {
       intent: 'car_availability',
       status: 'needs_clarification',
-      reply: 'Tell me which location to search.',
+      reply: parsed.clarificationQuestion || 'Tell me which location to search.',
       suggestedActions: ['Try: available cars tomorrow in Beirut'],
     }
   }
@@ -329,6 +333,7 @@ const handleCarAvailability = async (parsed: ParsedAssistantIntent): Promise<Ass
       data: {
         searchLocation: parsed.locationQuery,
         availableCars: [],
+        resolutionSource: parsed.source,
       },
       suggestedActions: ['Try another spelling or a broader city name.'],
     }
@@ -385,6 +390,7 @@ const handleCarAvailability = async (parsed: ParsedAssistantIntent): Promise<Ass
         to: parsed.dateRange.to,
       },
       availableCars,
+      resolutionSource: parsed.source,
     },
     suggestedActions: availableCars.length === 0 ? ['Try another location or date.'] : undefined,
   }
@@ -395,8 +401,11 @@ const handleSendEmail = async (parsed: ParsedAssistantIntent): Promise<Assistant
   status: 'needs_clarification',
   reply: parsed.email
     ? `Email sending is not enabled in this assistant yet. I captured ${parsed.email}, but a safe reviewed send flow still needs to be implemented.`
-    : 'Email sending is not enabled in this assistant yet. Tell me the recipient, subject, and body when the safe send flow is ready.',
-  data: parsed.email ? { email: parsed.email } : undefined,
+    : parsed.clarificationQuestion || 'Email sending is not enabled in this assistant yet. Tell me the recipient, subject, and body when the safe send flow is ready.',
+  data: {
+    email: parsed.email,
+    resolutionSource: parsed.source,
+  },
   suggestedActions: ['Collect recipient, subject, and message body before enabling sending.'],
 })
 
@@ -405,7 +414,7 @@ const handleCreateMeeting = async (parsed: ParsedAssistantIntent): Promise<Assis
   status: 'needs_clarification',
   reply: parsed.searchTerm
     ? `Meeting creation is not enabled yet. I captured ${parsed.searchTerm}${parsed.dateRange ? ` for ${parsed.dateRange.label}` : ''}, but calendar integration still needs a reviewed implementation.`
-    : 'Meeting creation is not enabled yet. Tell me who, when, and which calendar once scheduling is implemented.',
+    : parsed.clarificationQuestion || 'Meeting creation is not enabled yet. Tell me who, when, and which calendar once scheduling is implemented.',
   data: {
     supplierOrAttendee: parsed.searchTerm,
     dateRange: parsed.dateRange ? {
@@ -413,12 +422,39 @@ const handleCreateMeeting = async (parsed: ParsedAssistantIntent): Promise<Assis
       from: parsed.dateRange.from,
       to: parsed.dateRange.to,
     } : undefined,
+    resolutionSource: parsed.source,
   },
   suggestedActions: ['Confirm attendees, exact time, timezone, and calendar before enabling creation.'],
 })
 
-export const processAssistantMessage = async (message: string): Promise<AssistantResponse> => {
+const buildUnknownAssistantResponse = (parsed: ParsedAssistantIntent): AssistantResponse => ({
+  intent: 'unknown',
+  status: 'needs_clarification',
+  reply: parsed.clarificationQuestion || 'I can help with booking summaries, booking search, supplier search, car availability, email drafting, or meeting requests.',
+  data: {
+    resolutionSource: parsed.source,
+  },
+  suggestedActions: [
+    'show unpaid bookings today',
+    'find booking Mahmoud',
+    'find supplier Youssef',
+    'available cars tomorrow in Beirut',
+  ],
+})
+
+const resolveAssistantIntent = async (message: string) => {
   const parsed = parseAssistantMessage(message)
+
+  if (!shouldFallbackToAssistantLlm(parsed)) {
+    return parsed
+  }
+
+  const llmResolved = await resolveAssistantIntentWithLlm(parsed)
+  return llmResolved || parsed
+}
+
+export const processAssistantMessage = async (message: string): Promise<AssistantResponse> => {
+  const parsed = await resolveAssistantIntent(message)
 
   switch (parsed.intent) {
     case 'booking_summary':
@@ -434,28 +470,20 @@ export const processAssistantMessage = async (message: string): Promise<Assistan
     case 'create_meeting':
       return handleCreateMeeting(parsed)
     default:
-      return {
-        intent: 'unknown',
-        status: 'needs_clarification',
-        reply: 'I can help with booking summaries, booking search, supplier search, car availability, email drafting, or meeting requests.',
-        suggestedActions: [
-          'show unpaid bookings today',
-          'find booking Mahmoud',
-          'find supplier Youssef',
-          'available cars tomorrow in Beirut',
-        ],
-      }
+      return buildUnknownAssistantResponse(parsed)
   }
 }
 
 export const safeProcessAssistantMessage = async (message: string): Promise<AssistantResponse> => {
+  const parsed = parseAssistantMessage(message)
+
   try {
     return await processAssistantMessage(message)
   } catch (err) {
     logger.error('[assistant.processAssistantMessage] ERROR', err)
 
     return {
-      intent: parseAssistantMessage(message).intent,
+      intent: parsed.intent,
       status: 'error',
       reply: 'Something went wrong while processing the assistant request.',
     }
