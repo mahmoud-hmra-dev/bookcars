@@ -1,6 +1,5 @@
 import React from 'react'
 import {
-  Alert,
   Box,
   Chip,
   Divider,
@@ -64,7 +63,11 @@ const renderArray = (items: unknown[], depth: number): React.ReactNode => {
     const keys = Array.from(new Set(items.flatMap((item) => Object.keys(item as Record<string, unknown>))))
 
     return (
-      <TableContainer component={Paper} variant="outlined">
+      <TableContainer
+        component={Paper}
+        variant="outlined"
+        sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: 'none' }}
+      >
         <Table size="small">
           <TableHead>
             <TableRow>
@@ -147,35 +150,50 @@ function renderValue(value: unknown, depth = 0): React.ReactNode {
   return <Typography variant="body2">-</Typography>
 }
 
-const getSeverity = (status: AssistantResponse['status']) => {
+const getStatusTone = (status: AssistantResponse['status']) => {
   switch (status) {
     case 'success':
-      return 'success'
+      return { bg: 'success.50', border: 'success.light', chip: 'success' as const }
     case 'needs_clarification':
-      return 'warning'
+      return { bg: 'warning.50', border: 'warning.light', chip: 'warning' as const }
     default:
-      return 'error'
+      return { bg: 'error.50', border: 'error.light', chip: 'error' as const }
   }
 }
 
-const AssistantResult = ({ response }: AssistantResultProps) => (
-  <Stack spacing={2}>
-    <Alert severity={getSeverity(response.status)} variant="outlined">
-      <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 1 }}>
-        <Chip label={`${strings.INTENT}: ${response.intent}`} size="small" />
-        <Chip label={`${strings.STATUS}: ${response.status}`} size="small" variant="outlined" />
-        <Chip label={`${strings.LANGUAGE}: ${response.replyLanguage}`} size="small" variant="outlined" />
-      </Stack>
-      <Typography variant="body2">{response.reply}</Typography>
-    </Alert>
+const AssistantResult = ({ response }: AssistantResultProps) => {
+  const tone = getStatusTone(response.status)
 
-    <Paper variant="outlined" sx={{ p: 2 }}>
-      <Typography variant="subtitle1" gutterBottom>
-        {strings.RESULT}
-      </Typography>
-      {response.data ? renderValue(response.data) : <Typography variant="body2">{strings.NO_RESULT}</Typography>}
-    </Paper>
-  </Stack>
-)
+  return (
+    <Stack spacing={1.25}>
+      <Paper
+        variant="outlined"
+        sx={{
+          p: 1.5,
+          borderRadius: 3,
+          bgcolor: tone.bg,
+          borderColor: tone.border,
+          boxShadow: 'none',
+        }}
+      >
+        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 1 }}>
+          <Chip label={`${strings.INTENT}: ${response.intent}`} size="small" color={tone.chip} />
+          <Chip label={`${strings.STATUS}: ${response.status}`} size="small" variant="outlined" />
+          <Chip label={`${strings.LANGUAGE}: ${response.replyLanguage}`} size="small" variant="outlined" />
+        </Stack>
+        <Typography variant="body2" color="text.secondary">
+          {strings.STRUCTURED_RESULT}
+        </Typography>
+      </Paper>
+
+      <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, boxShadow: 'none' }}>
+        <Typography variant="subtitle1" gutterBottom>
+          {strings.RESULT}
+        </Typography>
+        {response.data ? renderValue(response.data) : <Typography variant="body2">{strings.NO_RESULT}</Typography>}
+      </Paper>
+    </Stack>
+  )
+}
 
 export default AssistantResult

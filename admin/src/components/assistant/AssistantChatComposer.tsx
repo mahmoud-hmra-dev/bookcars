@@ -1,17 +1,17 @@
 import React from 'react'
 import {
   Box,
-  Button,
   CircularProgress,
   IconButton,
+  Paper,
   Stack,
   TextField,
   Tooltip,
   Typography,
 } from '@mui/material'
-import SendIcon from '@mui/icons-material/Send'
-import MicIcon from '@mui/icons-material/Mic'
-import StopCircleIcon from '@mui/icons-material/StopCircle'
+import SendRoundedIcon from '@mui/icons-material/SendRounded'
+import MicRoundedIcon from '@mui/icons-material/MicRounded'
+import StopCircleRoundedIcon from '@mui/icons-material/StopCircleRounded'
 import { strings } from '@/lang/assistant'
 
 interface AssistantChatComposerProps {
@@ -47,68 +47,102 @@ const AssistantChatComposer = ({
   }
 
   return (
-    <Box>
-      <Stack spacing={1.5}>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ xs: 'stretch', md: 'flex-end' }}>
-          <TextField
-            fullWidth
-            multiline
-            minRows={3}
-            maxRows={8}
-            label={strings.INPUT_LABEL}
-            placeholder={strings.INPUT_PLACEHOLDER}
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={busy || !!recording}
-          />
+    <Paper
+      elevation={0}
+      sx={{
+        p: 1.5,
+        borderRadius: 4,
+        border: '1px solid',
+        borderColor: 'divider',
+        background: (theme) => theme.palette.mode === 'dark'
+          ? 'linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01))'
+          : 'linear-gradient(180deg, #ffffff, #fbfdff)',
+      }}
+    >
+      <Stack spacing={1.25}>
+        <TextField
+          fullWidth
+          multiline
+          minRows={2}
+          maxRows={8}
+          label={strings.INPUT_LABEL}
+          placeholder={strings.INPUT_PLACEHOLDER}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={busy || !!recording}
+          variant="standard"
+          InputProps={{ disableUnderline: true }}
+          sx={{
+            '& .MuiInputBase-root': {
+              px: 1,
+              py: 0.5,
+              fontSize: 15,
+            },
+          }}
+        />
 
-          <Stack direction="row" spacing={1} alignItems="center" justifyContent={{ xs: 'space-between', md: 'flex-end' }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+          <Box>
+            {recording && (
+              <Typography variant="body2" color="error.main">
+                {strings.RECORDING}
+              </Typography>
+            )}
+            {!recording && transcribing && (
+              <Typography variant="body2" color="text.secondary">
+                {strings.TRANSCRIBING}
+              </Typography>
+            )}
+            {!recording && !transcribing && !voiceSupported && (
+              <Typography variant="body2" color="text.secondary">
+                {strings.VOICE_NOT_SUPPORTED}
+              </Typography>
+            )}
+          </Box>
+
+          <Stack direction="row" spacing={1} alignItems="center">
             <Tooltip title={!voiceSupported ? strings.VOICE_NOT_SUPPORTED : recording ? strings.STOP_RECORDING : strings.START_RECORDING}>
               <span>
                 <IconButton
                   color={recording ? 'error' : 'primary'}
                   onClick={recording ? onStopRecording : onStartRecording}
                   disabled={busy || !voiceSupported}
-                  sx={{ width: 56, height: 56, border: 1, borderColor: 'divider' }}
+                  sx={{
+                    width: 48,
+                    height: 48,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    bgcolor: 'background.paper',
+                  }}
                 >
-                  {recording ? <StopCircleIcon /> : <MicIcon />}
+                  {recording ? <StopCircleRoundedIcon /> : <MicRoundedIcon />}
                 </IconButton>
               </span>
             </Tooltip>
 
-            <Button
-              variant="contained"
-              className="btn-primary"
-              startIcon={busy ? <CircularProgress color="inherit" size={16} /> : <SendIcon />}
+            <IconButton
+              color="primary"
               onClick={onSubmit}
               disabled={busy || !!recording || !value.trim()}
-              sx={{ minWidth: 150, height: 56 }}
+              sx={{
+                width: 48,
+                height: 48,
+                bgcolor: 'primary.main',
+                color: 'primary.contrastText',
+                '&:hover': { bgcolor: 'primary.dark' },
+                '&.Mui-disabled': {
+                  bgcolor: 'action.disabledBackground',
+                  color: 'action.disabled',
+                },
+              }}
             >
-              {busy ? strings.LOADING : strings.SEND}
-            </Button>
+              {busy ? <CircularProgress color="inherit" size={20} /> : <SendRoundedIcon />}
+            </IconButton>
           </Stack>
         </Stack>
-
-        {recording && (
-          <Typography variant="body2" color="error.main">
-            {strings.RECORDING}
-          </Typography>
-        )}
-
-        {!recording && transcribing && (
-          <Typography variant="body2" color="text.secondary">
-            {strings.TRANSCRIBING}
-          </Typography>
-        )}
-
-        {!voiceSupported && (
-          <Typography variant="body2" color="text.secondary">
-            {strings.VOICE_NOT_SUPPORTED}
-          </Typography>
-        )}
       </Stack>
-    </Box>
+    </Paper>
   )
 }
 

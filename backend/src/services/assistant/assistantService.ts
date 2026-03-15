@@ -6,7 +6,7 @@ import Location from '../../models/Location'
 import LocationValue from '../../models/LocationValue'
 import User from '../../models/User'
 import * as logger from '../../utils/logger'
-import { normalizeAssistantText, parseAssistantMessage, shouldFallbackToAssistantLlm } from './assistantParser'
+import { normalizeAssistantText, parseAssistantMessage } from './assistantParser'
 import { localizeAssistantResponse, resolveAssistantIntentWithLlm } from './assistantLlmResolver'
 import { AssistantConversationTurn, AssistantResponse, ParsedAssistantIntent } from './assistantTypes'
 
@@ -57,6 +57,11 @@ const withLanguageMetadata = (
   contextUsed: {
     historyTurns: history.length,
   },
+})
+
+const withResolutionSource = (parsed: ParsedAssistantIntent, data?: Record<string, unknown>) => ({
+  ...(data || {}),
+  resolutionSource: parsed.source,
 })
 
 const findSuppliers = async (searchTerm: string) => {
@@ -205,7 +210,7 @@ const summarizeBookings = async (parsed: ParsedAssistantIntent, history: Assista
     reply: total > 0
       ? `Found ${total} ${summaryLabel || ''} booking${total > 1 ? 's' : ''}.`.replace(/\s+/g, ' ').trim()
       : `No ${summaryLabel || ''} bookings found.`.replace(/\s+/g, ' ').trim(),
-    data: {
+    data: withResolutionSource(parsed, {
       total,
       filters: {
         unpaid: !!parsed.filters?.unpaid,
@@ -233,8 +238,7 @@ const summarizeBookings = async (parsed: ParsedAssistantIntent, history: Assista
           name: booking.car.name,
         } : null,
       })),
-      resolutionSource: parsed.source,
-    },
+    }),
     suggestedActions: total > MAX_RESULTS ? ['Refine by driver, supplier, or exact date.'] : undefined,
   })
 }
@@ -257,11 +261,10 @@ const handleBookingSearch = async (parsed: ParsedAssistantIntent, history: Assis
     reply: bookings.length > 0
       ? `Found ${bookings.length} matching booking${bookings.length > 1 ? 's' : ''}.`
       : `No bookings matched "${parsed.searchTerm}".`,
-    data: {
+    data: withResolutionSource(parsed, {
       searchTerm: parsed.searchTerm,
       bookings,
-      resolutionSource: parsed.source,
-    },
+    }),
     suggestedActions: bookings.length === 0 ? ['Try a full name, email, or booking ID.'] : undefined,
   })
 }
@@ -284,12 +287,11 @@ const handleSupplierSearch = async (parsed: ParsedAssistantIntent, history: Assi
     reply: suppliers.length > 0
       ? `Found ${suppliers.length} matching supplier${suppliers.length > 1 ? 's' : ''}.`
       : `No suppliers matched "${parsed.searchTerm}".`,
-    data: {
+    data: withResolutionSource(parsed, {
       searchTerm: parsed.searchTerm,
       suppliers,
       matchingNotes: 'Current matching is practical MVP matching across fullName/email with Arabic normalization and a small Youssef/يوسف alias fallback.',
-      resolutionSource: parsed.source,
-    },
+    }),
     suggestedActions: suppliers.length === 0 ? ['Try a full name, Arabic spelling, or email address.'] : undefined,
   })
 }
@@ -348,11 +350,10 @@ const handleCarAvailability = async (parsed: ParsedAssistantIntent, history: Ass
       intent: 'car_availability',
       status: 'success',
       reply: `No locations matched "${parsed.locationQuery}".`,
-      data: {
+      data: withResolutionSource(parsed, {
         searchLocation: parsed.locationQuery,
         availableCars: [],
-        resolutionSource: parsed.source,
-      },
+      }),
       suggestedActions: ['Try another spelling or a broader city name.'],
     })
   }
@@ -400,7 +401,7 @@ const handleCarAvailability = async (parsed: ParsedAssistantIntent, history: Ass
     reply: availableCars.length > 0
       ? `Found ${availableCars.length} available car${availableCars.length > 1 ? 's' : ''} for ${parsed.dateRange.label} in ${parsed.locationQuery}.`
       : `No available cars found for ${parsed.dateRange.label} in ${parsed.locationQuery}.`,
-    data: {
+    data: withResolutionSource(parsed, {
       searchLocation: parsed.locationQuery,
       dateRange: {
         label: parsed.dateRange.label,
@@ -408,8 +409,7 @@ const handleCarAvailability = async (parsed: ParsedAssistantIntent, history: Ass
         to: parsed.dateRange.to,
       },
       availableCars,
-      resolutionSource: parsed.source,
-    },
+    }),
     suggestedActions: availableCars.length === 0 ? ['Try another location or date.'] : undefined,
   })
 }
@@ -486,7 +486,7 @@ const handleOpsSummary = async (parsed: ParsedAssistantIntent, history: Assistan
     intent: 'ops_summary',
     status: 'success',
     reply,
-    data: {
+    data: withResolutionSource(parsed, {
       dateRange: activeRange,
       metrics: {
         totalOpenBookings,
@@ -517,8 +517,7 @@ const handleOpsSummary = async (parsed: ParsedAssistantIntent, history: Assistan
           car: booking.car ? booking.car.name : null,
         })),
       },
-      resolutionSource: parsed.source,
-    },
+    }),
     suggestedActions: [
       'show unpaid bookings today',
       'find supplier Youssef',
@@ -533,10 +532,9 @@ const handleSendEmail = async (parsed: ParsedAssistantIntent, history: Assistant
   reply: parsed.email
     ? `Email sending is not enabled in this assistant yet. I captured ${parsed.email}, but a safe reviewed send flow still needs to be implemented.`
     : parsed.clarificationQuestion || 'Email sending is not enabled in this assistant yet. Tell me the recipient, subject, and body when the safe send flow is ready.',
-  data: {
+  data: withResolutionSource(parsed, {
     email: parsed.email,
-    resolutionSource: parsed.source,
-  },
+  }),
   suggestedActions: ['Collect recipient, subject, and message body before enabling sending.'],
 })
 
@@ -546,15 +544,14 @@ const handleCreateMeeting = async (parsed: ParsedAssistantIntent, history: Assis
   reply: parsed.searchTerm
     ? `Meeting creation is not enabled yet. I captured ${parsed.searchTerm}${parsed.dateRange ? ` for ${parsed.dateRange.label}` : ''}, but calendar integration still needs a reviewed implementation.`
     : parsed.clarificationQuestion || 'Meeting creation is not enabled yet. Tell me who, when, and which calendar once scheduling is implemented.',
-  data: {
+  data: withResolutionSource(parsed, {
     supplierOrAttendee: parsed.searchTerm,
     dateRange: parsed.dateRange ? {
       label: parsed.dateRange.label,
       from: parsed.dateRange.from,
       to: parsed.dateRange.to,
     } : undefined,
-    resolutionSource: parsed.source,
-  },
+  }),
   suggestedActions: ['Confirm attendees, exact time, timezone, and calendar before enabling creation.'],
 })
 
@@ -562,9 +559,7 @@ const buildUnknownAssistantResponse = (parsed: ParsedAssistantIntent, history: A
   intent: 'unknown',
   status: 'needs_clarification',
   reply: parsed.clarificationQuestion || 'I can help with booking summaries, booking search, supplier search, car availability, operations summaries, email drafting, or meeting requests.',
-  data: {
-    resolutionSource: parsed.source,
-  },
+  data: withResolutionSource(parsed),
   suggestedActions: [
     'show unpaid bookings today',
     'find booking Mahmoud',
@@ -574,15 +569,110 @@ const buildUnknownAssistantResponse = (parsed: ParsedAssistantIntent, history: A
   ],
 })
 
-const resolveAssistantIntent = async (message: string, history: AssistantConversationTurn[] = []) => {
-  const parsed = parseAssistantMessage(message)
+const fallbackResolveAssistantIntent = (message: string): ParsedAssistantIntent => {
+  const extracted = parseAssistantMessage(message)
+  const normalizedMessage = extracted.normalizedMessage
 
-  if (!shouldFallbackToAssistantLlm(parsed)) {
-    return parsed
+  if (/^(send email|email)\b/.test(normalizedMessage)) {
+    return {
+      ...extracted,
+      intent: 'send_email',
+      source: 'system_fallback',
+      confidence: extracted.email ? 0.78 : 0.5,
+      needsClarification: !extracted.email,
+      clarificationQuestion: !extracted.email ? 'Who should receive the email?' : undefined,
+    }
   }
 
-  const llmResolved = await resolveAssistantIntentWithLlm(parsed, history)
-  return llmResolved || parsed
+  if (/^(create meeting|schedule meeting|book meeting)\b/.test(normalizedMessage)) {
+    return {
+      ...extracted,
+      intent: 'create_meeting',
+      source: 'system_fallback',
+      confidence: extracted.searchTerm && extracted.dateRange ? 0.8 : 0.52,
+      needsClarification: !extracted.searchTerm || !extracted.dateRange,
+      clarificationQuestion: !extracted.searchTerm
+        ? 'Who should the meeting be with?'
+        : !extracted.dateRange
+          ? 'When should I schedule the meeting?'
+          : undefined,
+    }
+  }
+
+  if (normalizedMessage.includes('available cars') || normalizedMessage.startsWith('available car')) {
+    return {
+      ...extracted,
+      intent: 'car_availability',
+      source: 'system_fallback',
+      confidence: extracted.locationQuery && extracted.dateRange ? 0.84 : 0.46,
+      needsClarification: !extracted.dateRange || !extracted.locationQuery,
+      clarificationQuestion: !extracted.dateRange
+        ? 'Which date should I check for car availability?'
+        : !extracted.locationQuery
+          ? 'Which location should I search for available cars?'
+          : undefined,
+    }
+  }
+
+  if (normalizedMessage.startsWith('find supplier')) {
+    return {
+      ...extracted,
+      intent: 'supplier_search',
+      source: 'system_fallback',
+      confidence: extracted.searchTerm ? 0.82 : 0.45,
+      needsClarification: !extracted.searchTerm,
+      clarificationQuestion: !extracted.searchTerm ? 'Which supplier should I look for?' : undefined,
+    }
+  }
+
+  if (normalizedMessage.startsWith('find booking')) {
+    return {
+      ...extracted,
+      intent: 'booking_search',
+      source: 'system_fallback',
+      confidence: extracted.searchTerm ? 0.82 : 0.45,
+      needsClarification: !extracted.searchTerm,
+      clarificationQuestion: !extracted.searchTerm ? 'Which booking should I look for?' : undefined,
+    }
+  }
+
+  if ([
+    'ops summary', 'operations summary', 'what needs attention', 'needs attention', 'what should i prioritize',
+    'what should we prioritize', 'prioritize', 'priorities', 'follow up', 'follow-up', 'what needs follow up',
+    'general analysis', 'overview', 'status overview', 'anything urgent',
+  ].some((pattern) => normalizedMessage.includes(pattern))) {
+    return {
+      ...extracted,
+      intent: 'ops_summary',
+      source: 'system_fallback',
+      confidence: 0.72,
+    }
+  }
+
+  if (normalizedMessage.includes('booking') || normalizedMessage.includes('bookings')) {
+    return {
+      ...extracted,
+      intent: 'booking_summary',
+      source: 'system_fallback',
+      confidence: 0.7,
+    }
+  }
+
+  return {
+    ...extracted,
+    intent: 'unknown',
+    source: 'system_fallback',
+    confidence: 0.18,
+    needsClarification: true,
+    clarificationQuestion: 'What would you like me to help with: bookings, suppliers, cars, email, meetings, or operations summary?',
+  }
+}
+
+const resolveAssistantIntent = async (message: string, history: AssistantConversationTurn[] = []) => {
+  const extracted = parseAssistantMessage(message)
+  const llmResolved = await resolveAssistantIntentWithLlm(extracted, history)
+
+  return llmResolved || fallbackResolveAssistantIntent(message)
 }
 
 export const processAssistantMessage = async (

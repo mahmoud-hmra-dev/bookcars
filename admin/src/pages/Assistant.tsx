@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
+  Avatar,
   Box,
   Chip,
   Paper,
   Stack,
   Typography,
 } from '@mui/material'
-import SmartToyIcon from '@mui/icons-material/SmartToy'
+import SmartToyRoundedIcon from '@mui/icons-material/SmartToyRounded'
 import * as bookcarsTypes from ':bookcars-types'
 import Layout from '@/components/Layout'
 import AssistantChatComposer from '@/components/assistant/AssistantChatComposer'
@@ -67,12 +68,13 @@ const Assistant = () => {
       text: nextMessage,
     }
 
-    setMessages((prev) => [...prev, userMessage])
+    const nextHistory = [...messages, userMessage]
+    setMessages(nextHistory)
     setMessage('')
     setLoading(true)
 
     try {
-      const history = messages.slice(-6).map((entry) => ({
+      const history = nextHistory.slice(-7, -1).map((entry) => ({
         role: entry.role,
         text: entry.text,
       }))
@@ -239,21 +241,38 @@ const Assistant = () => {
     <Layout onLoad={onLoad} strict admin>
       <Box sx={{ p: { xs: 2, md: 3 } }}>
         <Stack spacing={3}>
-          <Paper elevation={10} sx={{ p: { xs: 2, md: 3 } }}>
-            <Stack spacing={2}>
-              <Stack direction="row" spacing={1.5} alignItems="center">
-                <SmartToyIcon color="primary" />
-                <div>
-                  <Typography variant="h5">{strings.TITLE}</Typography>
-                  <Typography variant="body2" color="text.secondary">{strings.SUBTITLE}</Typography>
-                </div>
-              </Stack>
+          <Paper
+            elevation={0}
+            sx={{
+              p: { xs: 2.5, md: 3 },
+              borderRadius: 5,
+              border: '1px solid',
+              borderColor: 'divider',
+              background: (theme) => theme.palette.mode === 'dark'
+                ? 'radial-gradient(circle at top right, rgba(25,118,210,0.18), transparent 35%)'
+                : 'radial-gradient(circle at top right, rgba(25,118,210,0.12), transparent 35%), #fff',
+            }}
+          >
+            <Stack spacing={2.5}>
+              <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between">
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Avatar sx={{ width: 52, height: 52, bgcolor: 'primary.main' }}>
+                    <SmartToyRoundedIcon />
+                  </Avatar>
+                  <Box>
+                    <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
+                      <Typography variant="h4">{strings.TITLE}</Typography>
+                      <Chip label={strings.CHAT_BADGE} color="primary" size="small" />
+                    </Stack>
+                    <Typography variant="body1" color="text.secondary">{strings.SUBTITLE}</Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{strings.CHAT_HELPER}</Typography>
+                  </Box>
+                </Stack>
 
-              {canUseAssistant && (
-                <>
+                {canUseAssistant && (
                   <Box>
                     <Typography variant="subtitle2" gutterBottom>{strings.EXAMPLES_TITLE}</Typography>
-                    <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                    <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" justifyContent={{ xs: 'flex-start', md: 'flex-end' }}>
                       {quickExamples.map((example) => (
                         <Chip
                           key={example}
@@ -261,31 +280,13 @@ const Assistant = () => {
                           clickable
                           color="primary"
                           variant="outlined"
-                          onClick={() => {
-                            setMessage(example)
-                          }}
+                          onClick={() => setMessage(example)}
                         />
                       ))}
                     </Stack>
                   </Box>
-
-                  <AssistantChatComposer
-                    value={message}
-                    loading={loading}
-                    recording={recording}
-                    transcribing={transcribing}
-                    voiceSupported={voiceSupported}
-                    onChange={setMessage}
-                    onSubmit={() => {
-                      void submitMessage()
-                    }}
-                    onStartRecording={() => {
-                      void startRecording()
-                    }}
-                    onStopRecording={stopRecording}
-                  />
-                </>
-              )}
+                )}
+              </Stack>
             </Stack>
           </Paper>
 
@@ -294,13 +295,33 @@ const Assistant = () => {
               Admin access is required to use the assistant.
             </Alert>
           ) : (
-            <AssistantMessageList
-              messages={messages}
-              onSuggestedActionClick={(value) => {
-                setMessage(value)
-                void submitMessage(value)
-              }}
-            />
+            <Stack spacing={2}>
+              <AssistantMessageList
+                messages={messages}
+                loading={loading}
+                transcribing={transcribing}
+                onSuggestedActionClick={(value) => {
+                  setMessage(value)
+                  void submitMessage(value)
+                }}
+              />
+
+              <AssistantChatComposer
+                value={message}
+                loading={loading}
+                recording={recording}
+                transcribing={transcribing}
+                voiceSupported={voiceSupported}
+                onChange={setMessage}
+                onSubmit={() => {
+                  void submitMessage()
+                }}
+                onStartRecording={() => {
+                  void startRecording()
+                }}
+                onStopRecording={stopRecording}
+              />
+            </Stack>
           )}
         </Stack>
       </Box>

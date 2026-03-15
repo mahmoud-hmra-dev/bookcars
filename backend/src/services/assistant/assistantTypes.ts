@@ -9,7 +9,7 @@ export type AssistantIntent =
   | 'unknown'
 
 export type AssistantStatus = 'success' | 'needs_clarification' | 'error'
-export type AssistantSource = 'parser' | 'llm'
+export type AssistantSource = 'llm_primary' | 'system_fallback'
 export type AssistantDateRangeLabel = 'today' | 'tomorrow'
 
 export interface AssistantConversationTurn {

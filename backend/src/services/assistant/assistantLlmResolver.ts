@@ -38,7 +38,7 @@ const normalizeLlmResolution = (message: string, normalizedMessage: string, reso
     filters: {
       unpaid: resolution.filters?.unpaid || undefined,
     },
-    source: 'llm',
+    source: 'llm_primary',
     confidence: resolution.confidence,
     fallbackRecommended: false,
     needsClarification: resolution.needsClarification,
@@ -59,17 +59,15 @@ export const resolveAssistantIntentWithLlm = async (
   try {
     const llmResolution = await fetchAssistantLlmResolution(parsed.originalMessage, {
       normalizedMessage: parsed.normalizedMessage,
-      parserIntent: parsed.intent,
-      parserConfidence: parsed.confidence,
-      searchTerm: parsed.searchTerm ?? null,
-      email: parsed.email ?? null,
-      locationQuery: parsed.locationQuery ?? null,
-      dateRangeLabel: parsed.dateRange?.label ?? null,
-      filters: {
-        unpaid: parsed.filters?.unpaid ?? null,
+      extractedEntities: {
+        searchTerm: parsed.searchTerm ?? null,
+        email: parsed.email ?? null,
+        locationQuery: parsed.locationQuery ?? null,
+        dateRangeLabel: parsed.dateRange?.label ?? null,
+        filters: {
+          unpaid: parsed.filters?.unpaid ?? null,
+        },
       },
-      needsClarification: parsed.needsClarification ?? false,
-      clarificationQuestion: parsed.clarificationQuestion ?? null,
       inputLanguage: parsed.inputLanguage ?? 'en',
       replyLanguage: parsed.replyLanguage ?? parsed.inputLanguage ?? 'en',
     }, {
