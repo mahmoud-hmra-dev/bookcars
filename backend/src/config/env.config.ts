@@ -518,7 +518,7 @@ export const OPENAI_API_KEY = __env__('BC_OPENAI_API_KEY', false)
  *
  * @type {string}
  */
-export const ASSISTANT_LLM_MODEL = __env__('BC_ASSISTANT_LLM_MODEL', false, 'gpt-4.1-mini')
+export const ASSISTANT_LLM_MODEL = __env__('BC_ASSISTANT_LLM_MODEL', false, 'gpt-4.1')
 
 /**
  * Facebook App ID.

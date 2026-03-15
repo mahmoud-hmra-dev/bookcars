@@ -21,6 +21,7 @@ const quickExamples = [
   'find booking Mahmoud',
   'find supplier Youssef',
   'available cars tomorrow in Beirut',
+  'what needs attention today?',
 ]
 
 const Assistant = () => {
@@ -71,7 +72,12 @@ const Assistant = () => {
     setLoading(true)
 
     try {
-      const response = await AssistantService.sendMessage(nextMessage)
+      const history = messages.slice(-6).map((entry) => ({
+        role: entry.role,
+        text: entry.text,
+      }))
+
+      const response = await AssistantService.sendMessage(nextMessage, history)
 
       const assistantMessage: AssistantConversationMessage = {
         id: `assistant-${Date.now()}`,

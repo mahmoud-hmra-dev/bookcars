@@ -1,13 +1,14 @@
 import * as logger from '../../utils/logger'
 import { getDateRangeFromLabel } from './assistantParser'
 import { fetchAssistantLlmResolution, isAssistantLlmEnabled, localizeAssistantReply } from './assistantLlmClient'
-import { AssistantIntent, AssistantLlmResolution, AssistantResponse, ParsedAssistantIntent } from './assistantTypes'
+import { AssistantConversationTurn, AssistantIntent, AssistantLlmResolution, AssistantResponse, ParsedAssistantIntent } from './assistantTypes'
 
 const SUPPORTED_INTENTS: AssistantIntent[] = [
   'booking_summary',
   'booking_search',
   'supplier_search',
   'car_availability',
+  'ops_summary',
   'send_email',
   'create_meeting',
   'unknown',
@@ -47,7 +48,10 @@ const normalizeLlmResolution = (message: string, normalizedMessage: string, reso
   }
 }
 
-export const resolveAssistantIntentWithLlm = async (parsed: ParsedAssistantIntent): Promise<ParsedAssistantIntent | null> => {
+export const resolveAssistantIntentWithLlm = async (
+  parsed: ParsedAssistantIntent,
+  history: AssistantConversationTurn[] = [],
+): Promise<ParsedAssistantIntent | null> => {
   if (!isAssistantLlmEnabled()) {
     return null
   }
@@ -68,6 +72,8 @@ export const resolveAssistantIntentWithLlm = async (parsed: ParsedAssistantInten
       clarificationQuestion: parsed.clarificationQuestion ?? null,
       inputLanguage: parsed.inputLanguage ?? 'en',
       replyLanguage: parsed.replyLanguage ?? parsed.inputLanguage ?? 'en',
+    }, {
+      recentTurns: history.slice(-6),
     })
 
     if (!llmResolution) {

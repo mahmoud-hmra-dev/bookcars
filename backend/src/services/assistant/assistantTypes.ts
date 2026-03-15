@@ -3,6 +3,7 @@ export type AssistantIntent =
   | 'booking_search'
   | 'supplier_search'
   | 'car_availability'
+  | 'ops_summary'
   | 'send_email'
   | 'create_meeting'
   | 'unknown'
@@ -10,6 +11,11 @@ export type AssistantIntent =
 export type AssistantStatus = 'success' | 'needs_clarification' | 'error'
 export type AssistantSource = 'parser' | 'llm'
 export type AssistantDateRangeLabel = 'today' | 'tomorrow'
+
+export interface AssistantConversationTurn {
+  role: 'user' | 'assistant'
+  text: string
+}
 
 export interface AssistantResponse {
   intent: AssistantIntent
@@ -19,6 +25,9 @@ export interface AssistantResponse {
   inputLanguage: string
   data?: Record<string, unknown>
   suggestedActions?: string[]
+  contextUsed?: {
+    historyTurns: number
+  }
 }
 
 export interface ParsedDateRange {

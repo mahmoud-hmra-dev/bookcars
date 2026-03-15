@@ -24,11 +24,11 @@ const inferInputLanguage = (value: string) => {
     return 'ar'
   }
 
-  if (/[¿¡]/.test(normalized) || /\b(hola|buscar|reserva|reservas|coche|coches|proveedor|mañana|hoy|disponible|disponibles)\b/i.test(normalized)) {
+  if (/[¿¡]/.test(normalized) || /\b(hola|buscar|reserva|reservas|coche|coches|proveedor|mañana|hoy|disponible|disponibles|prioridad|seguimiento)\b/i.test(normalized)) {
     return 'es'
   }
 
-  if (/\b(bonjour|réservation|réservations|voiture|voitures|fournisseur|demain|aujourd'hui|disponible|disponibles)\b/i.test(normalized)) {
+  if (/\b(bonjour|réservation|réservations|voiture|voitures|fournisseur|demain|aujourd'hui|disponible|disponibles|priorite|priorité|suivi)\b/i.test(normalized)) {
     return 'fr'
   }
 
@@ -83,6 +83,30 @@ const parseSearchTerm = (message: string, patterns: RegExp[]) => {
 }
 
 const shouldUseLlmForLanguage = (inputLanguage: string) => inputLanguage !== 'en'
+
+const isOpsSummaryQuery = (message: string) => {
+  if (!message) {
+    return false
+  }
+
+  return [
+    'ops summary',
+    'operations summary',
+    'what needs attention',
+    'needs attention',
+    'what should i prioritize',
+    'what should we prioritize',
+    'prioritize',
+    'priorities',
+    'follow up',
+    'follow-up',
+    'what needs follow up',
+    'general analysis',
+    'overview',
+    'status overview',
+    'anything urgent',
+  ].some((pattern) => message.includes(pattern))
+}
 
 export const shouldFallbackToAssistantLlm = (parsed: ParsedAssistantIntent) => parsed.intent === 'unknown'
   || !!parsed.fallbackRecommended
@@ -197,6 +221,24 @@ export const parseAssistantMessage = (message: string): ParsedAssistantIntent =>
     }
   }
 
+  if (isOpsSummaryQuery(normalizedMessage)) {
+    return {
+      intent: 'ops_summary',
+      originalMessage: message,
+      normalizedMessage,
+      dateRange,
+      filters: {
+        unpaid: normalizedMessage.includes('unpaid'),
+      },
+      source: 'parser',
+      confidence: 0.86,
+      fallbackRecommended: false,
+      needsClarification: false,
+      inputLanguage,
+      replyLanguage,
+    }
+  }
+
   if (normalizedMessage.includes('booking') || normalizedMessage.includes('bookings')) {
     return {
       intent: 'booking_summary',
@@ -223,7 +265,7 @@ export const parseAssistantMessage = (message: string): ParsedAssistantIntent =>
     confidence: 0.1,
     fallbackRecommended: true,
     needsClarification: true,
-    clarificationQuestion: 'What would you like me to help with: bookings, suppliers, cars, email, or meetings?',
+    clarificationQuestion: 'What would you like me to help with: bookings, suppliers, cars, email, meetings, or operations summary?',
     inputLanguage,
     replyLanguage,
   }

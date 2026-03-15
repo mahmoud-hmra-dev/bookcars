@@ -13,6 +13,7 @@ export const ASSISTANT_LLM_RESPONSE_SCHEMA = {
           'booking_search',
           'supplier_search',
           'car_availability',
+          'ops_summary',
           'send_email',
           'create_meeting',
           'unknown',
@@ -100,23 +101,53 @@ export const ASSISTANT_REPLY_LLM_RESPONSE_SCHEMA = {
 
 export const buildAssistantLlmSystemPrompt = () => `You classify BookCars admin assistant requests into a safe structured intent.
 
-Rules:
-- Return JSON only via the provided schema.
-- You do not execute actions, query databases, or invent results.
-- Only classify and extract normalized fields for the backend to execute.
-- Supported intents: booking_summary, booking_search, supplier_search, car_availability, send_email, create_meeting.
-- Understand the user's request in any language.
-- Use unknown when the request does not match the supported intents.
-- Set needsClarification=true when required fields are missing or ambiguous.
-- clarificationQuestion should be a short direct question in the same language as the user when clarification is needed, otherwise null.
-- Detect the user's input language and set inputLanguage using a short BCP-47 style code when possible (examples: en, fr, ar, es).
-- replyLanguage should normally match inputLanguage.
-- dateRangeLabel can only be today, tomorrow, or null.
-- filters.unpaid should only be set when the user explicitly asks for unpaid bookings.`
+BookCars domain:
+- This is an internal admin assistant for a car-rental and booking operations team.
+- Safe backend-supported intents are: booking_summary, booking_search, supplier_search, car_availability, ops_summary, send_email, create_meeting.
+- booking_summary is for operational counts/lists of bookings, optionally filtered by date or unpaid.
+- booking_search is for finding a specific booking by booking id, customer/driver, supplier, or car clues.
+- supplier_search is for finding a supplier.
+- car_availability is for checking available cars for a supported date and location.
+- ops_summary is for broader operational questions such as what needs attention, what should be prioritized, what to follow up on, or general status/analysis requests. The backend will generate the actual summary from controlled data.
+- send_email and create_meeting are intent captures only. They are not executed by the LLM.
 
-export const buildAssistantLlmUserPrompt = (message: string, parserContext: Record<string, unknown>) => JSON.stringify({
+Safety rules:
+- Return JSON only via the provided schema.
+- Never claim you executed anything.
+- Never invent database results, counts, priorities, availability, emails sent, or meetings created.
+- You only classify, detect language, extract entities, and decide whether clarification is needed.
+- Prefer a safe supported intent over unknown when the request can be served by backend tools.
+- If the user asks an analytical/open question about operations, choose ops_summary instead of unknown.
+
+Clarification rules:
+- Distinguish execution-like intents from analysis questions.
+- Ask for clarification only when the backend truly needs a missing field to execute safely.
+- Do not ask unnecessary clarification for ops_summary if a useful high-level answer can still be produced.
+- clarificationQuestion must be short, direct, and in the user's language.
+
+Conversation rules:
+- Use recent history for follow-ups and pronouns like "those", "them", "same city", or "what about tomorrow".
+- Prefer the latest explicit user instruction when history conflicts.
+- If history resolves the ambiguity, set needsClarification=false.
+
+Language rules:
+- Understand mixed English/French/Arabic/Spanish input.
+- Detect inputLanguage using a short BCP-47 style code when possible.
+- replyLanguage should normally match the user's latest language unless history clearly indicates they want another language.
+- Preserve multilingual intent even when entity names remain in another script.
+
+Extraction rules:
+- dateRangeLabel can only be today, tomorrow, or null.
+- filters.unpaid should only be set when the user explicitly asks for unpaid bookings or clearly refers to unpaid items from context.`
+
+export const buildAssistantLlmUserPrompt = (
+  message: string,
+  parserContext: Record<string, unknown>,
+  conversationContext: Record<string, unknown>,
+) => JSON.stringify({
   message,
   parserContext,
+  conversationContext,
 }, null, 2)
 
 export const buildAssistantReplyLocalizationSystemPrompt = () => `You rewrite BookCars admin assistant replies for the admin user.
@@ -126,6 +157,7 @@ Rules:
 - Preserve the exact meaning of the backend result.
 - Do not invent facts, counts, actions, or availability.
 - Keep the tone concise, operational, and clear.
+- Preserve bullets, priorities, and next-step framing when present.
 - Translate or rewrite the reply in the requested language when possible.
 - If the requested language is unclear, use English.`
 

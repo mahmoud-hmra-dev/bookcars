@@ -8,9 +8,10 @@ import User from '../../models/User'
 import * as logger from '../../utils/logger'
 import { normalizeAssistantText, parseAssistantMessage, shouldFallbackToAssistantLlm } from './assistantParser'
 import { localizeAssistantResponse, resolveAssistantIntentWithLlm } from './assistantLlmResolver'
-import { AssistantResponse, ParsedAssistantIntent } from './assistantTypes'
+import { AssistantConversationTurn, AssistantResponse, ParsedAssistantIntent } from './assistantTypes'
 
 const MAX_RESULTS = 10
+const MAX_HISTORY_TURNS = 6
 
 const PAID_STATUSES = [
   bookcarsTypes.BookingStatus.Paid,
@@ -36,15 +37,26 @@ const buildFlexibleNamePattern = (value: string) => {
 }
 
 const isObjectId = (value?: string) => !!(value && mongoose.Types.ObjectId.isValid(value))
-
 const toObjectId = (value: string) => new mongoose.Types.ObjectId(value)
-
 const matchNormalized = (source: string | null | undefined, query: string) => normalizeAssistantText(source || '').includes(normalizeAssistantText(query))
 
-const withLanguageMetadata = (parsed: ParsedAssistantIntent, response: Omit<AssistantResponse, 'inputLanguage' | 'replyLanguage'>): AssistantResponse => ({
+const sanitizeAssistantHistory = (history: AssistantConversationTurn[] = []) => history
+  .filter((turn) => turn && (turn.role === 'user' || turn.role === 'assistant') && typeof turn.text === 'string')
+  .map((turn) => ({ role: turn.role, text: turn.text.trim() }))
+  .filter((turn) => turn.text)
+  .slice(-MAX_HISTORY_TURNS)
+
+const withLanguageMetadata = (
+  parsed: ParsedAssistantIntent,
+  history: AssistantConversationTurn[],
+  response: Omit<AssistantResponse, 'inputLanguage' | 'replyLanguage' | 'contextUsed'>,
+): AssistantResponse => ({
   ...response,
   inputLanguage: parsed.inputLanguage || 'en',
   replyLanguage: parsed.replyLanguage || parsed.inputLanguage || 'en',
+  contextUsed: {
+    historyTurns: history.length,
+  },
 })
 
 const findSuppliers = async (searchTerm: string) => {
@@ -165,7 +177,7 @@ const searchBookings = async (searchTerm: string) => {
   ])
 }
 
-const summarizeBookings = async (parsed: ParsedAssistantIntent): Promise<AssistantResponse> => {
+const summarizeBookings = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
   const match: Record<string, unknown> = { expireAt: null }
 
   if (parsed.dateRange) {
@@ -187,7 +199,7 @@ const summarizeBookings = async (parsed: ParsedAssistantIntent): Promise<Assista
   const total = await Booking.countDocuments(match)
   const summaryLabel = [parsed.filters?.unpaid ? 'unpaid' : null, parsed.dateRange?.label ?? null].filter(Boolean).join(' ')
 
-  return withLanguageMetadata(parsed, {
+  return withLanguageMetadata(parsed, history, {
     intent: 'booking_summary',
     status: 'success',
     reply: total > 0
@@ -227,9 +239,9 @@ const summarizeBookings = async (parsed: ParsedAssistantIntent): Promise<Assista
   })
 }
 
-const handleBookingSearch = async (parsed: ParsedAssistantIntent): Promise<AssistantResponse> => {
+const handleBookingSearch = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
   if (!parsed.searchTerm) {
-    return withLanguageMetadata(parsed, {
+    return withLanguageMetadata(parsed, history, {
       intent: 'booking_search',
       status: 'needs_clarification',
       reply: parsed.clarificationQuestion || 'Tell me which booking to find by ID, driver name, supplier name, or email.',
@@ -239,7 +251,7 @@ const handleBookingSearch = async (parsed: ParsedAssistantIntent): Promise<Assis
 
   const bookings = await searchBookings(parsed.searchTerm)
 
-  return withLanguageMetadata(parsed, {
+  return withLanguageMetadata(parsed, history, {
     intent: 'booking_search',
     status: 'success',
     reply: bookings.length > 0
@@ -254,9 +266,9 @@ const handleBookingSearch = async (parsed: ParsedAssistantIntent): Promise<Assis
   })
 }
 
-const handleSupplierSearch = async (parsed: ParsedAssistantIntent): Promise<AssistantResponse> => {
+const handleSupplierSearch = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
   if (!parsed.searchTerm) {
-    return withLanguageMetadata(parsed, {
+    return withLanguageMetadata(parsed, history, {
       intent: 'supplier_search',
       status: 'needs_clarification',
       reply: parsed.clarificationQuestion || 'Tell me which supplier to find by full name or email.',
@@ -266,7 +278,7 @@ const handleSupplierSearch = async (parsed: ParsedAssistantIntent): Promise<Assi
 
   const suppliers = await findSuppliers(parsed.searchTerm)
 
-  return withLanguageMetadata(parsed, {
+  return withLanguageMetadata(parsed, history, {
     intent: 'supplier_search',
     status: 'success',
     reply: suppliers.length > 0
@@ -309,9 +321,9 @@ const resolveLocationIds = async (locationQuery: string) => {
   return { locations, values }
 }
 
-const handleCarAvailability = async (parsed: ParsedAssistantIntent): Promise<AssistantResponse> => {
+const handleCarAvailability = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
   if (!parsed.dateRange) {
-    return withLanguageMetadata(parsed, {
+    return withLanguageMetadata(parsed, history, {
       intent: 'car_availability',
       status: 'needs_clarification',
       reply: parsed.clarificationQuestion || 'Tell me which date to check, for example today or tomorrow.',
@@ -320,7 +332,7 @@ const handleCarAvailability = async (parsed: ParsedAssistantIntent): Promise<Ass
   }
 
   if (!parsed.locationQuery) {
-    return withLanguageMetadata(parsed, {
+    return withLanguageMetadata(parsed, history, {
       intent: 'car_availability',
       status: 'needs_clarification',
       reply: parsed.clarificationQuestion || 'Tell me which location to search.',
@@ -332,7 +344,7 @@ const handleCarAvailability = async (parsed: ParsedAssistantIntent): Promise<Ass
   const locationIds = locations.map((location) => location._id)
 
   if (locationIds.length === 0) {
-    return withLanguageMetadata(parsed, {
+    return withLanguageMetadata(parsed, history, {
       intent: 'car_availability',
       status: 'success',
       reply: `No locations matched "${parsed.locationQuery}".`,
@@ -382,7 +394,7 @@ const handleCarAvailability = async (parsed: ParsedAssistantIntent): Promise<Ass
       blockOnPay: !!car.blockOnPay,
     }))
 
-  return withLanguageMetadata(parsed, {
+  return withLanguageMetadata(parsed, history, {
     intent: 'car_availability',
     status: 'success',
     reply: availableCars.length > 0
@@ -402,7 +414,120 @@ const handleCarAvailability = async (parsed: ParsedAssistantIntent): Promise<Ass
   })
 }
 
-const handleSendEmail = async (parsed: ParsedAssistantIntent): Promise<AssistantResponse> => withLanguageMetadata(parsed, {
+const handleOpsSummary = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
+  const now = new Date()
+  const activeRange = parsed.dateRange ?? {
+    label: 'today',
+    from: new Date(new Date().setHours(0, 0, 0, 0)),
+    to: new Date(new Date().setHours(23, 59, 59, 999)),
+  }
+
+  const baseMatch: Record<string, unknown> = { expireAt: null }
+  const dateMatch: Record<string, unknown> = {
+    expireAt: null,
+    from: { $gte: activeRange.from, $lte: activeRange.to },
+  }
+
+  const [
+    totalOpenBookings,
+    unpaidBookings,
+    upcomingBookings,
+    activeSuppliers,
+    inactiveSuppliers,
+    availableCarsCount,
+    sampleUnpaidBookings,
+    sampleUpcomingBookings,
+  ] = await Promise.all([
+    Booking.countDocuments(baseMatch),
+    Booking.countDocuments({ ...baseMatch, status: { $nin: PAID_STATUSES } }),
+    Booking.countDocuments({ ...dateMatch, to: { $gte: now } }),
+    User.countDocuments({ type: bookcarsTypes.UserType.Supplier, expireAt: null, active: true }),
+    User.countDocuments({ type: bookcarsTypes.UserType.Supplier, expireAt: null, $or: [{ active: { $ne: true } }, { verified: { $ne: true } }] }),
+    Car.countDocuments({ available: true, comingSoon: { $ne: true }, fullyBooked: { $ne: true } }),
+    Booking.find({ ...baseMatch, status: { $nin: PAID_STATUSES } })
+      .populate<{ driver: { fullName?: string }, supplier: { fullName?: string }, car: { name?: string } }>('driver supplier car')
+      .sort({ from: 1, _id: 1 })
+      .limit(3)
+      .lean(),
+    Booking.find({ ...dateMatch, to: { $gte: now } })
+      .populate<{ driver: { fullName?: string }, supplier: { fullName?: string }, car: { name?: string } }>('driver supplier car')
+      .sort({ from: 1, _id: 1 })
+      .limit(3)
+      .lean(),
+  ])
+
+  const priorities: string[] = []
+
+  if (unpaidBookings > 0) {
+    priorities.push(`Follow up on ${unpaidBookings} unpaid booking${unpaidBookings > 1 ? 's' : ''}.`)
+  }
+
+  if (upcomingBookings > 0) {
+    priorities.push(`Monitor ${upcomingBookings} upcoming booking${upcomingBookings > 1 ? 's' : ''} for ${activeRange.label}.`)
+  }
+
+  if (inactiveSuppliers > 0) {
+    priorities.push(`Review ${inactiveSuppliers} supplier account${inactiveSuppliers > 1 ? 's' : ''} that are inactive or unverified.`)
+  }
+
+  if (priorities.length === 0) {
+    priorities.push('No immediate operational risks detected in the current lightweight checks.')
+  }
+
+  const reply = [
+    `Ops summary for ${activeRange.label}:`,
+    `- ${priorities[0]}`,
+    priorities[1] ? `- ${priorities[1]}` : null,
+    priorities[2] ? `- ${priorities[2]}` : null,
+    `- Fleet signal: ${availableCarsCount} cars currently marked available.`,
+  ].filter(Boolean).join('\n')
+
+  return withLanguageMetadata(parsed, history, {
+    intent: 'ops_summary',
+    status: 'success',
+    reply,
+    data: {
+      dateRange: activeRange,
+      metrics: {
+        totalOpenBookings,
+        unpaidBookings,
+        upcomingBookings,
+        activeSuppliers,
+        inactiveOrUnverifiedSuppliers: inactiveSuppliers,
+        availableCarsCount,
+      },
+      priorities,
+      samples: {
+        unpaidBookings: sampleUnpaidBookings.map((booking) => ({
+          _id: booking._id,
+          status: booking.status,
+          from: booking.from,
+          to: booking.to,
+          driver: booking.driver ? booking.driver.fullName : null,
+          supplier: booking.supplier ? booking.supplier.fullName : null,
+          car: booking.car ? booking.car.name : null,
+        })),
+        upcomingBookings: sampleUpcomingBookings.map((booking) => ({
+          _id: booking._id,
+          status: booking.status,
+          from: booking.from,
+          to: booking.to,
+          driver: booking.driver ? booking.driver.fullName : null,
+          supplier: booking.supplier ? booking.supplier.fullName : null,
+          car: booking.car ? booking.car.name : null,
+        })),
+      },
+      resolutionSource: parsed.source,
+    },
+    suggestedActions: [
+      'show unpaid bookings today',
+      'find supplier Youssef',
+      'available cars tomorrow in Beirut',
+    ],
+  })
+}
+
+const handleSendEmail = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => withLanguageMetadata(parsed, history, {
   intent: 'send_email',
   status: 'needs_clarification',
   reply: parsed.email
@@ -415,7 +540,7 @@ const handleSendEmail = async (parsed: ParsedAssistantIntent): Promise<Assistant
   suggestedActions: ['Collect recipient, subject, and message body before enabling sending.'],
 })
 
-const handleCreateMeeting = async (parsed: ParsedAssistantIntent): Promise<AssistantResponse> => withLanguageMetadata(parsed, {
+const handleCreateMeeting = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => withLanguageMetadata(parsed, history, {
   intent: 'create_meeting',
   status: 'needs_clarification',
   reply: parsed.searchTerm
@@ -433,10 +558,10 @@ const handleCreateMeeting = async (parsed: ParsedAssistantIntent): Promise<Assis
   suggestedActions: ['Confirm attendees, exact time, timezone, and calendar before enabling creation.'],
 })
 
-const buildUnknownAssistantResponse = (parsed: ParsedAssistantIntent): AssistantResponse => withLanguageMetadata(parsed, {
+const buildUnknownAssistantResponse = (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): AssistantResponse => withLanguageMetadata(parsed, history, {
   intent: 'unknown',
   status: 'needs_clarification',
-  reply: parsed.clarificationQuestion || 'I can help with booking summaries, booking search, supplier search, car availability, email drafting, or meeting requests.',
+  reply: parsed.clarificationQuestion || 'I can help with booking summaries, booking search, supplier search, car availability, operations summaries, email drafting, or meeting requests.',
   data: {
     resolutionSource: parsed.source,
   },
@@ -445,57 +570,69 @@ const buildUnknownAssistantResponse = (parsed: ParsedAssistantIntent): Assistant
     'find booking Mahmoud',
     'find supplier Youssef',
     'available cars tomorrow in Beirut',
+    'what needs attention today?',
   ],
 })
 
-const resolveAssistantIntent = async (message: string) => {
+const resolveAssistantIntent = async (message: string, history: AssistantConversationTurn[] = []) => {
   const parsed = parseAssistantMessage(message)
 
   if (!shouldFallbackToAssistantLlm(parsed)) {
     return parsed
   }
 
-  const llmResolved = await resolveAssistantIntentWithLlm(parsed)
+  const llmResolved = await resolveAssistantIntentWithLlm(parsed, history)
   return llmResolved || parsed
 }
 
-export const processAssistantMessage = async (message: string): Promise<AssistantResponse> => {
-  const parsed = await resolveAssistantIntent(message)
+export const processAssistantMessage = async (
+  message: string,
+  history: AssistantConversationTurn[] = [],
+): Promise<AssistantResponse> => {
+  const safeHistory = sanitizeAssistantHistory(history)
+  const parsed = await resolveAssistantIntent(message, safeHistory)
 
   let response: AssistantResponse
 
   switch (parsed.intent) {
     case 'booking_summary':
-      response = await summarizeBookings(parsed)
+      response = await summarizeBookings(parsed, safeHistory)
       break
     case 'booking_search':
-      response = await handleBookingSearch(parsed)
+      response = await handleBookingSearch(parsed, safeHistory)
       break
     case 'supplier_search':
-      response = await handleSupplierSearch(parsed)
+      response = await handleSupplierSearch(parsed, safeHistory)
       break
     case 'car_availability':
-      response = await handleCarAvailability(parsed)
+      response = await handleCarAvailability(parsed, safeHistory)
+      break
+    case 'ops_summary':
+      response = await handleOpsSummary(parsed, safeHistory)
       break
     case 'send_email':
-      response = await handleSendEmail(parsed)
+      response = await handleSendEmail(parsed, safeHistory)
       break
     case 'create_meeting':
-      response = await handleCreateMeeting(parsed)
+      response = await handleCreateMeeting(parsed, safeHistory)
       break
     default:
-      response = buildUnknownAssistantResponse(parsed)
+      response = buildUnknownAssistantResponse(parsed, safeHistory)
       break
   }
 
   return localizeAssistantResponse(response, parsed)
 }
 
-export const safeProcessAssistantMessage = async (message: string): Promise<AssistantResponse> => {
+export const safeProcessAssistantMessage = async (
+  message: string,
+  history: AssistantConversationTurn[] = [],
+): Promise<AssistantResponse> => {
   const parsed = parseAssistantMessage(message)
+  const safeHistory = sanitizeAssistantHistory(history)
 
   try {
-    return await processAssistantMessage(message)
+    return await processAssistantMessage(message, safeHistory)
   } catch (err) {
     logger.error('[assistant.processAssistantMessage] ERROR', err)
 
@@ -505,6 +642,9 @@ export const safeProcessAssistantMessage = async (message: string): Promise<Assi
       reply: 'Something went wrong while processing the assistant request.',
       inputLanguage: parsed.inputLanguage || 'en',
       replyLanguage: parsed.replyLanguage || parsed.inputLanguage || 'en',
+      contextUsed: {
+        historyTurns: safeHistory.length,
+      },
     }
   }
 }

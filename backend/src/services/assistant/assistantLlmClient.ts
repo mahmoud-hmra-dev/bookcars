@@ -31,7 +31,7 @@ const postAssistantChatCompletion = async (messages: Array<{ role: 'system' | 'u
       Authorization: `Bearer ${env.OPENAI_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    timeout: 15000,
+    timeout: 20000,
   })
 
   const content = response.data?.choices?.[0]?.message?.content
@@ -40,7 +40,11 @@ const postAssistantChatCompletion = async (messages: Array<{ role: 'system' | 'u
 
 export const isAssistantLlmEnabled = () => env.ASSISTANT_LLM_ENABLED && !!env.OPENAI_API_KEY
 
-export const fetchAssistantLlmResolution = async (message: string, parserContext: Record<string, unknown>) => {
+export const fetchAssistantLlmResolution = async (
+  message: string,
+  parserContext: Record<string, unknown>,
+  conversationContext: Record<string, unknown>,
+) => {
   if (!isAssistantLlmEnabled()) {
     return null
   }
@@ -52,7 +56,7 @@ export const fetchAssistantLlmResolution = async (message: string, parserContext
     },
     {
       role: 'user',
-      content: buildAssistantLlmUserPrompt(message, parserContext),
+      content: buildAssistantLlmUserPrompt(message, parserContext, conversationContext),
     },
   ], ASSISTANT_LLM_RESPONSE_SCHEMA)
 }

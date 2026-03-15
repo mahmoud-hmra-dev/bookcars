@@ -122,6 +122,7 @@ describe('POST /api/assistant/message', () => {
     expect(res.body.inputLanguage).toBe('en')
     expect(res.body.replyLanguage).toBe('en')
     expect(res.body.data.total).toBeGreaterThanOrEqual(1)
+    expect(res.body.contextUsed.historyTurns).toBe(0)
   })
 
   it('should find a booking by driver name', async () => {
@@ -170,6 +171,35 @@ describe('POST /api/assistant/message', () => {
     expect(res.body.status).toBe('success')
     expect(res.body.data.availableCars.length).toBeGreaterThanOrEqual(1)
     expect(res.body.data.availableCars[0]._id).toBe(CAR_ID)
+  })
+
+  it('should return a safe ops summary for broad operational questions', async () => {
+    const res = await request(app)
+      .post('/api/assistant/message')
+      .set(env.X_ACCESS_TOKEN, ADMIN_TOKEN)
+      .send({ message: 'what needs attention today?' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.body.intent).toBe('ops_summary')
+    expect(res.body.status).toBe('success')
+    expect(res.body.data.metrics.unpaidBookings).toBeGreaterThanOrEqual(1)
+    expect(Array.isArray(res.body.data.priorities)).toBe(true)
+  })
+
+  it('should accept lightweight history payloads', async () => {
+    const res = await request(app)
+      .post('/api/assistant/message')
+      .set(env.X_ACCESS_TOKEN, ADMIN_TOKEN)
+      .send({
+        message: 'what needs attention today?',
+        history: [
+          { role: 'user', text: 'Show me today bookings' },
+          { role: 'assistant', text: 'Found 1 booking today.' },
+        ],
+      })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.body.contextUsed.historyTurns).toBe(2)
   })
 
   it('should keep email and meeting actions as stubs', async () => {

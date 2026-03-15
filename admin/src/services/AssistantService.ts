@@ -5,11 +5,17 @@ export type AssistantIntent =
   | 'booking_search'
   | 'supplier_search'
   | 'car_availability'
+  | 'ops_summary'
   | 'send_email'
   | 'create_meeting'
   | 'unknown'
 
 export type AssistantStatus = 'success' | 'needs_clarification' | 'error'
+
+export interface AssistantConversationTurn {
+  role: 'user' | 'assistant'
+  text: string
+}
 
 export interface AssistantResponse {
   intent: AssistantIntent
@@ -19,10 +25,14 @@ export interface AssistantResponse {
   inputLanguage: string
   data?: Record<string, unknown>
   suggestedActions?: string[]
+  contextUsed?: {
+    historyTurns: number
+  }
 }
 
 interface AssistantMessagePayload {
   message: string
+  history?: AssistantConversationTurn[]
 }
 
 export interface AssistantVoiceResponse {
@@ -30,11 +40,11 @@ export interface AssistantVoiceResponse {
   response: AssistantResponse
 }
 
-export const sendMessage = (message: string): Promise<AssistantResponse> => (
+export const sendMessage = (message: string, history: AssistantConversationTurn[] = []): Promise<AssistantResponse> => (
   axiosInstance
     .post(
       '/api/assistant/message',
-      { message } as AssistantMessagePayload,
+      { message, history } as AssistantMessagePayload,
       { withCredentials: true }
     )
     .then((res) => res.data)
