@@ -153,6 +153,31 @@ const Checkout = () => {
   const payDeposit = useWatch({ control, name: 'payDeposit' })
   const payInFull = useWatch({ control, name: 'payInFull' })
 
+  const getCheckoutSigninReturnTo = () => {
+    const state = location.state as {
+      carId?: string
+      pickupLocationId?: string
+      dropOffLocationId?: string
+      from?: Date | number | string
+      to?: Date | number | string
+    } | null
+
+    if (!state?.carId || !state.pickupLocationId || !state.dropOffLocationId || !state.from || !state.to) {
+      return '/sign-in'
+    }
+
+    const params = new URLSearchParams({
+      from: 'checkout',
+      c: state.carId,
+      p: state.pickupLocationId,
+      d: state.dropOffLocationId,
+      f: String(new Date(state.from).getTime()),
+      t: String(new Date(state.to).getTime()),
+    })
+
+    return `/sign-in?${params.toString()}`
+  }
+
   const validateEmail = (email: string) => {
     return validator.isEmail(email)
   }
@@ -697,7 +722,7 @@ const Checkout = () => {
                             </table>
                           </div>
 
-                          <SocialLogin reloadPage />
+                          <SocialLogin mode="signin" returnTo={getCheckoutSigninReturnTo()} />
                         </div>
                       </div>
                     )}

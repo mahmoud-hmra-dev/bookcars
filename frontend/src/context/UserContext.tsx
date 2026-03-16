@@ -29,6 +29,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children, refreshKey
 
   const exit = useCallback(async () => {
     setUser(null)
+    setUnauthorized(false)
     setUserLoaded(true)
     await UserService.signout(false, false)
   }, [])
@@ -38,7 +39,9 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children, refreshKey
 
     const currentUser = UserService.getCurrentUser()
     if (!currentUser) {
-      await exit()
+      setUser(null)
+      setUnauthorized(false)
+      setUserLoaded(true)
       return
     }
 

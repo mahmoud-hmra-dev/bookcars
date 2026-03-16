@@ -2,6 +2,8 @@ import React from 'react'
 import { useAuth0 } from '@auth0/auth0-react'
 import { strings as commonStrings } from '@/lang/common'
 import env from '@/config/env.config'
+import { buildAuth0LoginOptions } from '@/utils/auth0'
+import type { Auth0FlowMode } from '@/utils/auth0'
 
 import FacebookIcon from '@/assets/img/facebook-icon.png'
 import GoogleIcon from '@/assets/img/google-icon.png'
@@ -9,31 +11,23 @@ import GoogleIcon from '@/assets/img/google-icon.png'
 import '@/assets/css/social-login.css'
 
 interface SocialLoginProps {
-  facebook?: boolean
-  apple?: boolean
-  google?: boolean
-  redirectToHomepage?: boolean
-  reloadPage?: boolean
+  mode?: Auth0FlowMode
   className?: string
+  returnTo?: string
   onError?: (error: any) => void
-  onSignInError?: () => void
-  onBlackListed?: () => void
 }
 
 const SocialLogin = ({
+  mode = 'signin',
   className,
+  returnTo,
   onError,
 }: SocialLoginProps) => {
   const { loginWithRedirect } = useAuth0()
 
   const startLogin = async (connection: string) => {
     try {
-      await loginWithRedirect({
-        authorizationParams: {
-          connection,
-          prompt: 'login',
-        },
-      })
+      await loginWithRedirect(buildAuth0LoginOptions(mode, connection, returnTo))
     } catch (err) {
       console.error(err)
       onError?.(err)

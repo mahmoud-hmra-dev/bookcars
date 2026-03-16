@@ -1,5 +1,6 @@
 import React, { useState, useEffect, memo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth0 } from '@auth0/auth0-react'
 import {
   AppBar,
   Toolbar,
@@ -65,6 +66,7 @@ const Header = ({
   headerTitle,
 }: HeaderProps) => {
   const navigate = useNavigate()
+  const { isAuthenticated: isAuth0Authenticated, logout } = useAuth0()
 
   const { user } = useUserContext() as UserContextType
   const { notificationCount } = useNotificationContext() as NotificationContextType
@@ -212,8 +214,19 @@ const Header = ({
   }
 
   const handleSignout = async () => {
-    await UserService.signout(true, false)
     handleMenuClose()
+    await UserService.signout(false, false)
+
+    if (isAuth0Authenticated) {
+      logout({
+        logoutParams: {
+          returnTo: `${window.location.origin}/sign-in`,
+        },
+      })
+      return
+    }
+
+    navigate('/sign-in')
   }
 
   const handleMobileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {

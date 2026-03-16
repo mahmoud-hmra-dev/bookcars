@@ -406,6 +406,7 @@ export interface SignInPayload {
   mobile?: boolean
   fullName?: string
   avatar?: string
+  language?: string
   accessToken?: string
   socialSignInType?: SocialSignInType
 }

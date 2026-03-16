@@ -2,22 +2,33 @@ import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth0 } from '@auth0/auth0-react'
 import * as bookcarsTypes from ':bookcars-types'
-import Layout from '@/components/Layout'
 import ErrorView from '@/components/Error'
 import SimpleBackdrop from '@/components/SimpleBackdrop'
 import * as UserService from '@/services/UserService'
 import { useUserContext, UserContextType } from '@/context/UserContext'
+import { consumeAuth0ReturnTo } from '@/utils/auth0'
+import { strings as commonStrings } from '@/lang/common'
 
 const AuthCallback = () => {
   const navigate = useNavigate()
-  const { isLoading, isAuthenticated, user, getIdTokenClaims } = useAuth0()
+  const { isLoading, isAuthenticated, user, error, getIdTokenClaims } = useAuth0()
   const { setUser, setUserLoaded } = useUserContext() as UserContextType
-  const [error, setError] = React.useState('')
+  const [callbackError, setCallbackError] = React.useState('')
   const doneRef = React.useRef(false)
 
   React.useEffect(() => {
-    const run = async () => {
-      if (doneRef.current || isLoading || !isAuthenticated) {
+    const syncAuth0User = async () => {
+      if (doneRef.current || isLoading) {
+        return
+      }
+
+      if (!isAuthenticated) {
+        if (error) {
+          setCallbackError(error.message || commonStrings.GENERIC_ERROR)
+          return
+        }
+
+        navigate('/sign-in', { replace: true })
         return
       }
 
@@ -40,6 +51,7 @@ const AuthCallback = () => {
           email,
           fullName,
           avatar,
+          language: UserService.getLanguage(),
           stayConnected: UserService.getStayConnected(),
         })
 
@@ -55,21 +67,20 @@ const AuthCallback = () => {
         const appUser = await UserService.getUser(res.data._id)
         setUser(appUser)
         setUserLoaded(true)
-        navigate('/')
+        navigate(consumeAuth0ReturnTo('/'), { replace: true })
       } catch (err: any) {
         console.error(err)
-        setError(err?.message || 'Authentication failed')
+        setCallbackError(err?.message || 'Authentication failed')
+        setUserLoaded(true)
       }
     }
 
-    run()
-  }, [getIdTokenClaims, isAuthenticated, isLoading, navigate, setUser, setUserLoaded, user])
+    syncAuth0User()
+  }, [error, getIdTokenClaims, isAuthenticated, isLoading, navigate, setUser, setUserLoaded, user])
 
-  return (
-    <Layout strict>
-      {error ? <ErrorView message={error} homeLink /> : <SimpleBackdrop progress text="Signing you in..." />}
-    </Layout>
-  )
+  return callbackError
+    ? <ErrorView message={callbackError} homeLink />
+    : <SimpleBackdrop progress text="Signing you in..." />
 }
 
 export default AuthCallback

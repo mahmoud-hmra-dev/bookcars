@@ -2,6 +2,7 @@ import axios from 'axios'
 import * as bookcarsTypes from ':bookcars-types'
 import axiosInstance from './axiosInstance'
 import env from '@/config/env.config'
+import { clearAuth0ReturnTo } from '@/utils/auth0'
 
 /**
  * Sign up.
@@ -132,25 +133,34 @@ export const socialSignin = (data: bookcarsTypes.SignInPayload): Promise<{ statu
  */
 export const signout = async (redirect = true, redirectSignin = false) => {
   const deleteAllCookies = () => {
-    const cookies = document.cookie.split('')
+    const cookies = document.cookie.split(';')
 
     for (const cookie of cookies) {
       const eqPos = cookie.indexOf('=')
-      const name = eqPos > -1 ? cookie.substring(0, eqPos) : cookie
-      document.cookie = `${name}=expires=Thu, 01 Jan 1970 00:00:00 GMT`
+      const name = eqPos > -1 ? cookie.substring(0, eqPos).trim() : cookie.trim()
+
+      if (!name) {
+        continue
+      }
+
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`
     }
   }
 
-  sessionStorage.clear()
   localStorage.removeItem('bc-fe-user')
+  clearAuth0ReturnTo()
   deleteAllCookies()
 
-  await axiosInstance
-    .post(
-      '/api/sign-out',
-      null,
-      { withCredentials: true }
-    )
+  try {
+    await axiosInstance
+      .post(
+        '/api/sign-out',
+        null,
+        { withCredentials: true }
+      )
+  } catch (err) {
+    console.error(err)
+  }
 
   if (redirect) {
     window.location.href = '/'

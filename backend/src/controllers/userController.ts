@@ -778,7 +778,7 @@ export const signin = async (req: Request, res: Response) => {
  */
 export const socialSignin = async (req: Request, res: Response) => {
   const { body }: { body: bookcarsTypes.SignInPayload } = req
-  const { socialSignInType, accessToken, email: emailFromBody, fullName, avatar, stayConnected, mobile } = body
+  const { socialSignInType, accessToken, email: emailFromBody, fullName, avatar, language: languageFromBody, stayConnected, mobile } = body
 
   try {
     if (!socialSignInType) {
@@ -804,20 +804,57 @@ export const socialSignin = async (req: Request, res: Response) => {
     }
 
     let user = await User.findOne({ email })
+    const normalizedLanguage = env.LANGUAGES.includes(String(languageFromBody || '').toLowerCase())
+      ? String(languageFromBody).toLowerCase()
+      : env.DEFAULT_LANGUAGE
+    const normalizedFullName = helper.trim(fullName || email, ' ')
 
     if (!user) {
       user = new User({
         email,
-        fullName,
+        fullName: normalizedFullName,
         active: true,
         verified: true,
-        language: 'en',
+        verifiedAt: new Date(),
+        language: normalizedLanguage,
         enableEmailNotifications: true,
         type: bookcarsTypes.UserType.User,
         blacklisted: false,
         avatar,
       })
       await user.save()
+    } else {
+      let shouldSave = false
+
+      if (!user.active) {
+        user.active = true
+        shouldSave = true
+      }
+
+      if (!user.verified) {
+        user.verified = true
+        user.verifiedAt = user.verifiedAt || new Date()
+        shouldSave = true
+      }
+
+      if (!user.language) {
+        user.language = normalizedLanguage
+        shouldSave = true
+      }
+
+      if ((!user.fullName || user.fullName === user.email) && normalizedFullName) {
+        user.fullName = normalizedFullName
+        shouldSave = true
+      }
+
+      if (avatar && (!user.avatar || user.avatar.startsWith('http'))) {
+        user.avatar = avatar
+        shouldSave = true
+      }
+
+      if (shouldSave) {
+        await user.save()
+      }
     }
 
     //

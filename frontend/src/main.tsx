@@ -10,6 +10,7 @@ import { frFR, enUS, esES } from '@mui/x-date-pickers/locales'
 import { frFR as dataGridfrFR, enUS as dataGridenUS, esES as dataGridesEs } from '@mui/x-data-grid/locales'
 import { disableDevTools } from ':disable-react-devtools'
 import * as helper from '@/utils/helper'
+import { setAuth0ReturnTo } from '@/utils/auth0'
 import * as UserService from '@/services/UserService'
 import * as IpInfoService from '@/services/IpInfoService'
 import env from '@/config/env.config'
@@ -265,8 +266,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       redirect_uri: `${window.location.origin}/auth/callback`,
       scope: 'openid profile email',
     }}
-    onRedirectCallback={() => {
-      window.history.replaceState({}, document.title, '/auth/callback')
+    onRedirectCallback={(appState?: { returnTo?: string }) => {
+      setAuth0ReturnTo(appState?.returnTo || '/')
     }}
   >
     <ThemeProvider theme={theme}>

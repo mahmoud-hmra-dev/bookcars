@@ -1,78 +1,27 @@
 import React, { useState } from 'react'
-import {
-  Paper,
-  FormControl,
-  InputLabel,
-  Input,
-  Button,
-  FormHelperText,
-} from '@mui/material'
+import { Paper, Button } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
+import { useAuth0 } from '@auth0/auth0-react'
 import * as bookcarsTypes from ':bookcars-types'
-import { strings as commonStrings } from '@/lang/common'
 import { strings as suStrings } from '@/lang/sign-up'
 import { strings } from '@/lang/sign-in'
 import * as UserService from '@/services/UserService'
-import { useUserContext, UserContextType } from '@/context/UserContext'
-import Error from '@/components/Error'
 import Layout from '@/components/Layout'
 import SocialLogin from '@/components/SocialLogin'
 import Footer from '@/components/Footer'
-import { schema, FormFields } from '@/models/SignInForm'
-import PasswordInput from '@/components/PasswordInput'
+import Error from '@/components/Error'
+import SimpleBackdrop from '@/components/SimpleBackdrop'
+import { buildAuth0LoginOptions } from '@/utils/auth0'
 
 import '@/assets/css/signin.css'
 
 const SignIn = () => {
   const navigate = useNavigate()
+  const { loginWithRedirect } = useAuth0()
 
-  const { setUser, setUserLoaded } = useUserContext() as UserContextType
   const [visible, setVisible] = useState(false)
-
-  const {
-    register,
-    setValue,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-    setError,
-    clearErrors,
-  } = useForm({
-    resolver: zodResolver(schema),
-    mode: 'onSubmit',
-  })
-
-  const signinError = () => {
-    setError('root', { message: strings.ERROR_IN_SIGN_IN })
-  }
-
-  const onSubmit = async ({ email, password }: FormFields) => {
-    try {
-      const data: bookcarsTypes.SignInPayload = {
-        email,
-        password,
-        stayConnected: UserService.getStayConnected()
-      }
-
-      const res = await UserService.signin(data)
-
-      if (res.status === 200) {
-        if (res.data.blacklisted) {
-          await UserService.signout(false)
-          setError('root', { message: strings.IS_BLACKLISTED })
-        } else {
-          const user = await UserService.getUser(res.data._id)
-          setUser(user)
-          setUserLoaded(true)
-        }
-      } else {
-        signinError()
-      }
-    } catch {
-      signinError()
-    }
-  }
+  const [authError, setAuthError] = useState('')
+  const [isStartingAuth, setIsStartingAuth] = useState(false)
 
   const onLoad = async (user?: bookcarsTypes.User) => {
     UserService.setStayConnected(false)
@@ -103,80 +52,58 @@ const SignIn = () => {
     }
   }
 
+  const handleSignIn = async () => {
+    try {
+      setAuthError('')
+      setIsStartingAuth(true)
+      await loginWithRedirect(buildAuth0LoginOptions('signin'))
+    } catch (err) {
+      console.error(err)
+      setAuthError(strings.AUTH0_SIGN_IN_ERROR)
+      setIsStartingAuth(false)
+    }
+  }
+
   return (
     <Layout strict={false} onLoad={onLoad}>
 
       <div className="signin">
         <Paper className={`signin-form ${visible ? '' : 'hidden'}`} elevation={10}>
-          <form onSubmit={handleSubmit(onSubmit)}>
-            <h1 className="signin-form-title">{strings.SIGN_IN_HEADING}</h1>
-            <FormControl fullWidth margin="dense" error={!!errors.email}>
-              <InputLabel>{commonStrings.EMAIL}</InputLabel>
-              <Input
-                {...register('email')}
-                onChange={(e) => {
-                  if (errors.email) {
-                    clearErrors('email')
-                  }
-                  // Without the next line, if the field is auto-filled by the browser, react-form does not know it
-                  setValue('email', e.target.value)
-                }}
-                autoComplete="email"
-                required
-              />
-              <FormHelperText error={!!errors.email}>{errors.email?.message || ''}</FormHelperText>
-            </FormControl>
+          <h1 className="signin-form-title">{strings.SIGN_IN_HEADING}</h1>
+          <p>{strings.AUTH0_SIGN_IN_MESSAGE}</p>
 
-            <PasswordInput
-              label={commonStrings.PASSWORD}
-              {...register('password')}
-              error={!!errors.password}
-              helperText={errors.password?.message}
-              onChange={(e) => {
-                if (errors.password) {
-                  clearErrors('password')
-                }
-                setValue('password', e.target.value)
-              }}
-              required
-              autoComplete="password"
+          <div className="stay-connected">
+            <input
+              id="stay-connected"
+              type="checkbox"
+              onChange={(e) => UserService.setStayConnected(e.currentTarget.checked)}
             />
+            <label htmlFor="stay-connected">
+              {strings.STAY_CONNECTED}
+            </label>
+          </div>
 
-            <div className="stay-connected">
-              <input
-                id="stay-connected"
-                type="checkbox"
-                onChange={(e) => UserService.setStayConnected(e.currentTarget.checked)}
-              />
-              <label
-                htmlFor="stay-connected"
-              >
-                {strings.STAY_CONNECTED}
-              </label>
-            </div>
+          <Button type="button" variant="contained" className="btn-primary btn-margin btn-margin-bottom" onClick={handleSignIn}>
+            {strings.AUTH0_CONTINUE}
+          </Button>
 
-            <div className="forgot-password-wrapper">
-              <Button variant="text" onClick={() => navigate('/forgot-password')} className="btn-lnk">{strings.RESET_PASSWORD}</Button>
-            </div>
+          <SocialLogin mode="signin" onError={() => setAuthError(strings.AUTH0_SIGN_IN_ERROR)} />
 
-            <SocialLogin />
+          <div className="signin-buttons">
+            <Button variant="outlined" color="primary" onClick={() => navigate('/sign-up')} className="btn-margin btn-margin-bottom">
+              {suStrings.SIGN_UP}
+            </Button>
+          </div>
 
-            <div className="signin-buttons">
-              <Button variant="outlined" color="primary" onClick={() => navigate('/sign-up')} className="btn-margin btn-margin-bottom">
-                {suStrings.SIGN_UP}
-              </Button>
-              <Button type="submit" variant="contained" className="btn-primary btn-margin btn-margin-bottom" disabled={isSubmitting}>
-                {strings.SIGN_IN}
-              </Button>
-            </div>
-            <div className="form-error">
-              {errors.root && <Error message={errors.root.message!} />}
-            </div>
-          </form>
+          <div className="form-error">
+            {authError && <Error message={authError} />}
+          </div>
         </Paper>
       </div>
 
       <Footer />
+
+      {isStartingAuth && <SimpleBackdrop progress text={strings.AUTH0_REDIRECTING} />}
 
     </Layout>
   )
