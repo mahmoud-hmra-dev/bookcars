@@ -195,6 +195,14 @@ export const getCars = (keyword: string, data: bookcarsTypes.GetCarsPayload, pag
     )
     .then((res) => res.data)
 
+export const getTracking = (id: string): Promise<bookcarsTypes.CarTrackingSnapshot> =>
+  axiosInstance
+    .get(
+      `/api/car-tracking/${encodeURIComponent(id)}`,
+      { withCredentials: true }
+    )
+    .then((res) => res.data)
+
 /**
  * Get Cars by supplier and location.
  *

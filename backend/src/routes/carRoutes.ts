@@ -17,6 +17,7 @@ routes.route(routeNames.updateImage).post([authJwt.verifyToken, authJwt.authSupp
 routes.route(routeNames.deleteImage).post(authJwt.verifyToken, authJwt.authSupplier, carController.deleteImage)
 routes.route(routeNames.deleteTempImage).post(authJwt.verifyToken, authJwt.authSupplier, carController.deleteTempImage)
 routes.route(routeNames.getCar).get(carController.getCar)
+routes.route(routeNames.getTracking).get(authJwt.verifyToken, authJwt.authSupplier, carController.getTracking)
 routes.route(routeNames.getCars).post(authJwt.verifyToken, authJwt.authSupplier, carController.getCars)
 routes.route(routeNames.getBookingCars).post(authJwt.verifyToken, authJwt.authSupplier, carController.getBookingCars)
 routes.route(routeNames.getFrontendCars).post(carController.getFrontendCars)

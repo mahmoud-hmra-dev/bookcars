@@ -18,6 +18,24 @@ import Notification from '../models/Notification'
 import NotificationCounter from '../models/NotificationCounter'
 import * as mailHelper from '../utils/mailHelper'
 import Location from '../models/Location'
+import * as traccarService from '../services/traccarService'
+
+const getTrackingPayload = (tracking?: bookcarsTypes.TraccarCarTracking) => {
+  if (!tracking) {
+    return undefined
+  }
+
+  return {
+    enabled: !!tracking.enabled,
+    deviceId: tracking.deviceId,
+    deviceName: tracking.deviceName?.trim(),
+    status: tracking.status?.trim(),
+    lastEventType: tracking.lastEventType?.trim(),
+    notes: tracking.notes?.trim(),
+    linkedAt: tracking.deviceId ? (tracking.linkedAt || new Date()) : undefined,
+    lastSyncedAt: tracking.lastSyncedAt,
+  }
+}
 
 /**
  * Create a Car.
@@ -47,7 +65,7 @@ export const create = async (req: Request, res: Response) => {
       }
     }
 
-    const car = new Car({ ...carFields, dateBasedPrices: dateBasedPriceIds })
+    const car = new Car({ ...carFields, tracking: getTrackingPayload(body.tracking), dateBasedPrices: dateBasedPriceIds })
     await car.save()
 
     // --------- image ---------
@@ -240,6 +258,7 @@ export const update = async (req: Request, res: Response) => {
         isDateBasedPrice,
         dateBasedPrices,
         blockOnPay,
+        tracking,
       } = body
 
       car.supplier = new mongoose.Types.ObjectId(supplier)
@@ -280,6 +299,7 @@ export const update = async (req: Request, res: Response) => {
       car.co2 = co2
       car.isDateBasedPrice = isDateBasedPrice
       car.blockOnPay = blockOnPay
+      car.tracking = getTrackingPayload(tracking)
 
       //
       // Date based prices
@@ -693,6 +713,72 @@ export const getCar = async (req: Request, res: Response) => {
  * @param {Response} res
  * @returns {unknown}
  */
+export const getTracking = async (req: Request, res: Response) => {
+  const { id } = req.params
+
+  try {
+    const car = await Car.findById(id).lean()
+
+    if (!car) {
+      res.sendStatus(204)
+      return
+    }
+
+    const tracking = car.tracking
+    if (!tracking?.deviceId || !tracking.enabled) {
+      res.json({
+        linked: false,
+        tracking,
+        traccarUrl: env.TRACCAR_PUBLIC_URL,
+      })
+      return
+    }
+
+    if (!traccarService.isConfigured()) {
+      res.json({
+        linked: true,
+        tracking,
+        traccarUrl: env.TRACCAR_PUBLIC_URL,
+        warning: 'Traccar credentials are not configured on the backend.',
+      })
+      return
+    }
+
+    const [device, snapshot] = await Promise.all([
+      traccarService.getDevice(tracking.deviceId),
+      traccarService.getSnapshot(tracking.deviceId),
+    ])
+
+    await Car.updateOne({ _id: car._id }, {
+      $set: {
+        'tracking.deviceName': device?.name || tracking.deviceName,
+        'tracking.status': device?.status || tracking.status,
+        'tracking.lastEventType': snapshot.geofenceExitEvents[0]?.type || tracking.lastEventType,
+        'tracking.lastSyncedAt': new Date(),
+      },
+    })
+
+    res.json({
+      linked: true,
+      tracking: {
+        ...tracking,
+        deviceName: device?.name || tracking.deviceName,
+        status: device?.status || tracking.status,
+        lastEventType: snapshot.geofenceExitEvents[0]?.type || tracking.lastEventType,
+        lastSyncedAt: new Date(),
+      },
+      currentPosition: snapshot.currentPosition,
+      positions: snapshot.positions,
+      geofences: snapshot.geofences,
+      geofenceExitEvents: snapshot.geofenceExitEvents,
+      traccarUrl: env.TRACCAR_PUBLIC_URL,
+    })
+  } catch (err) {
+    logger.error(`[car.getTracking] ${i18n.t('ERROR')} ${id}`, err)
+    res.status(400).send(i18n.t('ERROR') + err)
+  }
+}
+
 export const getCars = async (req: Request, res: Response) => {
   try {
     const { body }: { body: bookcarsTypes.GetCarsPayload } = req

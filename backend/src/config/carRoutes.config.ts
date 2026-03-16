@@ -13,6 +13,7 @@ const routes = {
   getBookingCars: '/api/booking-cars/:page/:size',
   getFrontendCars: '/api/frontend-cars/:page/:size',
   checkCar: '/api/check-car/:id',
+  getTracking: '/api/car-tracking/:id',
 }
 
 export default routes

@@ -106,6 +106,10 @@ const UpdateCar = () => {
       multimedia: [],
       rating: '',
       co2: '',
+      trackingEnabled: false,
+      trackingDeviceId: '',
+      trackingDeviceName: '',
+      trackingNotes: '',
       isDateBasedPrice: false,
       dateBasedPrices: [],
     }
@@ -123,6 +127,7 @@ const UpdateCar = () => {
   const comingSoon = useWatch({ control, name: 'comingSoon' })
   const blockOnPay = useWatch({ control, name: 'blockOnPay' })
   const type = useWatch({ control, name: 'type' })
+  const trackingEnabled = useWatch({ control, name: 'trackingEnabled' })
   const gearbox = useWatch({ control, name: 'gearbox' })
   const seats = useWatch({ control, name: 'seats' })
   const doors = useWatch({ control, name: 'doors' })
@@ -219,6 +224,12 @@ const UpdateCar = () => {
         comingSoon: data.comingSoon,
         fullyBooked: data.fullyBooked,
         blockOnPay: data.blockOnPay,
+        tracking: {
+          enabled: data.trackingEnabled,
+          deviceId: data.trackingDeviceId ? Number.parseInt(data.trackingDeviceId, 10) : undefined,
+          deviceName: data.trackingDeviceName,
+          notes: data.trackingNotes,
+        },
         isDateBasedPrice: data.isDateBasedPrice,
         dateBasedPrices: data.dateBasedPrices || [],
       }
@@ -301,6 +312,10 @@ const UpdateCar = () => {
               if (_car.co2) {
                 setValue('co2', _car.co2.toString())
               }
+              setValue('trackingEnabled', _car.tracking?.enabled || false)
+              setValue('trackingDeviceId', _car.tracking?.deviceId ? _car.tracking.deviceId.toString() : '')
+              setValue('trackingDeviceName', _car.tracking?.deviceName || '')
+              setValue('trackingNotes', _car.tracking?.notes || '')
               setValue('available', _car.available)
               setValue('fullyBooked', _car.fullyBooked || false)
               setValue('comingSoon', _car.comingSoon || false)
@@ -706,6 +721,60 @@ const UpdateCar = () => {
                   }}
                 />
               </FormControl>
+
+              <FormControl fullWidth margin="dense" className="checkbox-fc">
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={trackingEnabled}
+                      onChange={(e) => setValue('trackingEnabled', e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label="Enable Traccar tracking"
+                  className="checkbox-fcl"
+                />
+              </FormControl>
+
+              {trackingEnabled && (
+                <>
+                  <FormControl fullWidth margin="dense">
+                    <TextField
+                      label="Traccar device ID"
+                      {...register('trackingDeviceId')}
+                      variant="standard"
+                      autoComplete="off"
+                      error={!!errors.trackingDeviceId}
+                      helperText={errors.trackingDeviceId?.message || 'Link this car to a Traccar device for safe tracking visibility.'}
+                      onChange={() => {
+                        if (errors.trackingDeviceId) {
+                          clearErrors('trackingDeviceId')
+                        }
+                      }}
+                    />
+                  </FormControl>
+
+                  <FormControl fullWidth margin="dense">
+                    <TextField
+                      label="Tracked device name"
+                      {...register('trackingDeviceName')}
+                      variant="standard"
+                      autoComplete="off"
+                    />
+                  </FormControl>
+
+                  <FormControl fullWidth margin="dense">
+                    <TextField
+                      label="Tracking notes"
+                      {...register('trackingNotes')}
+                      variant="standard"
+                      autoComplete="off"
+                      multiline
+                      minRows={2}
+                    />
+                  </FormControl>
+                </>
+              )}
 
               <FormControl fullWidth margin="dense" className="checkbox-fc">
                 <FormControlLabel

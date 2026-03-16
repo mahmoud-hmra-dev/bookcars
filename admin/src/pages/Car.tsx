@@ -51,6 +51,7 @@ const Car = () => {
   const [offset, setOffset] = useState(0)
   const [openInfoDialog, setOpenInfoDialog] = useState(false)
   const [language, setLanguage] = useState(env.DEFAULT_LANGUAGE)
+  const [tracking, setTracking] = useState<bookcarsTypes.CarTrackingSnapshot>()
 
   useEffect(() => {
     if (visible) {
@@ -133,6 +134,13 @@ const Car = () => {
                 const supplierIds = bookcarsHelper.flattenSuppliers(_suppliers)
                 setSuppliers(supplierIds)
                 setCar(_car)
+                if (_car.tracking?.enabled) {
+                  try {
+                    setTracking(await CarService.getTracking(_car._id))
+                  } catch {
+                    setTracking(undefined)
+                  }
+                }
                 setVisible(true)
                 setLoading(false)
               } catch (err) {
@@ -141,6 +149,13 @@ const Car = () => {
             } else if (_car.supplier._id === _user._id) {
               setSuppliers([_user._id as string])
               setCar(_car)
+              if (_car.tracking?.enabled) {
+                try {
+                  setTracking(await CarService.getTracking(_car._id))
+                } catch {
+                  setTracking(undefined)
+                }
+              }
               setVisible(true)
               setLoading(false)
             } else {
@@ -332,6 +347,46 @@ const Car = () => {
                     </li>
                   ))}
                 </ul>
+
+                {car.tracking?.enabled && (
+                  <div style={{ marginTop: 24 }}>
+                    <h3>Safe tracking</h3>
+                    <p><strong>Device ID:</strong> {car.tracking.deviceId || '—'}</p>
+                    <p><strong>Device name:</strong> {tracking?.tracking?.deviceName || car.tracking.deviceName || '—'}</p>
+                    <p><strong>Status:</strong> {tracking?.tracking?.status || car.tracking.status || '—'}</p>
+                    <p><strong>Current position:</strong> {tracking?.currentPosition ? `${tracking.currentPosition.latitude}, ${tracking.currentPosition.longitude}` : 'No live position yet'}</p>
+                    <p><strong>Latest safe alert:</strong> {tracking?.geofenceExitEvents?.[0]?.type || car.tracking.lastEventType || 'No zone-exit alert recorded'}</p>
+                    {car.tracking.notes && <p><strong>Notes:</strong> {car.tracking.notes}</p>}
+                    {tracking?.traccarUrl && (
+                      <p>
+                        <a href={tracking.traccarUrl} target="_blank" rel="noreferrer">Open Traccar dashboard</a>
+                      </p>
+                    )}
+                    {tracking?.warning && <p>{tracking.warning}</p>}
+                    {tracking?.positions && tracking.positions.length > 0 && (
+                      <div>
+                        <strong>Recent movement history</strong>
+                        <ul>
+                          {tracking.positions.slice(0, 5).map((position, index) => (
+                            <li key={`${position.id || index}`}>
+                              {`${position.fixTime || position.deviceTime || 'Unknown time'} — ${position.latitude}, ${position.longitude}`}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {tracking?.geofences && tracking.geofences.length > 0 && (
+                      <div>
+                        <strong>Geofences</strong>
+                        <ul>
+                          {tracking.geofences.slice(0, 5).map((geofence, index) => (
+                            <li key={`${geofence.id || index}`}>{geofence.name || geofence.description || `Geofence ${index + 1}`}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </section>
             {edit && (

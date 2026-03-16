@@ -185,6 +185,69 @@ export interface UpdateSupplierPayload {
   blacklisted?: boolean
 }
 
+export interface TraccarCarTracking {
+  enabled?: boolean
+  deviceId?: number
+  deviceName?: string
+  status?: string
+  lastEventType?: string
+  notes?: string
+  linkedAt?: Date
+  lastSyncedAt?: Date
+}
+
+export interface TraccarDevice {
+  id?: number
+  name?: string
+  uniqueId?: string
+  status?: string
+  lastUpdate?: Date | string
+  attributes?: Record<string, any>
+}
+
+export interface TraccarPosition {
+  id?: number
+  deviceId?: number
+  latitude: number
+  longitude: number
+  speed?: number
+  course?: number
+  altitude?: number
+  accuracy?: number
+  address?: string
+  fixTime?: Date | string
+  deviceTime?: Date | string
+  serverTime?: Date | string
+  attributes?: Record<string, any>
+}
+
+export interface TraccarEvent {
+  id?: number
+  deviceId?: number
+  geofenceId?: number
+  type?: string
+  eventTime?: Date | string
+  attributes?: Record<string, any>
+}
+
+export interface TraccarGeofence {
+  id?: number
+  name?: string
+  description?: string
+  area?: string
+}
+
+export interface CarTrackingSnapshot {
+  linked: boolean
+  tracking?: TraccarCarTracking
+  currentPosition?: TraccarPosition | null
+  positions?: TraccarPosition[]
+  geofences?: TraccarGeofence[]
+  geofenceExitEvents?: TraccarEvent[]
+  traccarUrl?: string
+  warning?: string
+}
+
 export interface CreateCarPayload {
   loggedUser: string
   name: string
@@ -231,6 +294,7 @@ export interface CreateCarPayload {
   rating?: number
   co2?: number
   blockOnPay?: boolean
+  tracking?: TraccarCarTracking
 }
 
 export interface UpdateCarPayload extends CreateCarPayload {
@@ -512,6 +576,7 @@ export interface Car {
   trips: number
   co2?: number
   blockOnPay?: boolean
+  tracking?: TraccarCarTracking
   [propKey: string]: any
 }
 

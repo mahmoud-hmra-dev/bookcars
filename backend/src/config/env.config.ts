@@ -472,6 +472,48 @@ export const SENTRY_DSN_BACKEND = __env__('BC_SENTRY_DSN_BACKEND', ENABLE_SENTRY
 export const SENTRY_TRACES_SAMPLE_RATE = Number.parseFloat(__env__('BC_SENTRY_TRACES_SAMPLE_RATE', false, '1.0'))
 
 /**
+ * Indicate whether Traccar integration is enabled.
+ *
+ * @type {boolean}
+ */
+export const TRACCAR_ENABLED = helper.StringToBoolean(__env__('BC_TRACCAR_ENABLED', false, 'false'))
+
+/**
+ * Traccar base URL.
+ *
+ * @type {string}
+ */
+export const TRACCAR_BASE_URL = __env__('BC_TRACCAR_BASE_URL', false, 'http://localhost:8082')
+
+/**
+ * Traccar public URL for admin links.
+ *
+ * @type {string}
+ */
+export const TRACCAR_PUBLIC_URL = __env__('BC_TRACCAR_PUBLIC_URL', false, 'http://localhost:8082')
+
+/**
+ * Traccar username.
+ *
+ * @type {string}
+ */
+export const TRACCAR_USERNAME = __env__('BC_TRACCAR_USERNAME', false, 'admin')
+
+/**
+ * Traccar password.
+ *
+ * @type {string}
+ */
+export const TRACCAR_PASSWORD = __env__('BC_TRACCAR_PASSWORD', false, 'admin')
+
+/**
+ * Traccar request timeout in milliseconds.
+ *
+ * @type {number}
+ */
+export const TRACCAR_TIMEOUT = Number.parseInt(__env__('BC_TRACCAR_TIMEOUT', false, '10000'), 10)
+
+/**
  * Apple Web client ID.
  *
  * @type {string}
@@ -676,6 +718,17 @@ export interface DateBasedPrice extends Document {
  * @typedef {Car}
  * @extends {Document}
  */
+export interface TraccarCarTracking {
+  enabled?: boolean
+  deviceId?: number
+  deviceName?: string
+  status?: string
+  lastEventType?: string
+  notes?: string
+  linkedAt?: Date
+  lastSyncedAt?: Date
+}
+
 export interface Car extends Document {
   name: string
   licensePlate?: string
@@ -721,6 +774,7 @@ export interface Car extends Document {
   trips: number
   co2?: number
   blockOnPay?: boolean
+  tracking?: TraccarCarTracking
 }
 
 /**

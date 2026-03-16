@@ -103,6 +103,10 @@ const CreateCar = () => {
       multimedia: [],
       rating: '',
       co2: '',
+      trackingEnabled: false,
+      trackingDeviceId: '',
+      trackingDeviceName: '',
+      trackingNotes: '',
       isDateBasedPrice: false,
       dateBasedPrices: [],
     }
@@ -210,6 +214,12 @@ const CreateCar = () => {
         multimedia: data.multimedia || [],
         rating: data.rating ? Number(data.rating) : undefined,
         co2: data.co2 ? Number(data.co2) : undefined,
+        tracking: {
+          enabled: data.trackingEnabled,
+          deviceId: data.trackingDeviceId ? Number.parseInt(data.trackingDeviceId, 10) : undefined,
+          deviceName: data.trackingDeviceName,
+          notes: data.trackingNotes,
+        },
         isDateBasedPrice: data.isDateBasedPrice,
         dateBasedPrices: data.dateBasedPrices || [],
       }

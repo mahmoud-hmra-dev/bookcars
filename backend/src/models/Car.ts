@@ -210,6 +210,37 @@ const carSchema = new Schema<env.Car>(
       type: Boolean,
       default: true,
     },
+    tracking: {
+      enabled: {
+        type: Boolean,
+        default: false,
+      },
+      deviceId: {
+        type: Number,
+      },
+      deviceName: {
+        type: String,
+        trim: true,
+      },
+      status: {
+        type: String,
+        trim: true,
+      },
+      lastEventType: {
+        type: String,
+        trim: true,
+      },
+      notes: {
+        type: String,
+        trim: true,
+      },
+      linkedAt: {
+        type: Date,
+      },
+      lastSyncedAt: {
+        type: Date,
+      },
+    },
   },
   {
     timestamps: true,

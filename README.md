@@ -100,6 +100,31 @@ Customers can register through the web frontend or mobile app, search for availa
 * Web
 * Docker
 
+## Traccar Fleet Tracking (Safe Integration)
+
+BookCars now includes an optional Traccar service in the Docker setup for safe fleet visibility only.
+
+* Traccar web UI: `http://localhost:8082`
+* Default Traccar login: `admin` / `admin`
+* Docker services: `traccar` + `traccar-db`
+* Backend-to-Traccar connection: configure in `backend/.env.docker`
+* Car linking: Admin/Supplier can open a car in the admin panel, edit it, enable Traccar tracking, and set the Traccar device ID
+
+Safe features currently wired into BookCars:
+
+* Link a BookCars car to a Traccar device ID
+* Store tracking metadata on the car record
+* View current coordinates and recent movement history in admin
+* View geofences and recent geofence-exit events in admin
+* Open the Traccar dashboard from the car details page
+
+Not included on purpose:
+
+* Engine shutoff
+* Remote immobilization
+* Kill switch / disabling a vehicle
+* Any remote control feature that could interfere with vehicle operation
+
 ## Support & Contributing
 
 If this project helped you, saved you time, or inspired you in any way, please consider supporting its future growth and maintenance. You can show your support by starring the repository (it helps increase visibility and shows your appreciation), sharing the project (recommend it to colleagues, communities, or on social media), or if you'd like to financially support the development via [GitHub Sponsors](https://github.com/sponsors/aelassas) (one-time or monthly), [PayPal](https://www.paypal.me/aelassaspp), or [Buy Me a Coffee](https://www.buymeacoffee.com/aelassas). 

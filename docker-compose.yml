@@ -25,6 +25,31 @@ services:
     depends_on:
       - mongo
 
+  traccar-db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: traccar
+      POSTGRES_USER: traccar
+      POSTGRES_PASSWORD: traccar
+    ports:
+      - 5433:5432
+    volumes:
+      - traccar_postgres_data:/var/lib/postgresql/data
+
+  traccar:
+    image: traccar/traccar:latest
+    restart: always
+    ports:
+      - 8082:8082
+      - 5000-5150:5000-5150
+    depends_on:
+      - traccar-db
+    volumes:
+      - ./__config/traccar/traccar.xml:/opt/traccar/conf/traccar.xml:ro
+      - traccar_data:/opt/traccar/data
+      - traccar_logs:/opt/traccar/logs
+
   bc-backend:
     build: 
       context: .
@@ -65,3 +90,6 @@ volumes:
   mongodb_data:
   mongodb_config:
   backend_logs:
+  traccar_postgres_data:
+  traccar_data:
+  traccar_logs:
