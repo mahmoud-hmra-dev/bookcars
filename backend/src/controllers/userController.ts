@@ -61,7 +61,16 @@ const _signup = async (req: Request, res: Response, userType: bookcarsTypes.User
     const passwordHash = await authHelper.hashPassword(password)
     body.password = passwordHash
 
+    if (!env.SMTP_ENABLED) {
+      body.verified = true
+    }
+
     user = new User(body)
+
+    if (!env.SMTP_ENABLED) {
+      user.verifiedAt = new Date()
+    }
+
     await user.save()
 
     // avatar
@@ -993,11 +1002,15 @@ export const deletePushToken = async (req: Request, res: Response) => {
  */
 export const validateEmail = async (req: Request, res: Response) => {
   const { body }: { body: bookcarsTypes.ValidateEmailPayload } = req
-  const { email, appType } = body
+  const email = helper.trim(body.email || '', ' ')
+  const { appType } = body
 
   try {
-    if (!helper.isValidEmail(email)) {
-      throw new Error('body.email is not valid')
+    // Empty or malformed email should not hard-fail the form.
+    // Frontend field validation can handle it; backend just answers "not usable yet".
+    if (!email || !helper.isValidEmail(email)) {
+      res.sendStatus(200)
+      return
     }
 
     const _appType = appType || bookcarsTypes.AppType.Frontend

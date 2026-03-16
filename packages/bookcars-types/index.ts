@@ -79,6 +79,7 @@ export enum RecordType {
 export enum PaymentGateway {
   PayPal = 'payPal',
   Stripe = 'stripe',
+  Areeba = 'areeba',
 }
 
 export interface Booking {

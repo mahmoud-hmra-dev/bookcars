@@ -10,6 +10,9 @@ const routes = {
   getBookings: '/api/bookings/:page/:size/:language',
   hasBookings: '/api/has-bookings/:driver',
   cancelBooking: '/api/cancel-booking/:id',
+  areebaSuccess: '/api/areeba/success/:bookingId/:sessionId',
+  areebaCancel: '/api/areeba/cancel/:bookingId/:sessionId',
+  areebaError: '/api/areeba/error/:bookingId/:sessionId',
 }
 
 export default routes

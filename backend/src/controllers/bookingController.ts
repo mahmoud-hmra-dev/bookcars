@@ -1152,3 +1152,90 @@ export const cancelBooking = async (req: Request, res: Response) => {
     res.status(400).send(i18n.t('ERROR') + err)
   }
 }
+
+const getPaidBookingStatus = (booking: env.Booking) => {
+  let status = bookcarsTypes.BookingStatus.Paid
+  if (booking.isDeposit) {
+    status = bookcarsTypes.BookingStatus.Deposit
+  } else if (booking.isPayedInFull) {
+    status = bookcarsTypes.BookingStatus.PaidInFull
+  }
+
+  return status
+}
+
+const redirectToFrontendCheckoutResult = (res: Response, bookingId: string, status: 'success' | 'cancel' | 'error', orderId?: string) => {
+  const params = new URLSearchParams({ bookingId, status })
+  if (orderId) {
+    params.set('orderId', orderId)
+  }
+
+  res.redirect(`${env.FRONTEND_HOST.replace(/\/$/, '')}/checkout-external?${params.toString()}`)
+}
+
+export const areebaSuccess = async (req: Request, res: Response) => {
+  const { bookingId, sessionId } = req.params
+  const orderId = String(req.query.order_id || '')
+  const paymentStatus = String(req.query.status || '').toLowerCase()
+
+  try {
+    const booking = await Booking.findOne({ _id: bookingId, sessionId, expireAt: { $ne: null } })
+    if (!booking) {
+      res.status(404).send('Booking not found')
+      return
+    }
+
+    if (paymentStatus !== 'paid') {
+      redirectToFrontendCheckoutResult(res, bookingId, 'error', orderId)
+      return
+    }
+
+    booking.expireAt = undefined
+    booking.status = getPaidBookingStatus(booking)
+    await booking.save()
+
+    const car = await Car.findById(booking.car)
+    if (car) {
+      car.trips += 1
+      await car.save()
+    }
+
+    const supplier = await User.findById(booking.supplier)
+    const user = await User.findById(booking.driver)
+
+    if (user) {
+      user.expireAt = undefined
+      await user.save()
+    }
+
+    if (supplier && user) {
+      await confirm(user, supplier, booking, false)
+
+      i18n.locale = supplier.language
+      await notify(user, booking._id.toString(), supplier, i18n.t('BOOKING_PAID_NOTIFICATION'))
+
+      const admin = !!env.ADMIN_EMAIL && (await User.findOne({ email: env.ADMIN_EMAIL, type: bookcarsTypes.UserType.Admin }))
+      if (admin) {
+        i18n.locale = admin.language
+        await notify(user, booking._id.toString(), admin, i18n.t('BOOKING_PAID_NOTIFICATION'))
+      }
+    }
+
+    redirectToFrontendCheckoutResult(res, bookingId, 'success', orderId)
+  } catch (err) {
+    logger.error(`[booking.areebaSuccess] ${i18n.t('ERROR')} ${bookingId}`, err)
+    res.status(400).send(i18n.t('ERROR') + err)
+  }
+}
+
+export const areebaCancel = async (req: Request, res: Response) => {
+  const { bookingId } = req.params
+  const orderId = String(req.query.order_id || '')
+  redirectToFrontendCheckoutResult(res, bookingId, 'cancel', orderId)
+}
+
+export const areebaError = async (req: Request, res: Response) => {
+  const { bookingId } = req.params
+  const orderId = String(req.query.order_id || '')
+  redirectToFrontendCheckoutResult(res, bookingId, 'error', orderId)
+}

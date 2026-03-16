@@ -16,6 +16,10 @@ let transporterPromise: Promise<nodemailer.Transporter> | null = null
  * @throws {Error} If the SMTP configuration is invalid or connection fails.
  */
 const createTransporter = async (): Promise<nodemailer.Transporter> => {
+  if (!env.SMTP_ENABLED) {
+    throw new Error('SMTP is disabled')
+  }
+
   if (transporterPromise) {
     return transporterPromise
   }
@@ -74,6 +78,23 @@ const createTransporter = async (): Promise<nodemailer.Transporter> => {
  * @returns {Promise<nodemailer.SentMessageInfo>} Result containing messageId and accepted recipients.
  */
 export const sendMail = async (mailOptions: nodemailer.SendMailOptions): Promise<nodemailer.SentMessageInfo> => {
+  if (!env.SMTP_ENABLED) {
+    return {
+      accepted: Array.isArray(mailOptions.to) ? mailOptions.to : mailOptions.to ? [String(mailOptions.to)] : [],
+      rejected: [],
+      envelopeTime: 0,
+      messageTime: 0,
+      messageSize: 0,
+      response: 'SMTP disabled',
+      envelope: {
+        from: mailOptions.from ? String(mailOptions.from) : false,
+        to: Array.isArray(mailOptions.to) ? mailOptions.to.map(String) : mailOptions.to ? [String(mailOptions.to)] : [],
+      },
+      messageId: 'smtp-disabled',
+      pending: [],
+    } as nodemailer.SentMessageInfo
+  }
+
   const transporter = await createTransporter()
   return transporter.sendMail(mailOptions)
 }

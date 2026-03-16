@@ -120,6 +120,12 @@ const SignUp = () => {
                   {...register('fullName')}
                   label={commonStrings.FULL_NAME}
                   autoComplete="off"
+                  onChange={(e) => {
+                    if (errors.fullName) {
+                      clearErrors('fullName')
+                    }
+                    setValue('fullName', e.target.value, { shouldValidate: true })
+                  }}
                   required
                 />
               </FormControl>
@@ -130,10 +136,11 @@ const SignUp = () => {
                   {...register('email')}
                   label={commonStrings.EMAIL}
                   autoComplete="off"
-                  onChange={() => {
+                  onChange={(e) => {
                     if (errors.email) {
                       clearErrors('email')
                     }
+                    setValue('email', e.target.value, { shouldValidate: true })
                   }}
                   required
                 />
@@ -146,10 +153,11 @@ const SignUp = () => {
                   {...register('phone')}
                   label={commonStrings.PHONE}
                   autoComplete="off"
-                  onChange={() => {
+                  onChange={(e) => {
                     if (errors.phone) {
                       clearErrors('phone')
                     }
+                    setValue('phone', e.target.value, { shouldValidate: true })
                   }}
                   required
                 />

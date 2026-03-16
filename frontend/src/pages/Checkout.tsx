@@ -47,6 +47,7 @@ import * as CarService from '@/services/CarService'
 import * as LocationService from '@/services/LocationService'
 import * as PaymentService from '@/services/PaymentService'
 import * as StripeService from '@/services/StripeService'
+import * as AreebaService from '@/services/AreebaService'
 import * as PayPalService from '@/services/PayPalService'
 import { useRecaptchaContext, RecaptchaContextType } from '@/context/RecaptchaContext'
 import Layout from '@/components/Layout'
@@ -255,6 +256,7 @@ const Checkout = () => {
       //
       let _customerId: string | undefined
       let _sessionId: string | undefined
+      let areebaPaymentUrl: string | undefined
       if (!payLater) {
         if (env.PAYMENT_GATEWAY === bookcarsTypes.PaymentGateway.Stripe) {
           const name = bookcarsHelper.truncateString(`${env.WEBSITE_NAME} - ${car.name}`, StripeService.ORDER_NAME_MAX_LENGTH)
@@ -281,8 +283,10 @@ const Checkout = () => {
           setClientSecret(res.clientSecret)
           _sessionId = res.sessionId
           _customerId = res.customerId
-        } else {
+        } else if (env.PAYMENT_GATEWAY === bookcarsTypes.PaymentGateway.PayPal) {
           setPayPalLoaded(true)
+        } else {
+          _sessionId = crypto.randomUUID()
         }
       }
 
@@ -302,12 +306,45 @@ const Checkout = () => {
       const { status, bookingId: _bookingId } = await BookingService.checkout(payload)
 
       if (status === 200) {
+        if (env.PAYMENT_GATEWAY === bookcarsTypes.PaymentGateway.Areeba && !payLater) {
+          let finalPrice = price
+          if (payDeposit) {
+            finalPrice = depositPrice
+          } else if (payInFull) {
+            finalPrice = price + depositPrice
+          }
+
+          const callbackBase = env.API_HOST.replace(/\/$/, '')
+          const successCallback = `${callbackBase}/api/areeba/success/${encodeURIComponent(_bookingId)}/${encodeURIComponent(_sessionId as string)}`
+          const cancelCallback = `${callbackBase}/api/areeba/cancel/${encodeURIComponent(_bookingId)}/${encodeURIComponent(_sessionId as string)}`
+          const errorCallback = `${callbackBase}/api/areeba/error/${encodeURIComponent(_bookingId)}/${encodeURIComponent(_sessionId as string)}`
+
+          areebaPaymentUrl = await AreebaService.createPaymentLink(env.AREEBA_API_HOST, {
+            project_id: env.AREEBA_PROJECT_ID,
+            project_name: env.WEBSITE_NAME,
+            prodact_id: car._id as string,
+            user_id: ((!authenticated ? driver?._id : user?._id) || _bookingId) as string,
+            firstName: ((!authenticated ? driver?.fullName : user?.fullName) || '').split(' ').slice(0, 1).join(' '),
+            lastName: ((!authenticated ? driver?.fullName : user?.fullName) || '').split(' ').slice(1).join(' '),
+            email: ((!authenticated ? driver?.email : user?.email) || '') as string,
+            price: finalPrice,
+            currency: PaymentService.getCurrency(),
+            successCallback,
+            cancelCallback,
+            errorCallback,
+          })
+        }
+
         if (payLater) {
           setVisible(false)
           setSuccess(true)
         }
         setBookingId(_bookingId)
         setSessionId(_sessionId)
+
+        if (areebaPaymentUrl) {
+          window.location.assign(areebaPaymentUrl)
+        }
       } else {
         helper.error()
       }
@@ -972,6 +1009,7 @@ const Checkout = () => {
                       {(
                         (env.PAYMENT_GATEWAY === bookcarsTypes.PaymentGateway.Stripe && !clientSecret)
                         || (env.PAYMENT_GATEWAY === bookcarsTypes.PaymentGateway.PayPal && !payPalInit)
+                        || env.PAYMENT_GATEWAY === bookcarsTypes.PaymentGateway.Areeba
                         || payLater) && (
                           <Button
                             type="submit"

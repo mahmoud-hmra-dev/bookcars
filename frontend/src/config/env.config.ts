@@ -61,6 +61,10 @@ const getPaymentGateway = () => {
     return bookcarsTypes.PaymentGateway.PayPal
   }
 
+  if (paymentGateway === 'AREEBA') {
+    return bookcarsTypes.PaymentGateway.Areeba
+  }
+
   // Default is Stripe
   return bookcarsTypes.PaymentGateway.Stripe
 }
@@ -114,6 +118,8 @@ const env = {
   PAYMENT_GATEWAY,
   STRIPE_PUBLISHABLE_KEY: String(import.meta.env.VITE_BC_STRIPE_PUBLISHABLE_KEY),
   PAYPAL_CLIENT_ID: String(import.meta.env.VITE_BC_PAYPAL_CLIENT_ID),
+  AREEBA_API_HOST: String(import.meta.env.VITE_BC_AREEBA_API_HOST || 'http://localhost:8001'),
+  AREEBA_PROJECT_ID: String(import.meta.env.VITE_BC_AREEBA_PROJECT_ID || ''),
   PAYPAL_DEBUG: (import.meta.env.VITE_BC_PAYPAL_DEBUG && import.meta.env.VITE_BC_PAYPAL_DEBUG.toLowerCase()) === 'true',
   SET_LANGUAGE_FROM_IP: (import.meta.env.VITE_BC_SET_LANGUAGE_FROM_IP && import.meta.env.VITE_BC_SET_LANGUAGE_FROM_IP.toLowerCase()) === 'true',
   GOOGLE_ANALYTICS_ENABLED: (import.meta.env.VITE_BC_GOOGLE_ANALYTICS_ENABLED && import.meta.env.VITE_BC_GOOGLE_ANALYTICS_ENABLED.toLowerCase()) === 'true',

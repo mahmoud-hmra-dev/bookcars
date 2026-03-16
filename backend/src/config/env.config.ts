@@ -201,39 +201,46 @@ export const JWT_EXPIRE_AT = Number.parseInt(__env__('BC_JWT_EXPIRE_AT', false, 
 export const TOKEN_EXPIRE_AT = Number.parseInt(__env__('BC_TOKEN_EXPIRE_AT', false, '86400'), 10)
 
 /**
+ * Indicates whether SMTP email sending is enabled.
+ *
+ * @type {boolean}
+ */
+export const SMTP_ENABLED = helper.StringToBoolean(__env__('BC_SMTP_ENABLED', false, 'true'))
+
+/**
  * SMTP host.
  *
  * @type {string}
  */
-export const SMTP_HOST = __env__('BC_SMTP_HOST', true)
+export const SMTP_HOST = __env__('BC_SMTP_HOST', SMTP_ENABLED)
 
 /**
  * SMTP port.
  *
  * @type {number}
  */
-export const SMTP_PORT = Number.parseInt(__env__('BC_SMTP_PORT', true), 10)
+export const SMTP_PORT = Number.parseInt(__env__('BC_SMTP_PORT', SMTP_ENABLED, '587'), 10)
 
 /**
  * SMTP username.
  *
  * @type {string}
  */
-export const SMTP_USER = __env__('BC_SMTP_USER', true)
+export const SMTP_USER = __env__('BC_SMTP_USER', SMTP_ENABLED)
 
 /**
  * SMTP password.
  *
  * @type {string}
  */
-export const SMTP_PASS = __env__('BC_SMTP_PASS', true)
+export const SMTP_PASS = __env__('BC_SMTP_PASS', SMTP_ENABLED)
 
 /**
  * SMTP from email.
  *
  * @type {string}
  */
-export const SMTP_FROM = __env__('BC_SMTP_FROM', true)
+export const SMTP_FROM = __env__('BC_SMTP_FROM', SMTP_ENABLED, 'no-reply@localhost')
 
 /**
  * CDN root folder path.

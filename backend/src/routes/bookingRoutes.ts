@@ -16,5 +16,8 @@ routes.route(routeNames.getBookingId).get(bookingController.getBookingId)
 routes.route(routeNames.getBookings).post(authJwt.verifyToken, bookingController.getBookings)
 routes.route(routeNames.hasBookings).get(authJwt.verifyToken, bookingController.hasBookings)
 routes.route(routeNames.cancelBooking).post(authJwt.verifyToken, bookingController.cancelBooking)
+routes.route(routeNames.areebaSuccess).get(bookingController.areebaSuccess)
+routes.route(routeNames.areebaCancel).get(bookingController.areebaCancel)
+routes.route(routeNames.areebaError).get(bookingController.areebaError)
 
 export default routes
