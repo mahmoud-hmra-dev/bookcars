@@ -35,6 +35,7 @@ import {
   AccountBalance as BankDetailsIcon,
   MonetizationOn as PricingIcon,
   SmartToy as AssistantIcon,
+  MyLocation as TrackingIcon,
 } from '@mui/icons-material'
 import { useNavigate } from 'react-router-dom'
 import * as bookcarsTypes from ':bookcars-types'
@@ -356,6 +357,15 @@ const Header = ({
                 >
                   <ListItemIcon><CarsIcon /></ListItemIcon>
                   <ListItemText primary={strings.CARS} />
+                </ListItem>
+                <ListItem
+                  onClick={() => {
+                    navigate('/tracking')
+                    handleSideMenuClose()
+                  }}
+                >
+                  <ListItemIcon><TrackingIcon /></ListItemIcon>
+                  <ListItemText primary={strings.TRACKING} />
                 </ListItem>
                 <ListItem
                   onClick={() => {

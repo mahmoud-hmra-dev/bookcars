@@ -1,0 +1,55 @@
+.tracking-page {
+  padding: 20px;
+}
+
+.tracking-title {
+  margin-bottom: 16px;
+}
+
+.tracking-card {
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.tracking-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
+
+.tracking-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.tracking-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tracking-data {
+  margin-top: 12px;
+}
+
+.tracking-list {
+  margin-top: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.tracking-list-item {
+  padding: 8px 0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.tracking-empty {
+  margin-top: 12px;
+  color: #666;
+}
