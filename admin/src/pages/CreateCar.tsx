@@ -122,6 +122,7 @@ const CreateCar = () => {
   const comingSoon = useWatch({ control, name: 'comingSoon' })
   const blockOnPay = useWatch({ control, name: 'blockOnPay' })
   const type = useWatch({ control, name: 'type' })
+  const trackingEnabled = useWatch({ control, name: 'trackingEnabled' })
   const gearbox = useWatch({ control, name: 'gearbox' })
   const seats = useWatch({ control, name: 'seats' })
   const doors = useWatch({ control, name: 'doors' })
@@ -620,6 +621,60 @@ const CreateCar = () => {
                 }}
               />
             </FormControl>
+
+            <FormControl fullWidth margin="dense" className="checkbox-fc">
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={trackingEnabled}
+                    onChange={(e) => setValue('trackingEnabled', e.target.checked)}
+                    color="primary"
+                  />
+                }
+                label="Enable Traccar tracking"
+                className="checkbox-fcl"
+              />
+            </FormControl>
+
+            {trackingEnabled && (
+              <>
+                <FormControl fullWidth margin="dense">
+                  <TextField
+                    label="Traccar device ID"
+                    {...register('trackingDeviceId')}
+                    variant="standard"
+                    autoComplete="off"
+                    error={!!errors.trackingDeviceId}
+                    helperText={errors.trackingDeviceId?.message || 'Link this car to a Traccar device for safe tracking visibility.'}
+                    onChange={() => {
+                      if (errors.trackingDeviceId) {
+                        clearErrors('trackingDeviceId')
+                      }
+                    }}
+                  />
+                </FormControl>
+
+                <FormControl fullWidth margin="dense">
+                  <TextField
+                    label="Tracked device name"
+                    {...register('trackingDeviceName')}
+                    variant="standard"
+                    autoComplete="off"
+                  />
+                </FormControl>
+
+                <FormControl fullWidth margin="dense">
+                  <TextField
+                    label="Tracking notes"
+                    {...register('trackingNotes')}
+                    variant="standard"
+                    autoComplete="off"
+                    multiline
+                    minRows={2}
+                  />
+                </FormControl>
+              </>
+            )}
 
             <FormControl fullWidth margin="dense" className="checkbox-fc">
               <FormControlLabel
