@@ -542,6 +542,20 @@ export const APPLE_CLIENT_ID_MOBILE = __env__('BC_APPLE_CLIENT_ID_MOBILE', false
 export const GOOGLE_CLIENT_ID = __env__('BC_GOOGLE_CLIENT_ID', false, 'GOOGLE_CLIENT_ID')
 
 /**
+ * Auth0 domain.
+ *
+ * @type {string}
+ */
+export const AUTH0_DOMAIN = __env__('BC_AUTH0_DOMAIN', false)
+
+/**
+ * Auth0 client ID.
+ *
+ * @type {string}
+ */
+export const AUTH0_CLIENT_ID = __env__('BC_AUTH0_CLIENT_ID', false)
+
+/**
  * Google mobile app Web client ID.
  *
  * @type {string}

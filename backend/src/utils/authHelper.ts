@@ -11,6 +11,8 @@ import * as logger from '../utils/logger'
 const jwtSecret = new TextEncoder().encode(env.JWT_SECRET)
 const jwtAlg = 'HS256'
 
+const normalizeAuth0Domain = (domain: string) => helper.trim(domain.replace(/^https?:\/\//i, ''), '/')
+
 export type SessionData = {
   id: string
 }
@@ -126,6 +128,9 @@ export const validateAccessToken = async (
       case bookcarsTypes.SocialSignInType.Facebook:
         return await verifyFacebookToken(token, email)
 
+      case bookcarsTypes.SocialSignInType.Auth0:
+        return await verifyAuth0Token(token, email)
+
       default:
         return false
     }
@@ -138,6 +143,7 @@ export const validateAccessToken = async (
 
 // Cache JWKS for performance
 const APPLE_JWKS = jose.createRemoteJWKSet(new URL('https://appleid.apple.com/auth/keys'))
+const AUTH0_JWKS = () => jose.createRemoteJWKSet(new URL(`https://${normalizeAuth0Domain(env.AUTH0_DOMAIN)}/.well-known/jwks.json`))
 
 /**
  * APPLE: Always a JWT
@@ -221,4 +227,39 @@ export async function verifyFacebookToken(token: string, email: string): Promise
   const emailMatches = userRes.data.email?.toLowerCase() === email.toLowerCase()
 
   return emailMatches
+}
+
+export async function verifyAuth0Token(token: string, email: string): Promise<boolean> {
+  if (!env.AUTH0_DOMAIN || !env.AUTH0_CLIENT_ID) {
+    return false
+  }
+
+  const auth0Domain = normalizeAuth0Domain(env.AUTH0_DOMAIN)
+  const issuer = `https://${auth0Domain}/`
+  const { payload } = await jose.jwtVerify(token, AUTH0_JWKS(), {
+    issuer,
+    clockTolerance: '2m',
+  })
+
+  const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud]
+  const clientIdMatches = audiences.includes(env.AUTH0_CLIENT_ID) || payload.azp === env.AUTH0_CLIENT_ID
+
+  if (!clientIdMatches || !payload.sub) {
+    return false
+  }
+
+  let payloadEmail = String(payload.email || '').toLowerCase()
+  let isVerified = payload.email_verified === true || payload.email_verified === 'true'
+
+  // Some Auth0 access tokens do not include email claims, so fall back to /userinfo.
+  if (!payloadEmail) {
+    const userInfoRes = await axios.get(`https://${auth0Domain}/userinfo`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    payloadEmail = String(userInfoRes.data.email || '').toLowerCase()
+    isVerified = userInfoRes.data.email_verified === true || userInfoRes.data.email_verified === 'true'
+  }
+
+  return Boolean(payloadEmail === email.toLowerCase() && isVerified)
 }

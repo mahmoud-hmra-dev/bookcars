@@ -7,6 +7,8 @@ jest.unstable_mockModule('../src/config/env.config', () => ({
     GOOGLE_CLIENT_ID: 'google-client-id',
     FACEBOOK_APP_ID: 'fb-app-id',
     FACEBOOK_APP_SECRET: 'fb-secret',
+    AUTH0_DOMAIN: 'tenant.us.auth0.com',
+    AUTH0_CLIENT_ID: 'auth0-client-id',
 }))
 
 jest.unstable_mockModule('jose', () => ({
@@ -108,6 +110,64 @@ describe('Social Auth Helper (ESM)', () => {
 
       const result = await authHelper.verifyFacebookToken(mockToken, mockEmail)
       expect(result).toBe(true)
+    })
+  })
+
+  describe('verifyAuth0Token', () => {
+    it('should return true for a valid Auth0 ID token', async () => {
+      // @ts-expect-error - jwtVerify is replaced by a Jest mock function during unstable_mockModule
+      mockedJose.jwtVerify.mockResolvedValue({
+        payload: {
+          aud: 'auth0-client-id',
+          azp: 'auth0-client-id',
+          email: mockEmail,
+          email_verified: true,
+          sub: 'auth0|123',
+        },
+      })
+
+      const result = await authHelper.verifyAuth0Token(mockToken, mockEmail)
+      expect(result).toBe(true)
+    })
+
+    it('should return true for a valid Auth0 access token by resolving /userinfo', async () => {
+      // @ts-expect-error - jwtVerify is replaced by a Jest mock function during unstable_mockModule
+      mockedJose.jwtVerify.mockResolvedValue({
+        payload: {
+          aud: ['https://api.example.com', 'https://tenant.us.auth0.com/userinfo'],
+          azp: 'auth0-client-id',
+          sub: 'auth0|456',
+        },
+      })
+      mockedAxios.get.mockResolvedValue({
+        data: {
+          email: mockEmail,
+          email_verified: true,
+        },
+      })
+
+      const result = await authHelper.verifyAuth0Token(mockToken, mockEmail)
+      expect(result).toBe(true)
+      expect(mockedAxios.get).toHaveBeenCalledWith(
+        'https://tenant.us.auth0.com/userinfo',
+        { headers: { Authorization: `Bearer ${mockToken}` } },
+      )
+    })
+
+    it('should return false when Auth0 token is for another client', async () => {
+      // @ts-expect-error - jwtVerify is replaced by a Jest mock function during unstable_mockModule
+      mockedJose.jwtVerify.mockResolvedValue({
+        payload: {
+          aud: 'different-client-id',
+          azp: 'different-client-id',
+          email: mockEmail,
+          email_verified: true,
+          sub: 'auth0|789',
+        },
+      })
+
+      const result = await authHelper.verifyAuth0Token(mockToken, mockEmail)
+      expect(result).toBe(false)
     })
   })
 })

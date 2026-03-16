@@ -395,7 +395,8 @@ export interface ValidateEmailPayload {
 export enum SocialSignInType {
   Facebook = 'facebook',
   Apple = 'apple',
-  Google = 'google'
+  Google = 'google',
+  Auth0 = 'auth0'
 }
 
 export interface SignInPayload {

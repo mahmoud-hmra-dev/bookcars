@@ -25,6 +25,7 @@ const Search = lazy(() => import('@/pages/Search'))
 const Checkout = lazy(() => import('@/pages/Checkout'))
 const CheckoutSession = lazy(() => import('@/pages/CheckoutSession'))
 const CheckoutExternal = lazy(() => import('@/pages/CheckoutExternal'))
+const AuthCallback = lazy(() => import('@/pages/AuthCallback'))
 const Bookings = lazy(() => import('@/pages/Bookings'))
 const Booking = lazy(() => import('@/pages/Booking'))
 const Settings = lazy(() => import('@/pages/Settings'))
@@ -84,6 +85,7 @@ const router = createBrowserRouter([
       { path: 'checkout', element: <Checkout /> },
       { path: 'checkout-session/:sessionId', element: <CheckoutSession /> },
       { path: 'checkout-external', element: <CheckoutExternal /> },
+      { path: 'auth/callback', element: <AuthCallback /> },
       { path: 'bookings', element: <Bookings /> },
       { path: 'booking', element: <Booking /> },
       { path: 'settings', element: <Settings /> },

@@ -70,6 +70,7 @@ const getPaymentGateway = () => {
 }
 
 const PAYMENT_GATEWAY = getPaymentGateway()
+const normalizeAuth0Domain = (domain: string) => domain.replace(/^https?:\/\//i, '').replace(/\/+$/, '')
 
 const env = {
   isMobile: window.innerWidth <= 960,
@@ -120,6 +121,11 @@ const env = {
   PAYPAL_CLIENT_ID: String(import.meta.env.VITE_BC_PAYPAL_CLIENT_ID),
   AREEBA_API_HOST: String(import.meta.env.VITE_BC_AREEBA_API_HOST || 'http://localhost:8001'),
   AREEBA_PROJECT_ID: String(import.meta.env.VITE_BC_AREEBA_PROJECT_ID || ''),
+  AUTH0_DOMAIN: normalizeAuth0Domain(String(import.meta.env.VITE_BC_AUTH0_DOMAIN || '')),
+  AUTH0_CLIENT_ID: String(import.meta.env.VITE_BC_AUTH0_CLIENT_ID || ''),
+  AUTH0_CONNECTION_GOOGLE: String(import.meta.env.VITE_BC_AUTH0_CONNECTION_GOOGLE || 'google-oauth2'),
+  AUTH0_CONNECTION_FACEBOOK: String(import.meta.env.VITE_BC_AUTH0_CONNECTION_FACEBOOK || 'facebook'),
+  AUTH0_CONNECTION_TWITTER: String(import.meta.env.VITE_BC_AUTH0_CONNECTION_TWITTER || 'twitter'),
   PAYPAL_DEBUG: (import.meta.env.VITE_BC_PAYPAL_DEBUG && import.meta.env.VITE_BC_PAYPAL_DEBUG.toLowerCase()) === 'true',
   SET_LANGUAGE_FROM_IP: (import.meta.env.VITE_BC_SET_LANGUAGE_FROM_IP && import.meta.env.VITE_BC_SET_LANGUAGE_FROM_IP.toLowerCase()) === 'true',
   GOOGLE_ANALYTICS_ENABLED: (import.meta.env.VITE_BC_GOOGLE_ANALYTICS_ENABLED && import.meta.env.VITE_BC_GOOGLE_ANALYTICS_ENABLED.toLowerCase()) === 'true',

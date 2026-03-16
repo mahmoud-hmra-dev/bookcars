@@ -1,24 +1,12 @@
 import React from 'react'
-import { useNavigate } from 'react-router-dom'
-import {
-  IResolveParams,
-  LoginSocialFacebook,
-  LoginSocialApple,
-  LoginSocialGoogle,
-} from ':reactjs-social-login'
-import * as bookcarsTypes from ':bookcars-types'
+import { useAuth0 } from '@auth0/auth0-react'
 import { strings as commonStrings } from '@/lang/common'
 import env from '@/config/env.config'
-import * as UserService from '@/services/UserService'
-import { useUserContext, UserContextType } from '@/context/UserContext'
 
 import FacebookIcon from '@/assets/img/facebook-icon.png'
-import AppleIcon from '@/assets/img/apple-icon.png'
 import GoogleIcon from '@/assets/img/google-icon.png'
 
 import '@/assets/css/social-login.css'
-
-const REDIRECT_URI = window.location.href
 
 interface SocialLoginProps {
   facebook?: boolean
@@ -33,65 +21,23 @@ interface SocialLoginProps {
 }
 
 const SocialLogin = ({
-  facebook,
-  apple,
-  google = true,
-  redirectToHomepage,
-  reloadPage,
   className,
   onError,
-  onSignInError,
-  onBlackListed }: SocialLoginProps) => {
-  const navigate = useNavigate()
+}: SocialLoginProps) => {
+  const { loginWithRedirect } = useAuth0()
 
-  const { setUser, setUserLoaded } = useUserContext() as UserContextType
-
-  const loginSuccess = async (socialSignInType: bookcarsTypes.SocialSignInType, accessToken: string, email: string, fullName: string, avatar?: string) => {
-    const data: bookcarsTypes.SignInPayload = {
-      socialSignInType,
-      accessToken,
-      email,
-      fullName,
-      avatar,
-      stayConnected: UserService.getStayConnected()
+  const startLogin = async (connection: string) => {
+    try {
+      await loginWithRedirect({
+        authorizationParams: {
+          connection,
+          prompt: 'login',
+        },
+      })
+    } catch (err) {
+      console.error(err)
+      onError?.(err)
     }
-
-    const res = await UserService.socialSignin(data)
-    if (res.status === 200) {
-      if (res.data.blacklisted) {
-        await UserService.signout(false)
-        if (onBlackListed) {
-          onBlackListed()
-        }
-      } else {
-        const user = await UserService.getUser(res.data._id)
-        setUser(user)
-        setUserLoaded(true)
-
-        if (redirectToHomepage) {
-          navigate('/')
-        }
-
-        if (reloadPage) {
-          navigate(0)
-        }
-      }
-    } else if (onSignInError) {
-      onSignInError()
-    }
-  }
-
-  const loginError = (err: any) => {
-    console.log(err)
-    if (onError) {
-      onError(err)
-    }
-  }
-
-  const getEmail = (jwtToken: string) => {
-    const jwt = UserService.parseJwt(jwtToken)
-    const { email } = jwt
-    return email
   }
 
   return (
@@ -103,58 +49,17 @@ const SocialLogin = ({
       </div>
 
       <div className="login-buttons">
-        {facebook && (
-          <LoginSocialFacebook
-            appId={env.FB_APP_ID}
-            redirect_uri={REDIRECT_URI}
-            onResolve={({ data }: IResolveParams) => {
-              loginSuccess(bookcarsTypes.SocialSignInType.Facebook, data?.accessToken, data?.email, data?.name, data?.picture?.data?.url)
-            }}
-            onReject={(err: any) => {
-              loginError(err)
-            }}
-            className="social"
-          >
-            <img alt="Facebook" src={FacebookIcon} className="social" />
-          </LoginSocialFacebook>
-        )}
+        <button type="button" className="social" onClick={() => startLogin(env.AUTH0_CONNECTION_FACEBOOK)}>
+          <img alt="Facebook" src={FacebookIcon} className="social" />
+        </button>
 
-        {apple && (
-          <LoginSocialApple
-            client_id={env.APPLE_ID}
-            scope="name email"
-            redirect_uri={REDIRECT_URI}
-            onResolve={({ data }: IResolveParams) => {
-              const email = data?.user?.email || getEmail(String(data?.id_token))
-              loginSuccess(bookcarsTypes.SocialSignInType.Apple, data?.id_token, email, data?.user ? `${data?.user?.firstName} ${data?.user?.lastName}` : email)
-            }}
-            onReject={(err: any) => {
-              loginError(err)
-            }}
-            className="social"
-          >
-            <img alt="Apple" src={AppleIcon} className="social" />
-          </LoginSocialApple>
-        )}
+        <button type="button" className="social" onClick={() => startLogin(env.AUTH0_CONNECTION_GOOGLE)}>
+          <img alt="Google" src={GoogleIcon} className="social" />
+        </button>
 
-        {google && (
-          <LoginSocialGoogle
-            client_id={env.GG_APP_ID}
-            typeResponse="idToken"
-            redirect_uri={REDIRECT_URI}
-            scope="openid profile email"
-            discoveryDocs="claims_supported"
-            onResolve={({ data }: IResolveParams) => {
-              loginSuccess(bookcarsTypes.SocialSignInType.Google, data?.credential, data?.email, data?.name || data?.email, data?.picture)
-            }}
-            onReject={(err: any) => {
-              loginError(err)
-            }}
-            className="social"
-          >
-            <img alt="Google" src={GoogleIcon} className="social" />
-          </LoginSocialGoogle>
-        )}
+        <button type="button" className="social" onClick={() => startLogin(env.AUTH0_CONNECTION_TWITTER)} aria-label="X / Twitter">
+          <span style={{ fontWeight: 700, fontSize: 18, lineHeight: 1 }}>X</span>
+        </button>
       </div>
     </div>
   )
