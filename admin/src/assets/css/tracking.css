@@ -2,13 +2,125 @@
   padding: 20px;
 }
 
-.tracking-title {
+.tracking-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
   margin-bottom: 16px;
+}
+
+.tracking-title {
+  margin-bottom: 6px;
+}
+
+.tracking-subtitle,
+.tracking-card-subtitle,
+.tracking-stat-note,
+.tracking-list-subtext {
+  color: #6b7280;
 }
 
 .tracking-card {
   padding: 16px;
   margin-bottom: 16px;
+  border-radius: 16px;
+}
+
+.tracking-controls-card {
+  margin-bottom: 20px;
+}
+
+.tracking-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.75fr) minmax(320px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.tracking-main-column,
+.tracking-side-column {
+  min-width: 0;
+}
+
+.tracking-map-card {
+  overflow: hidden;
+}
+
+.tracking-map-shell {
+  position: relative;
+  margin-top: 16px;
+  border-radius: 16px;
+  overflow: hidden;
+  min-height: 460px;
+  background: linear-gradient(135deg, #eef4ff 0%, #f8fbff 100%);
+  border: 1px solid #d9e5f9;
+}
+
+.tracking-map {
+  height: 460px;
+  width: 100%;
+  z-index: 1;
+}
+
+.tracking-map-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 8px;
+  padding: 24px;
+  background: rgba(248, 251, 255, 0.92);
+  z-index: 400;
+}
+
+.tracking-map-legend {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 0.875rem;
+  color: #475467;
+}
+
+.tracking-map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tracking-legend-dot,
+.tracking-legend-line,
+.tracking-legend-zone {
+  display: inline-block;
+}
+
+.tracking-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.tracking-legend-dot--current {
+  background: #d32f2f;
+}
+
+.tracking-legend-line {
+  width: 18px;
+  height: 4px;
+  border-radius: 999px;
+  background: #1976d2;
+}
+
+.tracking-legend-zone {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: rgba(0, 137, 123, 0.25);
+  border: 1px solid #00897b;
 }
 
 .tracking-grid {
@@ -38,18 +150,129 @@
   margin-top: 12px;
 }
 
+.tracking-detail-list {
+  display: grid;
+  gap: 10px;
+}
+
+.tracking-detail-list > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tracking-summary-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.tracking-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.tracking-stat-icon {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  color: #fff;
+}
+
+.tracking-stat-icon--position {
+  background: linear-gradient(135deg, #ef5350 0%, #c62828 100%);
+}
+
+.tracking-stat-icon--route {
+  background: linear-gradient(135deg, #42a5f5 0%, #1565c0 100%);
+}
+
+.tracking-stat-icon--geofence {
+  background: linear-gradient(135deg, #26a69a 0%, #00796b 100%);
+}
+
+.tracking-stat-icon--alerts {
+  background: linear-gradient(135deg, #ffa726 0%, #ef6c00 100%);
+}
+
+.tracking-stat-label {
+  font-size: 0.875rem;
+  color: #475467;
+  margin-bottom: 4px;
+}
+
 .tracking-list {
   margin-top: 12px;
   display: grid;
-  gap: 6px;
+  gap: 8px;
 }
 
 .tracking-list-item {
-  padding: 8px 0;
-  border-bottom: 1px solid #e0e0e0;
+  padding: 10px 0;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .tracking-empty {
   margin-top: 12px;
   color: #666;
+}
+
+.tracking-info-alert {
+  margin-bottom: 16px;
+}
+
+.tracking-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tracking-marker span {
+  display: block;
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.7);
+}
+
+.tracking-marker--current span {
+  width: 18px;
+  height: 18px;
+  background: #d32f2f;
+  border: 3px solid #fff;
+}
+
+.tracking-marker--start span {
+  width: 14px;
+  height: 14px;
+  background: #2e7d32;
+  border: 2px solid #fff;
+}
+
+.tracking-marker--end span {
+  width: 14px;
+  height: 14px;
+  background: #6a1b9a;
+  border: 2px solid #fff;
+}
+
+@media (max-width: 1100px) {
+  .tracking-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .tracking-page {
+    padding: 16px;
+  }
+
+  .tracking-map-shell,
+  .tracking-map {
+    min-height: 360px;
+    height: 360px;
+  }
 }
