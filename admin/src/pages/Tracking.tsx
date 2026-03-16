@@ -21,10 +21,10 @@ import RadarIcon from '@mui/icons-material/Radar'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import AccessTimeIcon from '@mui/icons-material/AccessTime'
 import SpeedIcon from '@mui/icons-material/Speed'
-import L from 'leaflet'
-import { Circle, MapContainer, Marker, Polygon, Polyline, Popup, Rectangle, TileLayer, useMap } from 'react-leaflet'
+import { GoogleMap, InfoWindow, MarkerF, PolygonF, PolylineF, RectangleF, CircleF, useJsApiLoader } from '@react-google-maps/api'
 import * as bookcarsTypes from ':bookcars-types'
 import * as bookcarsHelper from ':bookcars-helper'
+import wellknown from 'wellknown'
 import Layout from '@/components/Layout'
 import Backdrop from '@/components/SimpleBackdrop'
 import env from '@/config/env.config'
@@ -41,40 +41,34 @@ import '@/assets/css/tracking.css'
 const formatDateInput = (date: Date) => date.toISOString().slice(0, 16)
 const DEFAULT_CENTER: [number, number] = [33.8938, 35.5018]
 
-const currentMarkerIcon = L.divIcon({
-  className: 'tracking-marker tracking-marker--current',
-  html: '<span></span>',
-  iconSize: [22, 22],
-  iconAnchor: [11, 11],
-})
-
-const startMarkerIcon = L.divIcon({
-  className: 'tracking-marker tracking-marker--start',
-  html: '<span></span>',
-  iconSize: [18, 18],
-  iconAnchor: [9, 9],
-})
-
-const endMarkerIcon = L.divIcon({
-  className: 'tracking-marker tracking-marker--end',
-  html: '<span></span>',
-  iconSize: [18, 18],
-  iconAnchor: [9, 9],
-})
 
 type LatLngTuple = [number, number]
+
+type GoogleLatLng = google.maps.LatLngLiteral
 
 type ParsedGeofence = {
   id: number | string
   name: string
-  shape: 'circle' | 'polygon' | 'rectangle'
+  shape: 'circle' | 'polygon' | 'rectangle' | 'geojson'
   center?: LatLngTuple
   radius?: number
   points?: LatLngTuple[]
   bounds?: [LatLngTuple, LatLngTuple]
+  geojson?: any
 }
 
 const isFiniteCoordinate = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
+
+const toLeafletLatLng = (first: number, second: number): LatLngTuple => {
+  // Leaflet expects [lat, lng].
+  // For WKT/GeoJSON, coordinates are commonly [lng, lat].
+  // If only one ordering is geographically valid, normalize to it.
+  if (Math.abs(first) > 90 && Math.abs(second) <= 90) {
+    return [second, first]
+  }
+
+  return [first, second]
+}
 
 const toLatLng = (position?: bookcarsTypes.TraccarPosition | null): LatLngTuple | null => {
   if (!position || !isFiniteCoordinate(position.latitude) || !isFiniteCoordinate(position.longitude)) {
@@ -85,6 +79,22 @@ const toLatLng = (position?: bookcarsTypes.TraccarPosition | null): LatLngTuple 
 }
 
 const parseGeofenceArea = (geofence: bookcarsTypes.TraccarGeofence, fallbackIndex: number): ParsedGeofence | null => {
+  if (geofence.geojson) {
+    const name = geofence.name || geofence.description || `Geofence ${fallbackIndex + 1}`
+    const id = geofence.id ?? `GEOJSON-${fallbackIndex}`
+
+    return {
+      id,
+      name,
+      shape: 'geojson',
+      geojson: {
+        type: 'Feature',
+        properties: { name },
+        geometry: geofence.geojson,
+      },
+    }
+  }
+
   if (!geofence.area) {
     return null
   }
@@ -95,55 +105,155 @@ const parseGeofenceArea = (geofence: bookcarsTypes.TraccarGeofence, fallbackInde
   }
 
   const shapeType = rawType.trim().toUpperCase()
-  const coords = rawCoords.replace(/\)\s*$/, '').split(',').map((item) => Number.parseFloat(item.trim()))
   const name = geofence.name || geofence.description || `Geofence ${fallbackIndex + 1}`
   const id = geofence.id ?? `${shapeType}-${fallbackIndex}`
 
-  if (shapeType === 'CIRCLE' && coords.length >= 3) {
-    const [lat, lng, radius] = coords
-    if ([lat, lng, radius].every((item) => Number.isFinite(item))) {
-      return {
-        id,
-        name,
-        shape: 'circle',
-        center: [lat, lng],
-        radius,
-      }
+  const parseCircle = (): ParsedGeofence | null => {
+    // Supported formats:
+    // - CIRCLE (lat lon, radius)
+    // - CIRCLE (lat, lon, radius)
+    const full = geofence.area || ''
+    const match = full.match(/CIRCLE\s*\(\s*([-\d.]+)(?:\s+|,\s*)([-\d.]+)\s*,\s*([-\d.]+)\s*\)\s*$/i)
+    if (!match) {
+      return null
     }
+
+    const lat = Number.parseFloat(match[1])
+    const lng = Number.parseFloat(match[2])
+    const radius = Number.parseFloat(match[3])
+
+    if (![lat, lng, radius].every((value) => Number.isFinite(value))) {
+      return null
+    }
+
+    return { id, name, shape: 'circle', center: [lat, lng], radius }
   }
 
-  if (shapeType === 'RECTANGLE' && coords.length >= 4) {
-    const [lat1, lng1, lat2, lng2] = coords
-    if ([lat1, lng1, lat2, lng2].every((item) => Number.isFinite(item))) {
-      return {
-        id,
-        name,
-        shape: 'rectangle',
-        bounds: [[lat1, lng1], [lat2, lng2]],
+  const parseRectangle = (): ParsedGeofence | null => {
+    // Formats seen in the wild include:
+    // - RECTANGLE (lat1 lon1, lat2 lon2)
+    // - RECTANGLE (lat1,lng1,lat2,lng2)
+    const full = geofence.area || ''
+    const match = full.match(/RECTANGLE\s*\(\s*([-\d.]+)(?:\s+|,\s*)([-\d.]+)\s*,\s*([-\d.]+)(?:\s+|,\s*)([-\d.]+)\s*\)\s*$/i)
+    if (match) {
+      const lat1 = Number.parseFloat(match[1])
+      const lng1 = Number.parseFloat(match[2])
+      const lat2 = Number.parseFloat(match[3])
+      const lng2 = Number.parseFloat(match[4])
+      if ([lat1, lng1, lat2, lng2].every((value) => Number.isFinite(value))) {
+        return { id, name, shape: 'rectangle', bounds: [[lat1, lng1], [lat2, lng2]] }
       }
     }
+
+    // Fallback: pull 4 numbers (comma-style) from the inner part
+    const inner = rawCoords.replace(/\)\s*$/, '')
+    const nums = inner.split(',').map((item) => Number.parseFloat(item.trim())).filter((value) => Number.isFinite(value))
+    if (nums.length >= 4) {
+      const [lat1, lng1, lat2, lng2] = nums
+      return { id, name, shape: 'rectangle', bounds: [[lat1, lng1], [lat2, lng2]] }
+    }
+
+    return null
   }
 
-  if (shapeType === 'POLYGON' && coords.length >= 6 && coords.length % 2 === 0) {
-    const points: LatLngTuple[] = []
-    for (let i = 0; i < coords.length; i += 2) {
-      const lat = coords[i]
-      const lng = coords[i + 1]
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+  const parsePolygon = (): ParsedGeofence | null => {
+    const full = geofence.area || ''
+
+    try {
+      const geometry = wellknown.parse(full)
+      if (geometry?.type === 'Polygon' || geometry?.type === 'MultiPolygon') {
+        return {
+          id,
+          name,
+          shape: 'geojson',
+          geojson: {
+            type: 'Feature',
+            properties: { name },
+            geometry,
+          },
+        }
+      }
+    } catch {
+      // Fall back to permissive manual parsing below.
+    }
+
+    const wktMatch = full.match(/POLYGON\s*\(\(\s*([\s\S]+?)\s*\)\)\s*$/i)
+    const content = wktMatch ? wktMatch[1] : rawCoords.replace(/\)\s*$/, '')
+
+    const coordPairs: LatLngTuple[] = []
+    const pairRegex = /([+-]?\d+(?:\.\d+)?)\s+([+-]?\d+(?:\.\d+)?)/g
+    let match: RegExpExecArray | null
+
+    while ((match = pairRegex.exec(content)) !== null) {
+      const first = Number.parseFloat(match[1])
+      const second = Number.parseFloat(match[2])
+      if (Number.isFinite(first) && Number.isFinite(second)) {
+        coordPairs.push(toLeafletLatLng(first, second))
+      }
+    }
+
+    if (coordPairs.length < 3) {
+      const numericValues = (full.match(/[+-]?\d+(?:\.\d+)?/g) || [])
+        .map((value) => Number.parseFloat(value))
+        .filter((value) => Number.isFinite(value))
+
+      for (let i = 0; i + 1 < numericValues.length; i += 2) {
+        coordPairs.push(toLeafletLatLng(numericValues[i], numericValues[i + 1]))
+      }
+    }
+
+    if (coordPairs.length >= 3) {
+      return { id, name, shape: 'polygon', points: coordPairs }
+    }
+
+    // Last-resort fallback: treat any POLYGON string as a supported polygon shape
+    // if it contains at least 3 coordinate pairs after stripping punctuation.
+    const loosePairs = content
+      .replace(/[()]/g, ' ')
+      .split(',')
+      .map((segment) => segment.trim().split(/\s+/).map((value) => Number.parseFloat(value)).filter((value) => Number.isFinite(value)))
+      .filter((pair) => pair.length >= 2)
+      .map((pair) => toLeafletLatLng(pair[0], pair[1]))
+
+    return loosePairs.length >= 3 ? { id, name, shape: 'polygon', points: loosePairs } : null
+  }
+
+  const parseGeoJson = (): ParsedGeofence | null => {
+    try {
+      const geometry = wellknown.parse(geofence.area || '')
+      if (!geometry || typeof geometry !== 'object') {
         return null
       }
-      points.push([lat, lng])
-    }
 
-    return {
-      id,
-      name,
-      shape: 'polygon',
-      points,
+      // wellknown returns GeoJSON geometry. react-leaflet GeoJSON expects a GeoJSON object.
+      return {
+        id,
+        name,
+        shape: 'geojson',
+        geojson: {
+          type: 'Feature',
+          properties: { name },
+          geometry,
+        },
+      }
+    } catch {
+      return null
     }
   }
 
-  return null
+  if (shapeType === 'CIRCLE') {
+    return parseCircle() || parseGeoJson()
+  }
+
+  if (shapeType === 'RECTANGLE') {
+    return parseRectangle() || parseGeoJson()
+  }
+
+  if (shapeType === 'POLYGON') {
+    return parsePolygon() || parseGeoJson()
+  }
+
+  return parseGeoJson()
 }
 
 const formatTimestamp = (value?: Date | string) => {
@@ -158,45 +268,143 @@ const formatTimestamp = (value?: Date | string) => {
 const formatCoordinate = (value?: number) => (typeof value === 'number' && Number.isFinite(value) ? value.toFixed(6) : '—')
 const formatNumber = (value?: number, suffix = '') => (typeof value === 'number' && Number.isFinite(value) ? `${Math.round(value * 100) / 100}${suffix}` : '—')
 
-const TrackingMapViewport = ({
+const toGoogleLatLng = (point: LatLngTuple): GoogleLatLng => ({ lat: point[0], lng: point[1] })
+
+const extractGeoJsonPaths = (geojson: any): LatLngTuple[][] => {
+  const geometry = geojson?.type === 'Feature' ? geojson.geometry : geojson
+  if (!geometry) {
+    return []
+  }
+
+  if (geometry.type === 'Polygon') {
+    return (geometry.coordinates || []).map((ring: [number, number][]) => ring.map(([lng, lat]) => [lat, lng]))
+  }
+
+  if (geometry.type === 'MultiPolygon') {
+    return (geometry.coordinates || []).flatMap((polygon: [number, number][][]) => (
+      polygon.map((ring: [number, number][]) => ring.map(([lng, lat]) => [lat, lng]))
+    ))
+  }
+
+  return []
+}
+
+const GoogleTrackingMap = ({
   currentPoint,
+  currentPosition,
+  selectedCarName,
   routePoints,
+  routeStartPoint,
+  routeEndPoint,
   geofenceShapes,
 }: {
   currentPoint: LatLngTuple | null
+  currentPosition?: bookcarsTypes.TraccarPosition | null
+  selectedCarName: string
   routePoints: LatLngTuple[]
+  routeStartPoint: LatLngTuple | null
+  routeEndPoint: LatLngTuple | null
   geofenceShapes: ParsedGeofence[]
 }) => {
-  const map = useMap()
+  const { isLoaded } = useJsApiLoader({
+    id: 'bookcars-google-maps',
+    googleMapsApiKey: env.GOOGLE_MAPS_API_KEY,
+  })
 
-  React.useEffect(() => {
-    const bounds = L.latLngBounds([])
+  const onLoad = React.useCallback((map: google.maps.Map) => {
+    const bounds = new google.maps.LatLngBounds()
+    let hasBounds = false
 
-    if (currentPoint) {
-      bounds.extend(currentPoint)
+    const extend = (point: LatLngTuple) => {
+      bounds.extend(toGoogleLatLng(point))
+      hasBounds = true
     }
 
-    routePoints.forEach((point) => bounds.extend(point))
+    if (currentPoint) {
+      extend(currentPoint)
+    }
+
+    routePoints.forEach(extend)
 
     geofenceShapes.forEach((shape) => {
       if (shape.center) {
-        bounds.extend(shape.center)
+        extend(shape.center)
       }
-      shape.points?.forEach((point) => bounds.extend(point))
+      shape.points?.forEach(extend)
       if (shape.bounds) {
-        bounds.extend(shape.bounds[0])
-        bounds.extend(shape.bounds[1])
+        extend(shape.bounds[0])
+        extend(shape.bounds[1])
+      }
+      if (shape.geojson) {
+        extractGeoJsonPaths(shape.geojson).forEach((ring) => ring.forEach(extend))
       }
     })
 
-    if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 })
+    if (hasBounds) {
+      map.fitBounds(bounds, 40)
     } else {
-      map.setView(DEFAULT_CENTER, 7)
+      map.setCenter(toGoogleLatLng(DEFAULT_CENTER))
+      map.setZoom(7)
     }
-  }, [map, currentPoint, routePoints, geofenceShapes])
+  }, [currentPoint, routePoints, geofenceShapes])
 
-  return null
+  if (!env.GOOGLE_MAPS_API_KEY) {
+    return <div className="tracking-map-empty"><Typography variant="body2">Google Maps API key is missing.</Typography></div>
+  }
+
+  if (!isLoaded) {
+    return <div className="tracking-map-empty"><Typography variant="body2">Loading Google Maps...</Typography></div>
+  }
+
+  return (
+    <GoogleMap
+      mapContainerClassName="tracking-map"
+      center={toGoogleLatLng(DEFAULT_CENTER)}
+      zoom={7}
+      onLoad={onLoad}
+      options={{ streetViewControl: false, mapTypeControl: false, fullscreenControl: true }}
+    >
+      {geofenceShapes.map((geofence) => {
+        if (geofence.shape === 'circle' && geofence.center && geofence.radius) {
+          return <CircleF key={`${geofence.id}`} center={toGoogleLatLng(geofence.center)} radius={geofence.radius} options={{ strokeColor: '#00897b', fillColor: '#4db6ac', fillOpacity: 0.18, strokeWeight: 2 }} />
+        }
+
+        if (geofence.shape === 'rectangle' && geofence.bounds) {
+          const north = Math.max(geofence.bounds[0][0], geofence.bounds[1][0])
+          const south = Math.min(geofence.bounds[0][0], geofence.bounds[1][0])
+          const east = Math.max(geofence.bounds[0][1], geofence.bounds[1][1])
+          const west = Math.min(geofence.bounds[0][1], geofence.bounds[1][1])
+          return <RectangleF key={`${geofence.id}`} bounds={{ north, south, east, west }} options={{ strokeColor: '#00897b', fillColor: '#4db6ac', fillOpacity: 0.18, strokeWeight: 2 }} />
+        }
+
+        if (geofence.shape === 'polygon' && geofence.points) {
+          return <PolygonF key={`${geofence.id}`} paths={geofence.points.map(toGoogleLatLng)} options={{ strokeColor: '#00897b', fillColor: '#4db6ac', fillOpacity: 0.18, strokeWeight: 2 }} />
+        }
+
+        if (geofence.shape === 'geojson' && geofence.geojson) {
+          return extractGeoJsonPaths(geofence.geojson).map((ring, index) => (
+            <PolygonF key={`${geofence.id}-${index}`} paths={ring.map(toGoogleLatLng)} options={{ strokeColor: '#00897b', fillColor: '#4db6ac', fillOpacity: 0.18, strokeWeight: 2 }} />
+          ))
+        }
+
+        return null
+      })}
+
+      {routePoints.length > 1 && <PolylineF path={routePoints.map(toGoogleLatLng)} options={{ strokeColor: '#1976d2', strokeWeight: 4, strokeOpacity: 0.9 }} />}
+      {routeStartPoint && routePoints.length > 1 && <MarkerF position={toGoogleLatLng(routeStartPoint)} title={strings.ROUTE_START} />}
+      {routeEndPoint && routePoints.length > 1 && <MarkerF position={toGoogleLatLng(routeEndPoint)} title={strings.ROUTE_END} />}
+      {currentPoint && <MarkerF position={toGoogleLatLng(currentPoint)} title={selectedCarName} />}
+      {currentPoint && (
+        <InfoWindow position={toGoogleLatLng(currentPoint)}>
+          <div>
+            <strong>{selectedCarName}</strong>
+            <br />
+            {`${formatCoordinate(currentPosition?.latitude)}, ${formatCoordinate(currentPosition?.longitude)}`}
+          </div>
+        </InfoWindow>
+      )}
+    </GoogleMap>
+  )
 }
 
 const Tracking = () => {
@@ -472,87 +680,24 @@ const Tracking = () => {
                   </div>
 
                   <div className="tracking-map-shell">
-                    <MapContainer center={DEFAULT_CENTER} zoom={7} scrollWheelZoom className="tracking-map">
-                      <TileLayer
-                        attribution={'&copy; OpenStreetMap contributors'}
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                      />
-                      <TrackingMapViewport currentPoint={currentPoint} routePoints={routePoints} geofenceShapes={geofenceShapes} />
-
-                      {geofenceShapes.map((geofence) => {
-                        if (geofence.shape === 'circle' && geofence.center && geofence.radius) {
-                          return (
-                            <Circle
-                              key={`${geofence.id}`}
-                              center={geofence.center}
-                              radius={geofence.radius}
-                              pathOptions={{ color: '#00897b', fillColor: '#4db6ac', fillOpacity: 0.18, weight: 2 }}
-                            >
-                              <Popup>{geofence.name}</Popup>
-                            </Circle>
-                          )
-                        }
-
-                        if (geofence.shape === 'rectangle' && geofence.bounds) {
-                          return (
-                            <Rectangle
-                              key={`${geofence.id}`}
-                              bounds={geofence.bounds}
-                              pathOptions={{ color: '#00897b', fillColor: '#4db6ac', fillOpacity: 0.18, weight: 2 }}
-                            >
-                              <Popup>{geofence.name}</Popup>
-                            </Rectangle>
-                          )
-                        }
-
-                        if (geofence.shape === 'polygon' && geofence.points) {
-                          return (
-                            <Polygon
-                              key={`${geofence.id}`}
-                              positions={geofence.points}
-                              pathOptions={{ color: '#00897b', fillColor: '#4db6ac', fillOpacity: 0.18, weight: 2 }}
-                            >
-                              <Popup>{geofence.name}</Popup>
-                            </Polygon>
-                          )
-                        }
-
-                        return null
-                      })}
-
-                      {routePoints.length > 1 && (
-                        <Polyline positions={routePoints} pathOptions={{ color: '#1976d2', weight: 4, opacity: 0.9 }} />
-                      )}
-
-                      {routeStartPoint && routePoints.length > 1 && (
-                        <Marker position={routeStartPoint} icon={startMarkerIcon}>
-                          <Popup>{strings.ROUTE_START}</Popup>
-                        </Marker>
-                      )}
-
-                      {routeEndPoint && routePoints.length > 1 && (
-                        <Marker position={routeEndPoint} icon={endMarkerIcon}>
-                          <Popup>{strings.ROUTE_END}</Popup>
-                        </Marker>
-                      )}
-
-                      {currentPoint && (
-                        <Marker position={currentPoint} icon={currentMarkerIcon}>
-                          <Popup>
-                            <strong>{selectedCar.name}</strong>
-                            <br />
-                            {`${formatCoordinate(currentPosition?.latitude)}, ${formatCoordinate(currentPosition?.longitude)}`}
-                          </Popup>
-                        </Marker>
-                      )}
-                    </MapContainer>
-
-                    {!currentPoint && routePoints.length === 0 && geofenceShapes.length === 0 && (
-                      <div className="tracking-map-empty">
-                        <Typography variant="body1">{strings.NO_MAP_DATA}</Typography>
-                        <Typography variant="body2">{strings.MAP_EMPTY_HELP}</Typography>
-                      </div>
-                    )}
+                    {(!currentPoint && routePoints.length === 0 && geofenceShapes.length === 0)
+                      ? (
+                        <div className="tracking-map-empty">
+                          <Typography variant="body1">{strings.NO_MAP_DATA}</Typography>
+                          <Typography variant="body2">{strings.MAP_EMPTY_HELP}</Typography>
+                        </div>
+                        )
+                      : (
+                        <GoogleTrackingMap
+                          currentPoint={currentPoint}
+                          currentPosition={currentPosition}
+                          selectedCarName={selectedCar.name}
+                          routePoints={routePoints}
+                          routeStartPoint={routeStartPoint}
+                          routeEndPoint={routeEndPoint}
+                          geofenceShapes={geofenceShapes}
+                        />
+                        )}
                   </div>
                 </Paper>
 

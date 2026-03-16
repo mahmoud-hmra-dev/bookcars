@@ -235,6 +235,7 @@ export interface TraccarGeofence {
   name?: string
   description?: string
   area?: string
+  geojson?: any
 }
 
 export interface CarTrackingSnapshot {

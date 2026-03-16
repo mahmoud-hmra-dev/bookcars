@@ -69,6 +69,7 @@ const env = {
   CONTACT_EMAIL: String(import.meta.env.VITE_BC_CONTACT_EMAIL),
   RECAPTCHA_ENABLED: (import.meta.env.VITE_BC_RECAPTCHA_ENABLED && import.meta.env.VITE_BC_RECAPTCHA_ENABLED.toLowerCase()) === 'true',
   RECAPTCHA_SITE_KEY: String(import.meta.env.VITE_BC_RECAPTCHA_SITE_KEY),
+  GOOGLE_MAPS_API_KEY: String(import.meta.env.VITE_BC_GOOGLE_MAPS_API_KEY || ''),
   PASSWORD_MIN_LENGTH: 6,
 }
 

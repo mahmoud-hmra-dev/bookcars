@@ -1,10 +1,27 @@
-import axios, { AxiosInstance } from 'axios'
+import axios, { AxiosError, AxiosInstance } from 'axios'
 import * as bookcarsTypes from ':bookcars-types'
 import * as env from '../config/env.config'
+import * as logger from '../utils/logger'
 
 let client: AxiosInstance | null = null
 
 const GEOFENCE_FALLBACK_LOOKBACK_DAYS = 30
+
+const safeAxiosErrorDetails = (error: AxiosError) => {
+  const config = (error.config ?? {}) as any
+  const params = config?.params
+
+  return {
+    message: error.message,
+    status: error.response?.status,
+    statusText: error.response?.statusText,
+    method: config.method,
+    baseURL: config.baseURL,
+    url: config.url,
+    params,
+    responseData: error.response?.data,
+  }
+}
 
 const getClient = () => {
   if (!client) {
@@ -19,6 +36,16 @@ const getClient = () => {
         Accept: 'application/json',
       },
     })
+
+    client.interceptors.response.use(
+      (response) => response,
+      (error: unknown) => {
+        if (axios.isAxiosError(error)) {
+          logger.error('[traccar.http] Request failed', safeAxiosErrorDetails(error))
+        }
+        return Promise.reject(error)
+      },
+    )
   }
 
   return client
@@ -38,6 +65,16 @@ const isInvalidDeviceGeofenceFilterError = (error: unknown) => {
   return error.response?.status === 400
 }
 
+const isInvalidPositionsFilterError = (error: unknown) => {
+  if (!axios.isAxiosError(error)) {
+    return false
+  }
+
+  return error.response?.status === 400
+}
+
+const isNotFoundError = (error: unknown) => axios.isAxiosError(error) && error.response?.status === 404
+
 const uniqueById = <T extends { id?: number }>(items: T[]) => {
   const seen = new Set<number>()
 
@@ -54,6 +91,81 @@ const uniqueById = <T extends { id?: number }>(items: T[]) => {
     return true
   })
 }
+
+const toLatLng = (first: number, second: number): [number, number] => {
+  if (Math.abs(first) > 90 && Math.abs(second) <= 90) {
+    return [second, first]
+  }
+
+  return [first, second]
+}
+
+const geofenceAreaToGeoJson = (area?: string) => {
+  if (!area) {
+    return undefined
+  }
+
+  const normalized = area.trim()
+  const shapeType = normalized.split('(', 1)[0]?.trim().toUpperCase()
+
+  if (shapeType === 'POLYGON') {
+    const values = (normalized.match(/[+-]?\d+(?:\.\d+)?/g) || [])
+      .map((value) => Number.parseFloat(value))
+      .filter((value) => Number.isFinite(value))
+
+    const ring: [number, number][] = []
+    for (let i = 0; i + 1 < values.length; i += 2) {
+      const [lat, lng] = toLatLng(values[i], values[i + 1])
+      ring.push([lng, lat])
+    }
+
+    if (ring.length >= 3) {
+      const first = ring[0]
+      const last = ring[ring.length - 1]
+      if (first[0] !== last[0] || first[1] !== last[1]) {
+        ring.push(first)
+      }
+
+      return {
+        type: 'Polygon',
+        coordinates: [ring],
+      }
+    }
+  }
+
+  if (shapeType === 'RECTANGLE') {
+    const values = (normalized.match(/[+-]?\d+(?:\.\d+)?/g) || [])
+      .map((value) => Number.parseFloat(value))
+      .filter((value) => Number.isFinite(value))
+
+    if (values.length >= 4) {
+      const [lat1, lng1] = toLatLng(values[0], values[1])
+      const [lat2, lng2] = toLatLng(values[2], values[3])
+      const north = Math.max(lat1, lat2)
+      const south = Math.min(lat1, lat2)
+      const east = Math.max(lng1, lng2)
+      const west = Math.min(lng1, lng2)
+
+      return {
+        type: 'Polygon',
+        coordinates: [[
+          [west, north],
+          [east, north],
+          [east, south],
+          [west, south],
+          [west, north],
+        ]],
+      }
+    }
+  }
+
+  return undefined
+}
+
+const normalizeGeofence = (geofence: bookcarsTypes.TraccarGeofence): bookcarsTypes.TraccarGeofence => ({
+  ...geofence,
+  geojson: geofence.geojson || geofenceAreaToGeoJson(geofence.area),
+})
 
 const getFallbackGeofenceIds = async (deviceId: number) => {
   const now = new Date()
@@ -109,8 +221,19 @@ export const getDevice = async (deviceId: number): Promise<bookcarsTypes.Traccar
 
 export const getPositions = async (deviceId: number): Promise<bookcarsTypes.TraccarPosition[]> => {
   ensureEnabled()
-  const response = await getClient().get('/api/positions', { params: { deviceId } })
-  return response.data
+  try {
+    const response = await getClient().get('/api/positions', { params: { deviceId } })
+    return response.data
+  } catch (error) {
+    // Some Traccar versions don't support filtering positions by deviceId and reply 400.
+    if (!isInvalidPositionsFilterError(error)) {
+      throw error
+    }
+
+    const response = await getClient().get('/api/positions')
+    const positions: bookcarsTypes.TraccarPosition[] = response.data || []
+    return positions.filter((position: any) => position?.deviceId === deviceId)
+  }
 }
 
 export const getRoute = async (deviceId: number, from: string, to: string): Promise<bookcarsTypes.TraccarPosition[]> => {
@@ -132,12 +255,12 @@ export const getGeofences = async (deviceId?: number): Promise<bookcarsTypes.Tra
 
   if (!deviceId) {
     const response = await getClient().get('/api/geofences')
-    return response.data
+    return (response.data as bookcarsTypes.TraccarGeofence[]).map(normalizeGeofence)
   }
 
   try {
     const response = await getClient().get('/api/geofences', { params: { deviceId } })
-    return response.data
+    return (response.data as bookcarsTypes.TraccarGeofence[]).map(normalizeGeofence)
   } catch (error) {
     if (!isInvalidDeviceGeofenceFilterError(error)) {
       throw error
@@ -150,14 +273,34 @@ export const getGeofences = async (deviceId?: number): Promise<bookcarsTypes.Tra
 
     return uniqueById(allGeofences.filter((geofence: { id?: number }) => (
       typeof geofence.id === 'number' && allowedGeofenceIds.has(geofence.id)
-    )))
+    ))).map(normalizeGeofence)
   }
 }
 
 export const getEvents = async (deviceId: number, from: string, to: string, type?: string): Promise<bookcarsTypes.TraccarEvent[]> => {
   ensureEnabled()
-  const response = await getClient().get('/api/events', { params: { deviceId, from, to, type } })
-  return response.data
+
+  try {
+    const response = await getClient().get('/api/events', { params: { deviceId, from, to, type } })
+    return response.data
+  } catch (error) {
+    if (!isNotFoundError(error)) {
+      throw error
+    }
+
+    try {
+      const response = await getClient().get('/api/reports/events', { params: { deviceId, from, to, type } })
+      return response.data
+    } catch (fallbackError) {
+      if (!isNotFoundError(fallbackError)) {
+        throw fallbackError
+      }
+
+      // Some Traccar builds expose neither endpoint consistently.
+      // For UI stability, return an empty list instead of failing the whole page.
+      return []
+    }
+  }
 }
 
 export const getSnapshot = async (deviceId: number) => {

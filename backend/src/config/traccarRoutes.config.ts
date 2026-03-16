@@ -1,12 +1,12 @@
 const routes = {
-  status: '/api/traccar/status',
-  devices: '/api/traccar/devices',
-  link: '/api/traccar/link/:carId',
-  unlink: '/api/traccar/unlink/:carId',
-  positions: '/api/traccar/positions/:carId',
-  route: '/api/traccar/route/:carId',
-  geofences: '/api/traccar/geofences/:carId',
-  geofenceAlerts: '/api/traccar/geofence-alerts/:carId',
+  status: '/api/status',
+  devices: '/api/devices',
+  link: '/api/link/:carId',
+  unlink: '/api/unlink/:carId',
+  positions: '/api/positions/:carId',
+  route: '/api/route/:carId',
+  geofences: '/api/geofences/:carId',
+  geofenceAlerts: '/api/geofence-alerts/:carId',
 }
 
 export default routes

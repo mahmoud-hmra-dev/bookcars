@@ -1,0 +1,103 @@
+
+.box-design{
+    background-color: white;
+    margin-top: 5vh;
+    padding: 10px;
+    border-radius: 0.75rem;
+    color: black !important;
+}
+
+.dashboard-title{
+    color: var(--title);
+    padding-left: 25px;
+    padding-right: 25px;
+}
+
+.dashboard-title a.active{
+    border-bottom: 2px solid var(--title);
+    padding-bottom: 6px;
+}
+
+.card-design{
+    background-color: white;
+    margin-top: 6vh;
+    margin-bottom: 5vh;
+    padding: 20px;
+    border-radius: 0.75rem;
+    border:4px solid  var(--fourth-color);
+    color: black !important;
+}
+
+.info-box{
+    background-color: var(--title);
+    padding: 20px;
+    border-radius: 0.35rem;
+    width: 80%;
+    border-bottom: 4px solid  var(--second-color);
+}
+
+.color1{
+    color: var(--second-color);
+}
+
+.app-box{
+    background-color: black;
+    border-radius: 0.35rem;
+    width: 80%;
+}
+
+.app-box-title{
+    width: 100%;
+    border-bottom: 4px solid  var(--second-color);
+}
+
+.app-box-body li{
+    background-color: black !important;
+    color: white !important;
+}
+
+@media only screen and (max-width: 600px) {
+    .card-design {
+        width: 95%;
+    }
+}
+.list-group .dropdown button {
+    background-color: transparent;
+    color: var(--title);
+    border: none;
+    border-radius: 0;
+}
+
+.list-group-vertical .active{
+    background-color: var(--second-color);
+    color: white !important;
+    border-radius: 0.35rem;
+}
+.flexible-modal {
+    position: absolute;
+    z-index: 1;
+    border: 1px solid #ccc;
+    background: white;
+    top:60vh;
+    left:13vw;
+}
+.flexible-modal-mask {
+ display:none;
+}
+.flexible-modal-resizer {
+    position:absolute;
+    right:0;
+    bottom:0;
+    cursor:se-resize;
+    margin:5px;
+    border-bottom: solid 2px #333;
+    border-right: solid 2px #333;
+}
+.flexible-modal-drag-area{
+    background: rgba(22, 22, 333, 0.2);
+    height: 50px;
+    position:absolute;
+    right:0;
+    top:0;
+    cursor:move;
+}
