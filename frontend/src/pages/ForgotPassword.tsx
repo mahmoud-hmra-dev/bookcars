@@ -87,7 +87,7 @@ const ForgotPassword = () => {
                 </FormHelperText>
               </FormControl>
 
-              <SocialLogin redirectToHomepage />
+              <SocialLogin mode="signin" />
 
               <div className="buttons">
                 <Button type="submit" className="btn-primary" variant="contained" disabled={isSubmitting}>
