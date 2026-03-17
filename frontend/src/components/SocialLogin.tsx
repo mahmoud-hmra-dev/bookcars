@@ -24,6 +24,23 @@ const SocialLogin = ({
   onError,
 }: SocialLoginProps) => {
   const { loginWithRedirect } = useAuth0()
+  const providers = [
+    {
+      connection: env.AUTH0_CONNECTION_FACEBOOK,
+      label: 'Facebook',
+      icon: <img alt="Facebook" src={FacebookIcon} className="social" />,
+    },
+    {
+      connection: env.AUTH0_CONNECTION_GOOGLE,
+      label: 'Google',
+      icon: <img alt="Google" src={GoogleIcon} className="social" />,
+    },
+    {
+      connection: env.AUTH0_CONNECTION_TWITTER,
+      label: 'X',
+      icon: <span className="social-x">X</span>,
+    },
+  ]
 
   const startLogin = async (connection: string) => {
     try {
@@ -43,17 +60,18 @@ const SocialLogin = ({
       </div>
 
       <div className="login-buttons">
-        <button type="button" className="social" onClick={() => startLogin(env.AUTH0_CONNECTION_FACEBOOK)}>
-          <img alt="Facebook" src={FacebookIcon} className="social" />
-        </button>
-
-        <button type="button" className="social" onClick={() => startLogin(env.AUTH0_CONNECTION_GOOGLE)}>
-          <img alt="Google" src={GoogleIcon} className="social" />
-        </button>
-
-        <button type="button" className="social" onClick={() => startLogin(env.AUTH0_CONNECTION_TWITTER)} aria-label="X / Twitter">
-          <span style={{ fontWeight: 700, fontSize: 18, lineHeight: 1 }}>X</span>
-        </button>
+        {providers.map((provider) => (
+          <button
+            key={provider.label}
+            type="button"
+            className="social"
+            onClick={() => startLogin(provider.connection)}
+            aria-label={provider.label}
+          >
+            <span className="social-icon">{provider.icon}</span>
+            <span className="social-label">{provider.label}</span>
+          </button>
+        ))}
       </div>
     </div>
   )

@@ -1,90 +1,336 @@
-/* Signin */
 div.signin {
+  position: relative;
   display: flex;
-  flex-direction: row;
   flex: 1 0 auto;
+  align-items: center;
   justify-content: center;
-  margin: 120px 0;
-  transform: translate3d(0, 0, 0);
-  min-height: 100vh;
+  padding: clamp(32px, 5vw, 72px) 20px 72px;
+  min-height: calc(100vh - 160px);
+  overflow: hidden;
+}
+
+div.signin::before,
+div.signin::after {
+  content: '';
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(18px);
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+div.signin::before {
+  width: 280px;
+  height: 280px;
+  inset-inline-start: -80px;
+  top: 60px;
+  background: radial-gradient(circle, rgb(214 235 255 / 95%) 0%, rgb(214 235 255 / 0%) 72%);
+}
+
+div.signin::after {
+  width: 360px;
+  height: 360px;
+  inset-inline-end: -120px;
+  bottom: -40px;
+  background: radial-gradient(circle, rgb(253 223 203 / 80%) 0%, rgb(253 223 203 / 0%) 72%);
+}
+
+div.signin .signin-shell {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 430px);
+  gap: clamp(28px, 4vw, 64px);
+  align-items: center;
+  width: min(1180px, 100%);
+}
+
+div.signin .signin-hero {
+  position: relative;
+  padding: clamp(12px, 2vw, 20px) 0;
+}
+
+div.signin .signin-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: rgb(23 35 61 / 8%);
+  color: #243041;
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+div.signin .signin-hero-title {
+  margin: 18px 0 12px;
+  color: #142033;
+  font-size: clamp(2.9rem, 7vw, 4.9rem);
+  line-height: 0.95;
+  letter-spacing: -0.05em;
+}
+
+div.signin .signin-hero-subtitle {
+  margin: 0;
+  max-width: 580px;
+  color: rgb(27 39 57 / 78%);
+  font-size: clamp(1rem, 2vw, 1.18rem);
+  line-height: 1.8;
+}
+
+div.signin .signin-hero-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+div.signin .signin-hero-pills span {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid rgb(20 32 51 / 10%);
+  border-radius: 18px;
+  background: rgb(255 255 255 / 78%);
+  box-shadow: 0 12px 30px rgb(22 28 45 / 7%);
+  color: #1d2534;
+  font-weight: 600;
+  backdrop-filter: blur(12px);
+}
+
+div.signin .signin-hero-pills svg {
+  color: #0f766e;
+}
+
+div.signin .signin-hero-visual {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 240px);
+  gap: 18px;
+  align-items: end;
+  margin-top: 34px;
+}
+
+div.signin .signin-visual-card {
+  padding: 22px 24px;
+  border: 1px solid rgb(20 32 51 / 10%);
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgb(255 255 255 / 94%) 0%, rgb(249 250 252 / 95%) 100%);
+  box-shadow: 0 28px 58px rgb(27 37 55 / 12%);
+  backdrop-filter: blur(18px);
+}
+
+div.signin .signin-visual-card-primary {
+  min-height: 190px;
+}
+
+div.signin .signin-visual-card-secondary {
+  transform: translateY(22px);
+}
+
+div.signin .signin-visual-label {
+  display: block;
+  margin-bottom: 12px;
+  color: rgb(27 39 57 / 62%);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+div.signin .signin-visual-card strong {
+  display: block;
+  margin-bottom: 10px;
+  color: #111827;
+  font-size: 1.55rem;
+  line-height: 1.2;
+}
+
+div.signin .signin-visual-card p {
+  margin: 0;
+  color: rgb(27 39 57 / 72%);
+  line-height: 1.75;
+}
+
+div.signin .signin-brand-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+div.signin .signin-brand-cloud span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgb(245 247 250);
+  color: #1f2937;
+  font-weight: 700;
 }
 
 div.signin .signin-form {
-  height: fit-content;
+  position: relative;
+  padding: clamp(24px, 3vw, 34px);
+  border: 1px solid rgb(18 25 38 / 10%);
+  border-radius: 32px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 97%) 0%, rgb(250 251 253 / 97%) 100%);
+  box-shadow: 0 26px 70px rgb(17 24 39 / 18%);
+}
+
+div.signin .signin-form::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgb(15 118 110 / 20%), rgb(240 173 118 / 18%));
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+div.signin .signin-form-header {
+  margin-bottom: 18px;
+}
+
+div.signin .signin-form-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgb(15 118 110 / 10%);
+  color: #0f766e;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 div.signin .signin-form-title {
-  text-align: center;
-  text-transform: capitalize;
-  margin-top: 35px;
-  color: #232323;
+  margin: 18px 0 10px;
+  color: #101826;
+  font-size: clamp(2rem, 3vw, 2.5rem);
+  line-height: 1.1;
+  letter-spacing: -0.04em;
 }
 
-div.signin div.signin-buttons {
-  float: right;
-  margin-top: 20px;
-}
-
-div.signin .form-error {
-  clear: both;
-  height: 65px;
-  padding-top: 10px;
-  text-align: center;
+div.signin .signin-form-subtitle {
+  margin: 0;
+  color: rgb(27 39 57 / 70%);
+  line-height: 1.75;
 }
 
 div.signin div.stay-connected {
-  margin-top: 15px;
   display: flex;
   align-items: center;
+  gap: 10px;
+  margin: 22px 0 18px;
+  padding: 14px 16px;
+  border: 1px solid rgb(20 32 51 / 9%);
+  border-radius: 18px;
+  background: rgb(247 249 252 / 92%);
 }
 
 div.signin div.stay-connected input[type='checkbox'] {
-  margin-right: 5px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #0f766e;
 }
 
 div.signin div.stay-connected label {
   cursor: pointer;
-  color: rgb(0 0 0 / 60%);
+  color: rgb(20 32 51 / 78%);
+  font-weight: 600;
   user-select: none;
 }
 
-div.signin div.forgot-password-wrapper {
-  margin-top: 15px;
+div.signin .signin-primary-action {
+  min-height: 56px;
+  border-radius: 18px;
+  margin-bottom: 10px !important;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.01em;
 }
 
-/* Device width is less than or equal to 960px */
+div.signin .signin-secondary-action {
+  min-height: 52px;
+  border-radius: 18px;
+  border-color: rgb(20 32 51 / 16%);
+  color: #162235;
+  font-weight: 700;
+}
 
-@media only screen and (width <=960px) {
-  div.signin .signin-form {
-    align-items: center;
-    justify-content: center;
-    display: flex;
-    width: 350px;
-    border: 1px solid rgb(0 0 0 / 12%);
-    padding: 15px;
+div.signin div.signin-buttons {
+  width: 100%;
+  margin-top: 6px;
+}
+
+div.signin .signin-error {
+  height: auto;
+  min-height: 52px;
+  padding-top: 14px;
+}
+
+html[dir='rtl'] div.signin .signin-eyebrow,
+html[dir='rtl'] div.signin .signin-form-badge,
+html[dir='rtl'] div.signin .signin-visual-label {
+  letter-spacing: 0;
+}
+
+@media only screen and (width <=1100px) {
+  div.signin .signin-shell {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  div.signin div.signin-buttons {
-    margin-top: 15px;
-    margin-bottom: 5px;
-    display: grid;
+  div.signin .signin-hero {
+    order: 2;
+  }
+
+  div.signin .signin-form {
+    order: 1;
+    width: min(100%, 520px);
+    justify-self: center;
+  }
+
+  div.signin .signin-hero-title,
+  div.signin .signin-hero-subtitle {
+    max-width: 720px;
+  }
+}
+
+@media only screen and (width <=720px) {
+  div.signin {
+    padding: 24px 14px 48px;
+  }
+
+  div.signin .signin-shell {
+    gap: 24px;
+  }
+
+  div.signin .signin-hero-pills span {
     width: 100%;
+    justify-content: flex-start;
   }
 
-  div.signin div.signin-buttons button {
-    margin-right: 0;
+  div.signin .signin-hero-visual {
+    grid-template-columns: minmax(0, 1fr);
   }
-}
 
-/* Device width is greater than or equal to 960px */
+  div.signin .signin-visual-card-secondary {
+    transform: none;
+  }
 
-@media only screen and (width >=960px) {
   div.signin .signin-form {
-    align-items: center;
-    justify-content: center;
-    display: flex;
-    width: 380px;
-    border: 1px solid rgb(0 0 0 / 12%);
-    padding: 15px;
+    padding: 22px 18px;
+    border-radius: 26px;
   }
 }
