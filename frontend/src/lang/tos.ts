@@ -105,6 +105,62 @@ If you have any questions regarding these Terms of Service, please contact us at
 By using our services, you acknowledge that you have read and understood these Terms of Service and agree to be bound by them.
     `,
   },
+  ar: {
+    TITLE: 'Terms of Service',
+    TOS: `
+Welcome to ${env.WEBSITE_NAME}! By accessing our website and using our services, you agree to comply with and be bound by the following Terms of Service. If you do not agree to these terms, please do not use our services.
+
+
+1. Acceptance of Terms
+
+By accessing or using our services, you confirm that you have read, understood, and agree to these Terms of Service and our Privacy Policy.
+
+
+2. Use of Our Services
+
+You agree to use our services only for lawful purposes and in a manner that does not infringe the rights of, restrict, or inhibit anyone else's use of our services. This includes compliance with all applicable laws and regulations.
+
+
+3. Reservations and Payments
+
+When you make a reservation with ${env.WEBSITE_NAME}, you agree to provide accurate and complete information. All payments must be made through our secure payment system. Once payment is completed, you will receive a confirmation of your reservation.
+
+
+4. Cancellation Policy
+
+Cancellations made 24 hours before the rental date may be eligible for a full refund. Cancellations made less than 24 hours prior to the rental date may incur a cancellation fee. Please refer to our cancellation policy for detailed information.
+
+
+5. Rental Conditions
+
+All rentals are subject to our rental conditions, which include but are not limited to age restrictions, driver's license requirements, and insurance obligations. You are responsible for ensuring that you meet all requirements before making a reservation.
+
+
+6. Limitation of Liability
+
+${env.WEBSITE_NAME} shall not be liable for any indirect, incidental, or consequential damages arising out of your use of our services. In no event shall our total liability exceed the amount paid by you for the services.
+
+
+7. Modifications to Terms
+
+We reserve the right to modify these Terms of Service at any time. Any changes will be effective immediately upon posting on our website. Your continued use of our services following any changes constitutes your acceptance of the new terms.
+
+
+8. Governing Law
+
+These Terms of Service shall be governed by and construed in accordance with the laws. Any disputes arising out of these terms shall be resolved in the courts.
+
+
+9. Contact Information
+
+If you have any questions regarding these Terms of Service, please contact us at ${env.CONTACT_EMAIL}. We are here to help you with any inquiries related to our services.
+
+
+10. Acknowledgment
+
+By using our services, you acknowledge that you have read and understood these Terms of Service and agree to be bound by them.
+    `,
+  },
   es: {
     TITLE: 'Condiciones de uso',
     TOS: `

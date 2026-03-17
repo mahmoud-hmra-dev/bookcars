@@ -21,7 +21,6 @@ import {
   ArrowForwardIos as NextPageIcon,
 } from '@mui/icons-material'
 import { format } from 'date-fns'
-import { fr, enUS, es } from 'date-fns/locale'
 import { useNavigate } from 'react-router-dom'
 import * as bookcarsTypes from ':bookcars-types'
 import * as bookcarsHelper from ':bookcars-helper'
@@ -29,6 +28,7 @@ import { strings as commonStrings } from '@/lang/common'
 import { strings } from '@/lang/notifications'
 import * as NotificationService from '@/services/NotificationService'
 import * as helper from '@/utils/helper'
+import { getDateFnsLocale } from '@/utils/locale'
 import env from '@/config/env.config'
 import Backdrop from '@/components/SimpleBackdrop'
 import { useNotificationContext, NotificationContextType } from '@/context/NotificationContext'
@@ -53,9 +53,9 @@ const NotificationList = ({ user }: NotificationListProps) => {
   const notificationsListRef = useRef<HTMLDivElement>(null)
 
   const _fr = user?.language === 'fr'
-  const _es = user?.language === 'es'
-  const _locale = _fr ? fr : _es ? es : enUS
-  const _format = _fr ? 'eee d LLLL, kk:mm' : 'eee, d LLLL, kk:mm'
+  const _ar = user?.language === 'ar'
+  const _locale = getDateFnsLocale(user?.language)
+  const _format = _fr ? 'eee d LLLL, kk:mm' : _ar ? 'eee، d LLLL، kk:mm' : 'eee, d LLLL, kk:mm'
 
   const fetch = useCallback(async () => {
     if (user && user._id) {

@@ -31,6 +31,7 @@ export const __env__ = (name: string, required?: boolean, defaultValue?: string)
  */
 export const LANGUAGES = [
   'en',
+  'ar',
   'fr',
   'es',
 ]
@@ -139,11 +140,11 @@ export const COOKIE_SECRET = __env__('BC_COOKIE_SECRET', false, 'bookcars')
 
 /**
  * Authentication cookie domain.
- * Default is localhost.
+ * Leave empty to use a host-only cookie.
  *
  * @type {string}
  */
-export const AUTH_COOKIE_DOMAIN = __env__('BC_AUTH_COOKIE_DOMAIN', false, 'localhost')
+export const AUTH_COOKIE_DOMAIN = __env__('BC_AUTH_COOKIE_DOMAIN', false, '')
 
 /**
  * Cookie options.
@@ -156,7 +157,13 @@ export const AUTH_COOKIE_DOMAIN = __env__('BC_AUTH_COOKIE_DOMAIN', false, 'local
  *
  * @type {CookieOptions}
  */
-export const COOKIE_OPTIONS: CookieOptions = { httpOnly: true, secure: HTTPS, signed: true, sameSite: 'strict', domain: AUTH_COOKIE_DOMAIN }
+export const COOKIE_OPTIONS: CookieOptions = {
+  httpOnly: true,
+  secure: HTTPS,
+  signed: true,
+  sameSite: 'strict',
+  ...(AUTH_COOKIE_DOMAIN ? { domain: AUTH_COOKIE_DOMAIN } : {}),
+}
 
 /**
  * frontend authentication cookie name.
@@ -334,7 +341,7 @@ export const ADMIN_HOST = __env__('BC_ADMIN_HOST', true)
 export const FRONTEND_HOST = __env__('BC_FRONTEND_HOST', true)
 
 /**
- * Default language. Default is en. Available options: en, fr, es.
+ * Default language. Default is en. Available options: en, ar, fr, es.
  *
  * @type {string}
  */

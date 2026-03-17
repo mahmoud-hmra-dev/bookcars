@@ -14,6 +14,12 @@ const strings = new LocalizedStrings({
     DELETE_SELECTION: 'Delete selectied users',
     BLACKLIST: 'Add to the blacklist',
   },
+  ar: {
+    DELETE_USER: 'هل أنت متأكد أنك تريد حذف هذا المستخدم وكل بياناته؟',
+    DELETE_USERS: 'هل أنت متأكد أنك تريد حذف المستخدمين المحددين وكل بياناتهم؟',
+    DELETE_SELECTION: 'حذف المستخدمين المحددين',
+    BLACKLIST: 'إضافة إلى القائمة السوداء',
+  },
   es: {
     DELETE_USER: '¿Estás seguro de que quieres eliminar a este usuario y todos sus datos?',
     DELETE_USERS: '¿Estás seguro de que quieres eliminar a los usuarios seleccionados y todos sus datos?',

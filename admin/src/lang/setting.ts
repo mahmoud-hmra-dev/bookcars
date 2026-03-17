@@ -16,6 +16,13 @@ const strings = new LocalizedStrings({
     MIN_PICKUP_DROPOFF_HOUR: 'Minimum allowed hour for pickup and drop-off (e.g., 9 for 09:00)',
     MAX_PICKUP_DROPOFF_HOUR: 'Maximum allowed hour for pickup and drop-off (e.g., 19 for 19:00)',
   },
+  ar: {
+    SETTINGS: 'إعدادات التأجير',
+    MIN_PICKUP_HOURS: 'الحد الأدنى المطلوب بالساعات قبل الاستلام',
+    MIN_RENTAL_HOURS: 'الحد الأدنى لمدة الإيجار بالساعات بين الاستلام والتسليم',
+    MIN_PICKUP_DROPOFF_HOUR: 'أدنى ساعة مسموحة للاستلام والتسليم (مثال: 9 تعني 09:00)',
+    MAX_PICKUP_DROPOFF_HOUR: 'أقصى ساعة مسموحة للاستلام والتسليم (مثال: 19 تعني 19:00)',
+  },
   es: {
     SETTINGS: 'Configuración del alquiler',
     MIN_PICKUP_HOURS: 'Tiempo mínimo requerido en horas antes del retiro',

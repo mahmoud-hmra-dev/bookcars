@@ -120,6 +120,69 @@ If you have any questions about this Privacy Policy or our data practices, pleas
 By using our services, you acknowledge that you have read and understood this Privacy Policy and agree to its terms.
     `,
   },
+  ar: {
+    TITLE: 'Privacy Policy',
+    PRIVACY_POLICY: `
+Your privacy is important to us at ${env.WEBSITE_NAME}. This Privacy Policy outlines how we collect, use, and protect your information when you use our website and services. By accessing our services, you consent to the practices described in this policy.
+
+
+1. Information We Collect
+
+We collect information from you when you register on our site, place an order, or interact with our services. The information we may collect includes:
+
+Name
+Email address
+Phone number
+Payment information
+Rental preferences
+You may visit our site anonymously, but certain functionalities may be limited.
+
+
+2. How We Use Your Information
+
+Your information may be used in the following ways:
+
+To process your reservations and payments
+To improve customer service
+To send periodic emails regarding your order or other products and services
+To respond to inquiries and support requests
+
+
+3. How We Protect Your Information
+
+We implement a variety of security measures to maintain the safety of your personal information. All sensitive information is transmitted via secure servers and is only accessible by authorized personnel. We do not store your credit card information on our servers.
+
+
+4. Sharing Your Information
+
+We do not sell, trade, or otherwise transfer your personally identifiable information to outside parties, except to trusted partners who assist us in operating our website, conducting our business, or servicing you, as long as those parties agree to keep this information confidential. We may also release your information when we believe release is appropriate to comply with the law, enforce our site policies, or protect our rights or others' rights, property, or safety.
+
+
+5. Children's Privacy
+
+We comply with the Children's Online Privacy Protection Act (COPPA). Our services are not directed to children under the age of 13, and we do not knowingly collect personal information from children under 13. If we become aware that we have collected personal information from a child under 13, we will take steps to delete such information.
+
+
+6. Changes to Our Privacy Policy
+
+We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page. You are advised to review this Privacy Policy periodically for any changes.
+
+
+7. Your Rights
+
+You have the right to request access to the personal information we hold about you, to request correction of any inaccuracies, and to request deletion of your personal information, subject to certain exceptions. To exercise these rights, please contact us using the information provided below.
+
+
+8. Contact Us
+
+If you have any questions about this Privacy Policy or our data practices, please contact us at ${env.CONTACT_EMAIL}. We are committed to addressing your concerns and protecting your privacy.
+
+
+9. Acknowledgment
+
+By using our services, you acknowledge that you have read and understood this Privacy Policy and agree to its terms.
+    `,
+  },
   es: {
     TITLE: 'Política de privacidad de alquiler',
     PRIVACY_POLICY: `

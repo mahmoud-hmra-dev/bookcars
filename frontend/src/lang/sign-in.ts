@@ -26,6 +26,18 @@ const strings = new LocalizedStrings({
     AUTH0_SIGN_IN_ERROR: 'Auth0 sign-in failed.',
     AUTH0_REDIRECTING: 'Redirecting to Auth0...',
   },
+  ar: {
+    SIGN_IN_HEADING: 'تسجيل الدخول',
+    SIGN_IN: 'تسجيل الدخول',
+    ERROR_IN_SIGN_IN: 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
+    IS_BLACKLISTED: 'تم تعليق حسابك.',
+    RESET_PASSWORD: 'هل نسيت كلمة المرور؟',
+    STAY_CONNECTED: 'البقاء متصلًا',
+    AUTH0_CONTINUE: 'المتابعة باستخدام Auth0',
+    AUTH0_SIGN_IN_MESSAGE: 'سجّل الدخول بأمان عبر Auth0 للمتابعة.',
+    AUTH0_SIGN_IN_ERROR: 'فشل تسجيل الدخول عبر Auth0.',
+    AUTH0_REDIRECTING: 'جارٍ التحويل إلى Auth0...',
+  },
   es: {
     SIGN_IN_HEADING: 'Iniciar sesion',
     SIGN_IN: 'Iniciar sesion',

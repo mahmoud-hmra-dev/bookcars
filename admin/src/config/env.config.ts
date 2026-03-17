@@ -11,6 +11,10 @@ const LANGUAGES = [
     label: 'English',
   },
   {
+    code: 'ar',
+    label: 'العربية',
+  },
+  {
     code: 'fr',
     label: 'Français',
   },

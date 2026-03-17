@@ -14,6 +14,12 @@ const strings = new LocalizedStrings({
     INVALID_COUNTRY: 'This country already exists.',
     COUNTRY_CREATED: 'Country created successfully.',
   },
+  ar: {
+    NEW_COUNTRY_HEADING: 'دولة جديدة',
+    COUNTRY_NAME: 'الدولة',
+    INVALID_COUNTRY: 'هذه الدولة موجودة بالفعل.',
+    COUNTRY_CREATED: 'تم إنشاء الدولة بنجاح.',
+  },
   es: {
     NEW_COUNTRY_HEADING: 'Nuevo país',
     COUNTRY_NAME: 'País',

@@ -8,6 +8,9 @@ const strings = new LocalizedStrings({
   en: {
     NEW_USER: 'New user',
   },
+  ar: {
+    NEW_USER: 'مستخدم جديد',
+  },
   es: {
     NEW_USER: 'Nuevo usuario',
   },

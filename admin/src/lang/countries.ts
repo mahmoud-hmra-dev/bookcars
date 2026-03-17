@@ -18,6 +18,14 @@ const strings = new LocalizedStrings({
     COUNTRY: 'country',
     COUNTRIES: 'countries',
   },
+  ar: {
+    NEW_COUNTRY: 'دولة جديدة',
+    DELETE_COUNTRY: 'هل أنت متأكد أنك تريد حذف هذه الدولة؟',
+    CANNOT_DELETE_COUNTRY: 'لا يمكن حذف هذه الدولة لأنها مرتبطة بمواقع.',
+    EMPTY_LIST: 'لا توجد دول.',
+    COUNTRY: 'دولة',
+    COUNTRIES: 'دول',
+  },
   es: {
     NEW_COUNTRY: 'Nuevo país',
     DELETE_COUNTRY: '¿Estás seguro de que quieres eliminar este país?',

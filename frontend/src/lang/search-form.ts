@@ -20,6 +20,15 @@ const strings = new LocalizedStrings({
     INVALID_PICK_UP_TIME: 'Invalid pick-up time',
     INVALID_DROP_OFF_TIME: 'Invalid drop-off time',
   },
+  ar: {
+    PICK_UP_DATE: 'تاريخ الاستلام',
+    DROP_OFF_DATE: 'تاريخ التسليم',
+    DROP_OFF: 'إعادة السيارة إلى نفس الموقع',
+    MIN_PICK_UP_HOURS_ERROR: 'يجب أن يكون وقت الاستلام بعد عدة ساعات على الأقل من الآن',
+    MIN_RENTAL_HOURS_ERROR: 'مدة الإيجار قصيرة جدًا',
+    INVALID_PICK_UP_TIME: 'وقت الاستلام غير صالح',
+    INVALID_DROP_OFF_TIME: 'وقت التسليم غير صالح',
+  },
   es: {
     PICK_UP_DATE: 'Fecha de recogida',
     DROP_OFF_DATE: 'Fecha de entrega',

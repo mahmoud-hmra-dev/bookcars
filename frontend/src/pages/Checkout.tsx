@@ -22,7 +22,6 @@ import {
   AssignmentTurnedIn as ChecklistIcon,
 } from '@mui/icons-material'
 import { format } from 'date-fns'
-import { fr, enUS, es } from 'date-fns/locale'
 import {
   EmbeddedCheckoutProvider,
   EmbeddedCheckout,
@@ -37,6 +36,7 @@ import CarList from '@/components/CarList'
 import * as bookcarsTypes from ':bookcars-types'
 import * as bookcarsHelper from ':bookcars-helper'
 import env from '@/config/env.config'
+import { getDateFnsLocale } from '@/utils/locale'
 import * as BookingService from '@/services/BookingService'
 import { strings as commonStrings } from '@/lang/common'
 import { strings as csStrings } from '@/lang/cars'
@@ -118,8 +118,9 @@ const Checkout = () => {
 
   const _fr = language === 'fr'
   const _es = language === 'es'
-  const _locale = _fr ? fr : _es ? es : enUS
-  const _format = _fr ? 'eee d LLL yyyy kk:mm' : _es ? 'eee, d LLLL yyyy HH:mm' : 'eee, d LLL yyyy, p'
+  const _ar = language === 'ar'
+  const _locale = getDateFnsLocale(language)
+  const _format = _fr ? 'eee d LLL yyyy kk:mm' : _es ? 'eee, d LLLL yyyy HH:mm' : _ar ? 'eee، d LLL yyyy، p' : 'eee, d LLL yyyy, p'
   const bookingDetailHeight = env.SUPPLIER_IMAGE_HEIGHT + 10
   const days = bookcarsHelper.days(from, to)
   const daysLabel = from && to && `${helper.getDaysShort(days)} (${bookcarsHelper.capitalize(format(from, _format, { locale: _locale }))} - ${bookcarsHelper.capitalize(format(to, _format, { locale: _locale }))})`

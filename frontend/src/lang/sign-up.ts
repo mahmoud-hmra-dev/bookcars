@@ -22,6 +22,16 @@ const strings = new LocalizedStrings({
     AUTH0_REDIRECTING: 'Redirecting to Auth0...',
     GO_TO_SIGN_IN: 'Go to sign in',
   },
+  ar: {
+    SIGN_UP_HEADING: 'إنشاء حساب',
+    SIGN_UP: 'إنشاء حساب',
+    SIGN_UP_ERROR: 'حدث خطأ أثناء إنشاء الحساب.',
+    AUTH0_CREATE_ACCOUNT: 'إنشاء حساب عبر Auth0',
+    AUTH0_SIGN_UP_MESSAGE: 'أنشئ حسابك عبر Auth0 ثم أكمل ملفك الشخصي داخل التطبيق.',
+    AUTH0_SIGN_UP_ERROR: 'فشل إنشاء الحساب عبر Auth0.',
+    AUTH0_REDIRECTING: 'جارٍ التحويل إلى Auth0...',
+    GO_TO_SIGN_IN: 'الانتقال إلى تسجيل الدخول',
+  },
   es: {
     SIGN_UP_HEADING: 'Registrate',
     SIGN_UP: 'Registrate',

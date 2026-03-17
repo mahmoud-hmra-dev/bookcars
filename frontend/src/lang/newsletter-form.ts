@@ -14,6 +14,12 @@ const strings = new LocalizedStrings({
     SUBSCRIBE: 'Subscribe',
     SUCCESS: 'Subscription successful!',
   },
+  ar: {
+    TITLE: 'اشترك',
+    SUB_TITLE: 'اشترك في قائمتنا البريدية للحصول على آخر التحديثات!',
+    SUBSCRIBE: 'اشتراك',
+    SUCCESS: 'تم الاشتراك بنجاح!',
+  },
   es: {
     TITLE: 'Suscribir',
     SUB_TITLE: '¡Suscríbete a nuestra lista de correo para recibir las últimas actualizaciones!',

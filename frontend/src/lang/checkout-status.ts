@@ -19,6 +19,14 @@ const strings = new LocalizedStrings({
     STATUS_TITLE: `${env.WEBSITE_NAME} Booking Confirmation`,
     STATUS_MESSAGE: 'Check your mailbox and follow the steps described in the booking confirmation email to book your car.',
   },
+  ar: {
+    CONGRATULATIONS: 'تهانينا!',
+    SUCCESS: 'تمت عملية الدفع بنجاح. لقد أرسلنا لك رسالة تأكيد عبر البريد الإلكتروني.',
+    SUCCESS_PAY_LATER: 'تم إتمام حجزك بنجاح. لقد أرسلنا لك رسالة تأكيد عبر البريد الإلكتروني.',
+    ERROR: 'حدث خطأ ما. حاول مرة أخرى لاحقًا.',
+    STATUS_TITLE: `${env.WEBSITE_NAME} تأكيد الحجز`,
+    STATUS_MESSAGE: 'تحقق من بريدك الإلكتروني واتبع الخطوات الموضحة في رسالة تأكيد الحجز لإكمال حجز سيارتك.',
+  },
   es: {
     CONGRATULATIONS: '¡Felicitaciones!',
     SUCCESS: 'Tu pago se realizó con éxito. Te hemos enviado un correo de confirmación.',

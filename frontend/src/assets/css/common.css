@@ -245,6 +245,36 @@ div.content {
   background-color: #FAFAFA;
 }
 
+html[dir='rtl'] .buttons button {
+  margin-right: 0;
+  margin-left: 15px;
+}
+
+html[dir='rtl'] .btn-margin {
+  margin-right: 0 !important;
+  margin-left: 10px !important;
+}
+
+html[dir='rtl'] .avatar-action-icon {
+  margin-left: 0;
+  margin-right: 8px;
+}
+
+html[dir='rtl'] .info span {
+  margin-left: 0;
+  margin-right: 5px;
+}
+
+html[dir='rtl'] .dialog-actions {
+  margin-right: 0;
+  margin-left: 5px;
+}
+
+html[dir='rtl'] .d-adornment {
+  margin-right: 0;
+  margin-left: -13px;
+}
+
 @media only screen and (width <=550px) {
   .search-dialog-content {
     width: auto;
@@ -280,6 +310,19 @@ div.content {
     margin-right: -3px;
   }
 
+  html[dir='rtl'] .buttons button {
+    margin-left: 0 !important;
+  }
+
+  html[dir='rtl'] .btn-margin {
+    margin-left: 0 !important;
+  }
+
+  html[dir='rtl'] .d-adornment {
+    margin-right: 0;
+    margin-left: -3px;
+  }
+
   .dialog-content {
     width: 350px;
   }
@@ -290,5 +333,9 @@ div.content {
     float: right;
     margin-top: 15px;
     margin-bottom: 5px;
+  }
+
+  html[dir='rtl'] .buttons {
+    float: left;
   }
 }

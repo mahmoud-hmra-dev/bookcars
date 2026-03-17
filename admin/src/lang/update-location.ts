@@ -10,6 +10,10 @@ const strings = new LocalizedStrings({
     UPDATE_LOCATION: 'Location update',
     LOCATION_UPDATED: 'Location updated successfully.',
   },
+  ar: {
+    UPDATE_LOCATION: 'تحديث الموقع',
+    LOCATION_UPDATED: 'تم تحديث الموقع بنجاح.',
+  },
   es: {
     UPDATE_LOCATION: 'Actualización del lugar',
     LOCATION_UPDATED: 'Lugar actualizado correctamente.',

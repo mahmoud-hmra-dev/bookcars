@@ -5,11 +5,16 @@ import { ToastContainer } from 'react-toastify'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
 
-import { frFR as corefrFR, enUS as coreenUS, esES as coresES } from '@mui/material/locale'
-import { frFR, enUS, esES } from '@mui/x-date-pickers/locales'
-import { frFR as dataGridfrFR, enUS as dataGridenUS, esES as dataGridesEs } from '@mui/x-data-grid/locales'
 import { disableDevTools } from ':disable-react-devtools'
 import * as helper from '@/utils/helper'
+import {
+  applyDocumentLanguage,
+  getDirection,
+  getMuiCoreLocale,
+  getMuiDataGridLocale,
+  getMuiDatePickersLocale,
+  isRTL,
+} from '@/utils/locale'
 import { setAuth0ReturnTo } from '@/utils/auth0'
 import * as UserService from '@/services/UserService'
 import * as IpInfoService from '@/services/IpInfoService'
@@ -169,11 +174,13 @@ if (lang) {
 }
 
 language = UserService.getLanguage()
-const isFr = language === 'fr'
-const isEs = language === 'es'
+applyDocumentLanguage(language)
+const rtl = isRTL(language)
+const direction = getDirection(language)
 
 const theme = createTheme(
   {
+    direction,
     palette: {
       primary: {
         main: '#1a1a1a',
@@ -186,6 +193,7 @@ const theme = createTheme(
         '-apple-system',
         'BlinkMacSystemFont',
         '"Segoe UI"',
+        'Tahoma',
         'Roboto',
         '"Helvetica Neue"',
         'Arial',
@@ -200,6 +208,7 @@ const theme = createTheme(
         styleOverrides: {
           body: {
             backgroundColor: '#FAFAFA',
+            direction,
           },
         },
       },
@@ -229,7 +238,9 @@ const theme = createTheme(
         styleOverrides: {
           root: {
             '& .MuiAutocomplete-inputRoot': {
-              paddingRight: '20px !important',
+              ...(rtl
+                ? { paddingLeft: '20px !important' }
+                : { paddingRight: '20px !important' }),
             },
           },
           listbox: {
@@ -253,9 +264,9 @@ const theme = createTheme(
       },
     },
   },
-  isFr ? frFR : isEs ? esES : enUS,
-  isFr ? dataGridfrFR : isEs ? dataGridesEs : dataGridenUS,
-  isFr ? corefrFR : isEs ? coresES : coreenUS,
+  getMuiDatePickersLocale(language),
+  getMuiDataGridLocale(language),
+  getMuiCoreLocale(language),
 )
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -274,7 +285,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <CssBaseline>
         <App />
         <ToastContainer
-          position="bottom-right"
+          position={rtl ? 'bottom-left' : 'bottom-right'}
           autoClose={5000}
           hideProgressBar={false}
           newestOnTop={false}

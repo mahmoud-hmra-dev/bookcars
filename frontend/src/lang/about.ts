@@ -21,6 +21,15 @@ const strings = new LocalizedStrings({
     CONTENT2: "Enjoy unmatched convenience, reliability, and value with our premier car rental service. From effortless bookings to high-quality vehicles, we're your trusted travel partner.",
     FIND_DEAL: 'Find Deal',
   },
+  ar: {
+    TITLE1: `${env.WEBSITE_NAME} - خدمة تأجير السيارات المميزة`,
+    SUBTITLE1: 'شريكك الموثوق لتأجير السيارات',
+    CONTENT1: `في ${env.WEBSITE_NAME} ندرك أن كل رحلة فريدة من نوعها. لذلك نلتزم بتوفير مجموعة متنوعة من السيارات التي تلبي مختلف احتياجات السفر. سواء كنت تستكشف مدينة، أو تسافر للعمل، أو تبحث عن المغامرة، فإن خدماتنا الموثوقة تجعل بداية رحلتك سهلة وسلسة. مهمتنا هي تقديم خدمة عملاء استثنائية تجعل تجربتك مريحة وممتعة وخالية من التوتر. مع أسعار تنافسية، ومجموعة من السيارات المعتنى بها جيدًا، وفريق جاهز لمساعدتك، نسعى لأن نكون شريكك الموثوق على الطريق. اختر ${env.WEBSITE_NAME} لجميع احتياجاتك في تأجير السيارات واستمتع بحرية الاستكشاف بالوتيرة التي تناسبك.`,
+    TITLE2: `لماذا تختار ${env.WEBSITE_NAME}`,
+    SUBTITLE2: 'اختبر التميز في كل رحلة',
+    CONTENT2: 'استمتع براحة وموثوقية وقيمة استثنائية مع خدمتنا المميزة لتأجير السيارات. من الحجز السهل إلى السيارات عالية الجودة، نحن شريك السفر الذي يمكنك الاعتماد عليه.',
+    FIND_DEAL: 'ابحث عن عرض',
+  },
   es: {
     TITLE1: `${env.WEBSITE_NAME} - Su servicio de alquiler de coches`,
     SUBTITLE1: 'Su socio de confianza para alquileres de coches',

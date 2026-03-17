@@ -10,6 +10,10 @@ const strings = new LocalizedStrings({
     SHOW_FILTERS: 'Show Filters',
     HILE_FILTERS: 'Hide Filters',
   },
+  ar: {
+    SHOW_FILTERS: 'إظهار الفلاتر',
+    HILE_FILTERS: 'إخفاء الفلاتر',
+  },
   es: {
     SHOW_FILTERS: 'Mostrar filtros',
     HILE_FILTERS: 'Ocultar filtros',

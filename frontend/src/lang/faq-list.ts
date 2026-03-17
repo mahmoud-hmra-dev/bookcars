@@ -26,6 +26,18 @@ const strings = new LocalizedStrings({
     FAQ_CANCEL_TITLE: 'What happens if I need to cancel my reservation?',
     FAQ_CANCEL_TEXT: 'We understand that plans can change, which is why we offer flexible cancellation policies. Depending on the timing of your cancellation, there may be applicable fees. Please refer to our terms and conditions or contact our customer support team for assistance with cancellations.',
   },
+  ar: {
+    FAQ_TITLE: 'الأسئلة الشائعة',
+    MORE_QUESTIONS: 'هل لديك المزيد من الأسئلة؟',
+    FAQ_DOCUMENTS_TITLE: 'ما المستندات التي أحتاجها لاستئجار مركبة؟',
+    FAQ_DOCUMENTS_TEXT: 'لاستئجار مركبة، ستحتاج عادةً إلى رخصة قيادة سارية، وبطاقة ائتمان للدفع والتأمين، وإثبات تأمين. قد تختلف المتطلبات الإضافية حسب موقعك ونوع المركبة التي تستأجرها.',
+    FAQ_SERVICES_TITLE: 'هل توفرون خدمات التوصيل والاستلام؟',
+    FAQ_SERVICES_TEXT: 'نعم. نوفر خدمات توصيل واستلام مريحة إلى مواقع متعددة، بما في ذلك المطارات والفنادق وغيرها. فقط أخبرنا بالموقع الذي تفضله وسنتولى الباقي.',
+    FAQ_AGE_TITLE: 'هل يوجد حد أدنى للعمر لاستئجار مركبة؟',
+    FAQ_AGE_TEXT: 'نعم، الحد الأدنى للعمر المطلوب لاستئجار مركبة يكون عادة 18 عامًا. ومع ذلك، قد تفرض بعض المواقع متطلبات عمر أعلى أو قيودًا إضافية على أنواع معينة من المركبات.',
+    FAQ_CANCEL_TITLE: 'ماذا يحدث إذا احتجت إلى إلغاء حجزي؟',
+    FAQ_CANCEL_TEXT: 'نحن نتفهم أن الخطط قد تتغير، لذلك نوفر سياسات إلغاء مرنة. قد تُطبق رسوم بحسب توقيت الإلغاء. يرجى الرجوع إلى الشروط والأحكام أو التواصل مع فريق دعم العملاء للحصول على المساعدة بخصوص الإلغاء.',
+  },
   es: {
     FAQ_TITLE: 'Preguntas frecuentes',
     MORE_QUESTIONS: '¿Más preguntas?',

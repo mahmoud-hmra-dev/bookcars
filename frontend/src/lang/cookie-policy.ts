@@ -103,6 +103,56 @@ We may update this Cookie Policy from time to time to reflect changes in technol
 If you have any questions about this Cookie Policy, please contact us at: ${env.CONTACT_EMAIL}
     `,
   },
+  ar: {
+    TITLE: 'Cookie Policy',
+    POLICY: `
+This Cookie Policy explains how ${env.WEBSITE_NAME} ("we," "us," or "our") uses cookies and similar technologies on our website. By using our website, you consent to the use of cookies as described in this policy.
+
+1. What Are Cookies?
+
+Cookies are small text files that are stored on your device (computer, tablet, smartphone) when you visit a website. They help improve your browsing experience by remembering your preferences and providing relevant information or services.
+
+2. Types of Cookies We Use
+
+We use the following types of cookies:
+
+- Strictly Necessary Cookies: These cookies are essential for the website to function and cannot be turned off in our systems.
+- Performance Cookies: These cookies help us understand how visitors interact with our website by collecting and reporting information anonymously.
+- Functional Cookies: These cookies enable the website to provide enhanced functionality and personalization.
+- Targeting/Advertising Cookies: These cookies are used to deliver relevant advertisements and track ad performance.
+
+3. How We Use Cookies
+
+We use cookies to:
+
+- Enhance website functionality and performance.
+- Analyze site usage to improve our services.
+- Personalize your experience and remember your preferences.
+- Deliver targeted advertisements based on your interests.
+
+4. Managing Your Cookie Preferences
+
+You can manage your cookie preferences at any time by adjusting the settings in your browser. Most browsers allow you to:
+
+- Block all cookies.
+- Delete existing cookies.
+- Receive notifications when a cookie is set.
+
+Please note that disabling cookies may impact your experience on our website.
+
+5. Third-Party Cookies
+
+We may allow third-party service providers to place cookies on our website to analyze site traffic, provide advertising services, or enable additional features. These cookies are governed by the third parties' privacy policies.
+
+6. Changes to This Cookie Policy
+
+We may update this Cookie Policy from time to time to reflect changes in technology, legislation, or our practices. The updated policy will be posted on this page with a revised "Last updated" date.
+
+7. Contact Us
+
+If you have any questions about this Cookie Policy, please contact us at: ${env.CONTACT_EMAIL}
+    `,
+  },
   es: {
     TITLE: 'Política de Cookies',
     POLICY: `

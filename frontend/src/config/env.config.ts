@@ -16,6 +16,11 @@ const LANGUAGES: Language[] = [
     label: 'English',
   },
   {
+    code: 'ar',
+    countryCode: 'sa',
+    label: 'العربية',
+  },
+  {
     code: 'fr',
     countryCode: 'fr',
     label: 'Français',

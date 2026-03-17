@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { fr, enUS, es } from 'date-fns/locale'
 import { Scheduler } from '@/components/scheduler/index'
 import {
   ProcessedEvent,
@@ -8,6 +7,7 @@ import {
 } from '@/components/scheduler/types'
 import * as bookcarsTypes from ':bookcars-types'
 import * as helper from '@/utils/helper'
+import { getDateFnsLocale, isRTL } from '@/utils/locale'
 import * as BookingService from '@/services/BookingService'
 
 interface VehicleSchedulerProps {
@@ -99,6 +99,42 @@ const VehicleScheduler = (
   }, [statuses, suppliers, filter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const getTranslations = (_language: string) => {
+    if (_language === 'ar') {
+      return {
+        navigation: {
+          month: 'شهر',
+          week: 'أسبوع',
+          day: 'يوم',
+          today: 'اليوم',
+          agenda: 'الأجندة',
+        },
+        form: {
+          addTitle: 'إضافة حدث',
+          editTitle: 'تعديل الحدث',
+          confirm: 'تأكيد',
+          delete: 'حذف',
+          cancel: 'إلغاء',
+        },
+        event: {
+          title: 'العنوان',
+          subtitle: 'العنوان الفرعي',
+          start: 'البداية',
+          end: 'النهاية',
+          allDay: 'طوال اليوم',
+        },
+        validation: {
+          required: 'هذا الحقل مطلوب',
+          invalidEmail: 'البريد الإلكتروني غير صالح',
+          onlyNumbers: 'يسمح بالأرقام فقط',
+          min: 'الحد الأدنى {{min}} أحرف',
+          max: 'الحد الأقصى {{max}} أحرف',
+        },
+        moreEvents: 'المزيد...',
+        noDataToDisplay: 'لا توجد بيانات للعرض',
+        loading: 'جارٍ التحميل...',
+      }
+    }
+
     if (_language === 'fr') {
       return {
         navigation: {
@@ -211,7 +247,8 @@ const VehicleScheduler = (
     <Scheduler
       ref={schedulerRef}
       view="month"
-      locale={language === 'fr' ? fr : language === 'es' ? es : enUS}
+      locale={getDateFnsLocale(language)}
+      direction={isRTL(language) ? 'rtl' : 'ltr'}
       disableViewer
       editable={false}
       draggable={false}
