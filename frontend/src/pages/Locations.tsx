@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import { Dialog, DialogContent } from '@mui/material'
-import L from 'leaflet'
 import env from '@/config/env.config'
 import * as bookcarsTypes from ':bookcars-types'
 import * as bookcarsHelper from ':bookcars-helper'
@@ -26,7 +25,7 @@ const Locations = () => {
     <Layout onLoad={onLoad} strict={false}>
       <div className="locations">
         <Map
-          position={new L.LatLng(env.MAP_LATITUDE, env.MAP_LONGITUDE)}
+          position={[env.MAP_LATITUDE, env.MAP_LONGITUDE]}
           initialZoom={env.MAP_ZOOM}
           locations={locations}
           onSelelectPickUpLocation={async (locationId) => {

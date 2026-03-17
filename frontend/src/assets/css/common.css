@@ -8,10 +8,6 @@
   visibility: hidden !important;
 }
 
-.leaflet-control-attribution {
-  display: none !important;
-}
-
 #nprogress .bar {
   background: #1a1a1a !important;
 }

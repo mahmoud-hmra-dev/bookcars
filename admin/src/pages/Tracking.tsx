@@ -35,7 +35,6 @@ import * as SupplierService from '@/services/SupplierService'
 import * as CarService from '@/services/CarService'
 import * as TraccarService from '@/services/TraccarService'
 
-import 'leaflet/dist/leaflet.css'
 import '@/assets/css/tracking.css'
 
 const formatDateInput = (date: Date) => date.toISOString().slice(0, 16)
@@ -59,10 +58,9 @@ type ParsedGeofence = {
 
 const isFiniteCoordinate = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
 
-const toLeafletLatLng = (first: number, second: number): LatLngTuple => {
-  // Leaflet expects [lat, lng].
+const normalizeLatLngOrder = (first: number, second: number): LatLngTuple => {
   // For WKT/GeoJSON, coordinates are commonly [lng, lat].
-  // If only one ordering is geographically valid, normalize to it.
+  // If only one ordering is geographically valid, normalize to [lat, lng].
   if (Math.abs(first) > 90 && Math.abs(second) <= 90) {
     return [second, first]
   }
@@ -188,7 +186,7 @@ const parseGeofenceArea = (geofence: bookcarsTypes.TraccarGeofence, fallbackInde
       const first = Number.parseFloat(match[1])
       const second = Number.parseFloat(match[2])
       if (Number.isFinite(first) && Number.isFinite(second)) {
-        coordPairs.push(toLeafletLatLng(first, second))
+        coordPairs.push(normalizeLatLngOrder(first, second))
       }
     }
 
@@ -198,7 +196,7 @@ const parseGeofenceArea = (geofence: bookcarsTypes.TraccarGeofence, fallbackInde
         .filter((value) => Number.isFinite(value))
 
       for (let i = 0; i + 1 < numericValues.length; i += 2) {
-        coordPairs.push(toLeafletLatLng(numericValues[i], numericValues[i + 1]))
+        coordPairs.push(normalizeLatLngOrder(numericValues[i], numericValues[i + 1]))
       }
     }
 
@@ -213,7 +211,7 @@ const parseGeofenceArea = (geofence: bookcarsTypes.TraccarGeofence, fallbackInde
       .split(',')
       .map((segment) => segment.trim().split(/\s+/).map((value) => Number.parseFloat(value)).filter((value) => Number.isFinite(value)))
       .filter((pair) => pair.length >= 2)
-      .map((pair) => toLeafletLatLng(pair[0], pair[1]))
+      .map((pair) => normalizeLatLngOrder(pair[0], pair[1]))
 
     return loosePairs.length >= 3 ? { id, name, shape: 'polygon', points: loosePairs } : null
   }
@@ -225,7 +223,6 @@ const parseGeofenceArea = (geofence: bookcarsTypes.TraccarGeofence, fallbackInde
         return null
       }
 
-      // wellknown returns GeoJSON geometry. react-leaflet GeoJSON expects a GeoJSON object.
       return {
         id,
         name,

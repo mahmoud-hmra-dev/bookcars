@@ -4,9 +4,35 @@
 }
 
 .map {
+  position: relative;
   min-height: 540px;
   height: 100%;
   width: 100%;
+  overflow: hidden;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #eef4f8 0%, #e6edf2 100%);
+}
+
+.map-canvas {
+  height: 100%;
+  width: 100%;
+}
+
+.map-status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgb(255 255 255 / 78%);
+  color: #233142;
+  font-weight: 600;
+  z-index: 5;
+}
+
+.map-status-error {
+  color: #b42318;
 }
 
 .marker .name {

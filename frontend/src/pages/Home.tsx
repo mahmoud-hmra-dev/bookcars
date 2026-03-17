@@ -20,7 +20,6 @@ import {
   FlashOn,
   CheckBox,
 } from '@mui/icons-material'
-import L from 'leaflet'
 import * as bookcarsTypes from ':bookcars-types'
 import * as bookcarsHelper from ':bookcars-helper'
 import env from '@/config/env.config'
@@ -501,7 +500,7 @@ const Home = () => {
         <div className="home-map">
           <Map
             title={strings.MAP_TITLE}
-            position={new L.LatLng(env.MAP_LATITUDE, env.MAP_LONGITUDE)}
+            position={[env.MAP_LATITUDE, env.MAP_LONGITUDE]}
             initialZoom={env.MAP_ZOOM}
             locations={locations}
             onSelelectPickUpLocation={async (locationId) => {

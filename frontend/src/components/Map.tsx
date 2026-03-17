@@ -1,228 +1,286 @@
-import React, { Dispatch, ReactNode, SetStateAction, useEffect, useRef, useState } from 'react'
-import { MapContainer, Marker, Popup, TileLayer, useMapEvents } from 'react-leaflet'
-import L, { LatLngExpression } from 'leaflet'
-import icon from 'leaflet/dist/images/marker-icon.png'
-import iconShadow from 'leaflet/dist/images/marker-shadow.png'
+import React, { ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import * as bookcarsTypes from ':bookcars-types'
-// import * as UserService from '@/services/UserService'
+import env from '@/config/env.config'
+import { strings as commonStrings } from '@/lang/common'
 import { strings } from '@/lang/map'
 import * as LocationService from '@/services/LocationService'
 import * as helper from '@/utils/helper'
+import { loadGoogleMapsApi } from '@/utils/googleMaps'
 
-import 'leaflet-boundary-canvas'
-import 'leaflet/dist/leaflet.css'
 import '@/assets/css/map.css'
 
-const DefaultIcon = L.icon({
-  iconUrl: icon,
-  shadowUrl: iconShadow
-})
-
-L.Marker.prototype.options.icon = DefaultIcon
-
-interface Marker {
-  name: string,
-  position: L.LatLng
+type LatLngLiteral = {
+  lat: number
+  lng: number
 }
 
-const markers: Marker[] = [
-  // { name: 'Athens (ATH)', position: new L.LatLng(37.983810, 23.727539) },
-]
-const zoomMarkers: Marker[] = [
-  // { name: 'Athens Airport (ATH)', position: new L.LatLng(37.937225, 23.945238) },
-  // { name: 'Athens Port Piraeus (ATH)', position: new L.LatLng(37.9495811, 23.6121006) },
-]
-
-interface ZoomTrackerProps {
-  setZoom: Dispatch<SetStateAction<number>>
-}
-
-const ZoomTracker = ({ setZoom }: ZoomTrackerProps) => {
-  const mapEvents = useMapEvents({
-    zoom() {
-      setZoom(mapEvents.getZoom())
-    }
-  })
-
-  return null
-}
-
-interface ZoomControlledLayerProps {
-  zoom: number
-  minZoom: number
-  children: ReactNode
-}
-
-const ZoomControlledLayer = ({ zoom, minZoom, children }: ZoomControlledLayerProps) => {
-  if (zoom >= minZoom) {
-    return (
-      <>
-        {children}
-      </>
-    )
-  }
-  return null
+type MapMarker = {
+  key: string
+  name: string
+  position: LatLngLiteral
+  locationId?: string
+  isPickupSelectable?: boolean
 }
 
 interface MapProps {
   title?: string
-  position?: LatLngExpression
+  position?: LatLngLiteral | [number, number]
   initialZoom?: number
   locations?: bookcarsTypes.Location[]
   parkingSpots?: bookcarsTypes.ParkingSpot[]
   className?: string
   children?: ReactNode
   onSelelectPickUpLocation?: (locationId: string) => void
-  // onSelelectDropOffLocation?: (locationId: string) => void
+}
+
+const DEFAULT_POSITION: LatLngLiteral = {
+  lat: 31.792305849269,
+  lng: -7.080168000000015,
+}
+
+const isFiniteCoordinate = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
+
+const toLatLngLiteral = (value?: LatLngLiteral | [number, number] | null): LatLngLiteral => {
+  if (!value) {
+    return DEFAULT_POSITION
+  }
+
+  if (Array.isArray(value)) {
+    const [lat, lng] = value
+    return {
+      lat: Number(lat),
+      lng: Number(lng),
+    }
+  }
+
+  return {
+    lat: Number(value.lat),
+    lng: Number(value.lng),
+  }
 }
 
 const Map = ({
   title,
-  position = new L.LatLng(31.792305849269, -7.080168000000015),
+  position,
   initialZoom,
   locations,
   parkingSpots,
   className,
   children,
   onSelelectPickUpLocation,
-  // onSelelectDropOffLocation,
 }: MapProps) => {
   const _initialZoom = initialZoom || 5.5
-  const [zoom, setZoom] = useState(_initialZoom)
-  const map = useRef<L.Map | null>(null)
+  const mapRef = useRef<any>(null)
+  const mapContainerRef = useRef<HTMLDivElement | null>(null)
+  const googleMapsRef = useRef<any>(null)
+  const infoWindowRef = useRef<any>(null)
+  const markersRef = useRef<any[]>([])
+  const [isLoaded, setIsLoaded] = useState(false)
+  const [loadError, setLoadError] = useState(false)
+
+  const center = useMemo(() => toLatLngLiteral(position), [position])
+
+  const locationMarkers = useMemo<MapMarker[]>(() => (
+    (locations || [])
+      .filter((location) => isFiniteCoordinate(location.latitude) && isFiniteCoordinate(location.longitude))
+      .map((location) => ({
+        key: location._id,
+        name: location.name || '',
+        locationId: location._id,
+        position: {
+          lat: Number(location.latitude),
+          lng: Number(location.longitude),
+        },
+        isPickupSelectable: !!onSelelectPickUpLocation,
+      }))
+  ), [locations, onSelelectPickUpLocation])
+
+  const parkingSpotMarkers = useMemo<MapMarker[]>(() => (
+    (parkingSpots || [])
+      .filter((parkingSpot) => Number.isFinite(Number(parkingSpot.latitude)) && Number.isFinite(Number(parkingSpot.longitude)))
+      .map((parkingSpot, index) => ({
+        key: parkingSpot._id || `parking-spot-${index}`,
+        name: parkingSpot.name || '',
+        position: {
+          lat: Number(parkingSpot.latitude),
+          lng: Number(parkingSpot.longitude),
+        },
+      }))
+  ), [parkingSpots])
 
   useEffect(() => {
-    if (map.current) {
-      map.current.attributionControl.setPrefix('')
-      map.current.invalidateSize()
+    let cancelled = false
+
+    const initMap = async () => {
+      if (!env.GOOGLE_MAPS_API_KEY) {
+        setLoadError(true)
+        return
+      }
+
+      try {
+        const googleMaps = await loadGoogleMapsApi(env.GOOGLE_MAPS_API_KEY)
+        if (cancelled || !mapContainerRef.current) {
+          return
+        }
+
+        googleMapsRef.current = googleMaps
+
+        if (!mapRef.current) {
+          mapRef.current = new googleMaps.Map(mapContainerRef.current, {
+            center,
+            zoom: _initialZoom,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: true,
+            clickableIcons: false,
+            gestureHandling: 'cooperative',
+          })
+          infoWindowRef.current = new googleMaps.InfoWindow()
+        }
+
+        setIsLoaded(true)
+      } catch (err) {
+        console.error(err)
+        if (!cancelled) {
+          setLoadError(true)
+        }
+      }
     }
-  }, [map])
+
+    initMap()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
-    if (map.current && position) {
-      map.current.setView(position, _initialZoom)
+    if (!isLoaded || !mapRef.current || !googleMapsRef.current) {
+      return
     }
-  }, [position, _initialZoom, map])
 
-  //
-  // Tile server
-  //
+    mapRef.current.setCenter(center)
+    mapRef.current.setZoom(_initialZoom)
 
-  const tileURL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-  // const tileURL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-  // const language = UserService.getLanguage()
-  // if (language === 'fr') {
-  //   tileURL = 'https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png'
-  // }
+    window.setTimeout(() => {
+      if (!mapRef.current || !googleMapsRef.current) {
+        return
+      }
 
-  const getLocationMarkers = (): Marker[] => (
-    (locations
-      && locations
-        .filter((l) => l.latitude && l.longitude)
-        .map((l) => ({ name: l.name!, position: new L.LatLng(l.latitude!, l.longitude!) }))
-    ) || []
-  )
+      const currentCenter = mapRef.current.getCenter()
+      googleMapsRef.current.event.trigger(mapRef.current, 'resize')
+      if (currentCenter) {
+        mapRef.current.setCenter(currentCenter)
+      }
+    }, 0)
+  }, [_initialZoom, center, center.lat, center.lng, isLoaded])
 
-  const getMarkers = (__markers: Marker[]) =>
-    __markers.map((marker) => (
-      <Marker key={marker.name} position={marker.position}>
-        <Popup className="marker">
-          <div className="name">{marker.name}</div>
-          <div className="action">
-            {!!onSelelectPickUpLocation && (
-              <button
-                type="button"
-                className="action-btn"
-                onClick={async () => {
-                  try {
-                    if (onSelelectPickUpLocation) {
-                      const { status, data } = await LocationService.getLocationId(marker.name, 'en')
+  useEffect(() => {
+    if (!isLoaded || !mapRef.current || !googleMapsRef.current) {
+      return
+    }
 
-                      if (status === 200) {
-                        onSelelectPickUpLocation(data)
-                      } else {
-                        helper.error()
-                      }
-                    }
-                  } catch (err) {
-                    helper.error(err)
-                  }
-                }}
-              >
-                {strings.SELECT_PICK_UP_LOCATION}
-              </button>
-            )}
-            {/* {!!onSelelectDropOffLocation && (
-              <button
-                type="button"
-                className="action-btn"
-                onClick={async () => {
-                  try {
-                    if (onSelelectDropOffLocation) {
-                      const { status, data } = await LocationService.getLocationId(marker.name, 'en')
+    const googleMaps = googleMapsRef.current
+    const map = mapRef.current
 
-                      if (status === 200) {
-                        onSelelectDropOffLocation(data)
-                      } else {
-                        helper.error()
-                      }
-                    }
-                  } catch (err) {
-                    helper.error(err)
-                  }
-                }}
-              >
-                {strings.SELECT_DROP_OFF_LOCATION}
-              </button>
-            )} */}
-          </div>
-        </Popup>
-      </Marker>
-    ))
+    infoWindowRef.current?.close()
+    markersRef.current.forEach((marker) => marker.setMap(null))
+    markersRef.current = []
 
-  const getParkingSpots = () =>
-    parkingSpots && parkingSpots.map((parkingSpot) => (
-      <Marker key={parkingSpot._id} position={[Number(parkingSpot.latitude), Number(parkingSpot.longitude)]}>
-        <Popup className="marker">
-          <div className="name">{parkingSpot.name}</div>
-        </Popup>
-      </Marker>
-    ))
+    const resolveLocationId = async (marker: MapMarker) => {
+      if (marker.locationId) {
+        return marker.locationId
+      }
+
+      const { status, data } = await LocationService.getLocationId(marker.name, 'en')
+      if (status !== 200) {
+        throw new Error('Unable to resolve location id.')
+      }
+
+      return data
+    }
+
+    const buildInfoWindowContent = (marker: MapMarker) => {
+      const container = document.createElement('div')
+      container.className = 'marker'
+
+      const name = document.createElement('div')
+      name.className = 'name'
+      name.textContent = marker.name
+      container.appendChild(name)
+
+      if (marker.isPickupSelectable && onSelelectPickUpLocation) {
+        const action = document.createElement('div')
+        action.className = 'action'
+
+        const button = document.createElement('button')
+        button.type = 'button'
+        button.className = 'action-btn'
+        button.textContent = strings.SELECT_PICK_UP_LOCATION
+        button.onclick = () => {
+          button.disabled = true
+          void (async () => {
+            try {
+              const locationId = await resolveLocationId(marker)
+              onSelelectPickUpLocation(locationId)
+            } catch (err) {
+              helper.error(err)
+              button.disabled = false
+            }
+          })()
+        }
+
+        action.appendChild(button)
+        container.appendChild(action)
+      }
+
+      return container
+    }
+
+    const createMarker = (marker: MapMarker) => {
+      const instance = new googleMaps.Marker({
+        position: marker.position,
+        map,
+        title: marker.name,
+      })
+
+      instance.addListener('click', () => {
+        if (!infoWindowRef.current) {
+          return
+        }
+
+        infoWindowRef.current.setContent(buildInfoWindowContent(marker))
+        infoWindowRef.current.open({
+          anchor: instance,
+          map,
+        })
+      })
+
+      markersRef.current.push(instance)
+    }
+
+    locationMarkers.forEach(createMarker)
+    parkingSpotMarkers.forEach(createMarker)
+
+    return () => {
+      infoWindowRef.current?.close()
+      markersRef.current.forEach((marker) => marker.setMap(null))
+      markersRef.current = []
+    }
+  }, [isLoaded, locationMarkers, parkingSpotMarkers, onSelelectPickUpLocation])
 
   return (
     <>
       {title && <h1 className="title">{title}</h1>}
-      <MapContainer
-        center={position}
-        zoom={_initialZoom}
-        className={`${className ? `${className} ` : ''}map`}
-        ref={map}
-      >
-        <TileLayer
-          // attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url={tileURL}
-        />
-        <ZoomTracker setZoom={setZoom} />
-        <ZoomControlledLayer zoom={zoom} minZoom={7.5}>
-          {
-            getMarkers(zoomMarkers)
-          }
-        </ZoomControlledLayer>
-        <ZoomControlledLayer zoom={zoom} minZoom={5.5}>
-          {
-            getMarkers(markers)
-          }
-        </ZoomControlledLayer>
-        <ZoomControlledLayer zoom={zoom} minZoom={_initialZoom}>
-          {
-            getMarkers(getLocationMarkers())
-          }
-          {
-            getParkingSpots()
-          }
-        </ZoomControlledLayer>
+      <div className={`${className ? `${className} ` : ''}map`}>
+        <div ref={mapContainerRef} className="map-canvas" />
         {children}
-      </MapContainer>
+        {!isLoaded && (
+          <div className={`map-status ${loadError ? 'map-status-error' : ''}`}>
+            {loadError ? 'Google Maps is unavailable.' : commonStrings.LOADING}
+          </div>
+        )}
+      </div>
     </>
   )
 }
