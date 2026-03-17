@@ -36,6 +36,8 @@ import {
   MonetizationOn as PricingIcon,
   SmartToy as AssistantIcon,
   MyLocation as TrackingIcon,
+  MenuBook as ManualDocumentationIcon,
+  IntegrationInstructions as TechnicalDocumentationIcon,
 } from '@mui/icons-material'
 import { useNavigate } from 'react-router-dom'
 import * as bookcarsTypes from ':bookcars-types'
@@ -394,6 +396,26 @@ const Header = ({
                   <ListItemIcon><AssistantIcon /></ListItemIcon>
                   <ListItemText primary={strings.ASSISTANT} />
                 </ListItem>
+                <ListItem
+                  onClick={() => {
+                    navigate('/manual-documentation')
+                    handleSideMenuClose()
+                  }}
+                >
+                  <ListItemIcon><ManualDocumentationIcon /></ListItemIcon>
+                  <ListItemText primary={strings.MANUAL_DOCUMENTATION} />
+                </ListItem>
+                {currentUser?.type === bookcarsTypes.UserType.Admin && (
+                  <ListItem
+                    onClick={() => {
+                      navigate('/technical-documentation')
+                      handleSideMenuClose()
+                    }}
+                  >
+                    <ListItemIcon><TechnicalDocumentationIcon /></ListItemIcon>
+                    <ListItemText primary={strings.TECHNICAL_DOCUMENTATION} />
+                  </ListItem>
+                )}
                 {bankDetails?.showBankDetailsPage && (
                   <ListItem
                     onClick={() => {

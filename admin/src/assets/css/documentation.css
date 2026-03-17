@@ -1,0 +1,15 @@
+.documentation {
+  padding: 20px;
+}
+
+.documentation h1 {
+  margin-bottom: 12px;
+}
+
+.documentation p {
+  margin-bottom: 16px;
+}
+
+.documentation ul {
+  margin: 0 0 20px 20px;
+}
