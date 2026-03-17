@@ -45,6 +45,8 @@ const BankDetails = lazy(() => import('@/pages/BankDetails'))
 const Pricing = lazy(() => import('@/pages/Pricing'))
 const Assistant = lazy(() => import('@/pages/Assistant'))
 const Tracking = lazy(() => import('@/pages/Tracking'))
+const ManualDocumentation = lazy(() => import('@/pages/ManualDocumentation'))
+const TechnicalDocumentation = lazy(() => import('@/pages/TechnicalDocumentation'))
 
 const AppLayout = () => {
   const location = useLocation()
@@ -113,6 +115,8 @@ const router = createBrowserRouter([
       { path: 'pricing', element: <Pricing /> },
       { path: 'assistant', element: <Assistant /> },
       { path: 'tracking', element: <Tracking /> },
+      { path: 'manual-documentation', element: <ManualDocumentation /> },
+      { path: 'technical-documentation', element: <TechnicalDocumentation /> },
       { path: '*', element: <NoMatch /> }
     ]
   }
