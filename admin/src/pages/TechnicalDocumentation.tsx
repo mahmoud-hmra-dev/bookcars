@@ -10,23 +10,63 @@ const TechnicalDocumentation = () => (
       <h1>{strings.TITLE}</h1>
       <p>{strings.INTRO}</p>
 
-      <h2>{strings.SECTION1_TITLE}</h2>
-      <ul>
-        <li>{strings.SECTION1_ITEM1}</li>
-        <li>{strings.SECTION1_ITEM2}</li>
-      </ul>
+      <section className="documentation-section">
+        <h2>{strings.ARCHITECTURE_TITLE}</h2>
+        <ul>
+          <li>{strings.ARCHITECTURE_ITEM1}</li>
+          <li>{strings.ARCHITECTURE_ITEM2}</li>
+          <li>{strings.ARCHITECTURE_ITEM3}</li>
+          <li>{strings.ARCHITECTURE_ITEM4}</li>
+        </ul>
+      </section>
 
-      <h2>{strings.SECTION2_TITLE}</h2>
-      <ul>
-        <li>{strings.SECTION2_ITEM1}</li>
-        <li>{strings.SECTION2_ITEM2}</li>
-      </ul>
+      <section className="documentation-section">
+        <h2>{strings.MODULES_TITLE}</h2>
+        <ul>
+          <li>{strings.MODULES_ITEM1}</li>
+          <li>{strings.MODULES_ITEM2}</li>
+          <li>{strings.MODULES_ITEM3}</li>
+          <li>{strings.MODULES_ITEM4}</li>
+        </ul>
+      </section>
 
-      <h2>{strings.SECTION3_TITLE}</h2>
-      <ul>
-        <li>{strings.SECTION3_ITEM1}</li>
-        <li>{strings.SECTION3_ITEM2}</li>
-      </ul>
+      <section className="documentation-section">
+        <h2>{strings.DATA_TITLE}</h2>
+        <ul>
+          <li>{strings.DATA_ITEM1}</li>
+          <li>{strings.DATA_ITEM2}</li>
+          <li>{strings.DATA_ITEM3}</li>
+        </ul>
+      </section>
+
+      <section className="documentation-section">
+        <h2>{strings.SECURITY_TITLE}</h2>
+        <ul>
+          <li>{strings.SECURITY_ITEM1}</li>
+          <li>{strings.SECURITY_ITEM2}</li>
+          <li>{strings.SECURITY_ITEM3}</li>
+          <li>{strings.SECURITY_ITEM4}</li>
+        </ul>
+      </section>
+
+      <section className="documentation-section">
+        <h2>{strings.OPERATIONS_TITLE}</h2>
+        <ol>
+          <li>{strings.OPERATIONS_ITEM1}</li>
+          <li>{strings.OPERATIONS_ITEM2}</li>
+          <li>{strings.OPERATIONS_ITEM3}</li>
+          <li>{strings.OPERATIONS_ITEM4}</li>
+        </ol>
+      </section>
+
+      <section className="documentation-section">
+        <h2>{strings.TROUBLESHOOTING_TITLE}</h2>
+        <ul>
+          <li>{strings.TROUBLESHOOTING_ITEM1}</li>
+          <li>{strings.TROUBLESHOOTING_ITEM2}</li>
+          <li>{strings.TROUBLESHOOTING_ITEM3}</li>
+        </ul>
+      </section>
     </div>
   </Layout>
 )

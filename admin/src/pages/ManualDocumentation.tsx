@@ -10,23 +10,67 @@ const ManualDocumentation = () => (
       <h1>{strings.TITLE}</h1>
       <p>{strings.INTRO}</p>
 
-      <h2>{strings.SECTION1_TITLE}</h2>
-      <ul>
-        <li>{strings.SECTION1_ITEM1}</li>
-        <li>{strings.SECTION1_ITEM2}</li>
-      </ul>
+      <section className="documentation-section">
+        <h2>{strings.SYSTEM_OVERVIEW_TITLE}</h2>
+        <ul>
+          <li>{strings.SYSTEM_OVERVIEW_ITEM1}</li>
+          <li>{strings.SYSTEM_OVERVIEW_ITEM2}</li>
+          <li>{strings.SYSTEM_OVERVIEW_ITEM3}</li>
+        </ul>
+      </section>
 
-      <h2>{strings.SECTION2_TITLE}</h2>
-      <ul>
-        <li>{strings.SECTION2_ITEM1}</li>
-        <li>{strings.SECTION2_ITEM2}</li>
-      </ul>
+      <section className="documentation-section">
+        <h2>{strings.ROLES_TITLE}</h2>
 
-      <h2>{strings.SECTION3_TITLE}</h2>
-      <ul>
-        <li>{strings.SECTION3_ITEM1}</li>
-        <li>{strings.SECTION3_ITEM2}</li>
-      </ul>
+        <h3>{strings.ADMIN_TITLE}</h3>
+        <ul>
+          <li>{strings.ADMIN_ITEM1}</li>
+          <li>{strings.ADMIN_ITEM2}</li>
+          <li>{strings.ADMIN_ITEM3}</li>
+        </ul>
+
+        <h3>{strings.SUPPLIER_TITLE}</h3>
+        <ul>
+          <li>{strings.SUPPLIER_ITEM1}</li>
+          <li>{strings.SUPPLIER_ITEM2}</li>
+          <li>{strings.SUPPLIER_ITEM3}</li>
+        </ul>
+
+        <h3>{strings.CUSTOMER_TITLE}</h3>
+        <ul>
+          <li>{strings.CUSTOMER_ITEM1}</li>
+          <li>{strings.CUSTOMER_ITEM2}</li>
+          <li>{strings.CUSTOMER_ITEM3}</li>
+        </ul>
+
+        <h3>{strings.GUEST_TITLE}</h3>
+        <ul>
+          <li>{strings.GUEST_ITEM1}</li>
+          <li>{strings.GUEST_ITEM2}</li>
+        </ul>
+      </section>
+
+      <section className="documentation-section">
+        <h2>{strings.OPERATIONS_TITLE}</h2>
+        <ol>
+          <li>{strings.OPERATIONS_ITEM1}</li>
+          <li>{strings.OPERATIONS_ITEM2}</li>
+          <li>{strings.OPERATIONS_ITEM3}</li>
+          <li>{strings.OPERATIONS_ITEM4}</li>
+          <li>{strings.OPERATIONS_ITEM5}</li>
+          <li>{strings.OPERATIONS_ITEM6}</li>
+        </ol>
+      </section>
+
+      <section className="documentation-section">
+        <h2>{strings.BEST_PRACTICES_TITLE}</h2>
+        <ul>
+          <li>{strings.BEST_PRACTICES_ITEM1}</li>
+          <li>{strings.BEST_PRACTICES_ITEM2}</li>
+          <li>{strings.BEST_PRACTICES_ITEM3}</li>
+          <li>{strings.BEST_PRACTICES_ITEM4}</li>
+        </ul>
+      </section>
     </div>
   </Layout>
 )
