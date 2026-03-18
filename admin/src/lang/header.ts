@@ -21,6 +21,8 @@ const strings = new LocalizedStrings({
     BANK_DETAILS: 'Détails bancaires',
     PRICING: 'Tarification',
     ASSISTANT: 'Assistant',
+    MANUAL_DOCUMENTATION: 'Documentation utilisateur',
+    TECHNICAL_DOCUMENTATION: 'Documentation technique',
   },
   en: {
     DASHBOARD: 'Dashboard',
@@ -41,6 +43,8 @@ const strings = new LocalizedStrings({
     BANK_DETAILS: 'Bank Details',
     PRICING: 'Pricing',
     ASSISTANT: 'Assistant',
+    MANUAL_DOCUMENTATION: 'User Manual',
+    TECHNICAL_DOCUMENTATION: 'Technical Documentation',
   },
   ar: {
     DASHBOARD: 'لوحة التحكم',
@@ -61,6 +65,8 @@ const strings = new LocalizedStrings({
     BANK_DETAILS: 'البيانات البنكية',
     PRICING: 'التسعير',
     ASSISTANT: 'المساعد',
+    MANUAL_DOCUMENTATION: 'دليل الاستخدام',
+    TECHNICAL_DOCUMENTATION: 'التوثيق التقني',
   },
   es: {
     DASHBOARD: 'Panel de control',
@@ -81,6 +87,8 @@ const strings = new LocalizedStrings({
     BANK_DETAILS: 'Detalles bancarios',
     PRICING: 'Precios',
     ASSISTANT: 'Asistente',
+    MANUAL_DOCUMENTATION: 'Manual de usuario',
+    TECHNICAL_DOCUMENTATION: 'Documentación técnica',
   },
 })
 

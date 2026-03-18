@@ -1,0 +1,40 @@
+.documentation {
+  max-width: 980px;
+  padding: 20px;
+}
+
+.documentation h1 {
+  margin-bottom: 12px;
+}
+
+.documentation h2 {
+  margin: 24px 0 10px;
+}
+
+.documentation h3 {
+  margin: 16px 0 8px;
+}
+
+.documentation p {
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.documentation ul,
+.documentation ol {
+  margin: 0 0 20px 22px;
+  line-height: 1.7;
+}
+
+.documentation-section {
+  border: 1px solid #e4e4e4;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  background: #fff;
+}
+
+html[dir='rtl'] .documentation ul,
+html[dir='rtl'] .documentation ol {
+  margin: 0 22px 20px 0;
+}
