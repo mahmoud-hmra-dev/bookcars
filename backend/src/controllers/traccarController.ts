@@ -31,6 +31,36 @@ const getCarWithTracking = async (id: string) => {
   return car
 }
 
+const parseId = (value: string, label: string) => {
+  const parsed = Number.parseInt(value, 10)
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    throw new Error(`Invalid ${label}`)
+  }
+
+  return parsed
+}
+
+const sanitizeGeofencePayload = (payload: Partial<bookcarsTypes.UpsertTraccarGeofencePayload>) => {
+  const name = payload.name?.trim()
+  const area = payload.area?.trim()
+
+  if (!name) {
+    throw new Error('Geofence name is required')
+  }
+
+  if (!area) {
+    throw new Error('Geofence area is required')
+  }
+
+  return {
+    name,
+    description: payload.description?.trim(),
+    area,
+    calendarId: payload.calendarId,
+    attributes: payload.attributes || {},
+  }
+}
+
 const getPositionDate = (position?: bookcarsTypes.TraccarPosition | null) => {
   if (!position) {
     return 0
@@ -47,6 +77,16 @@ export const getDevices = async (_req: Request, res: Response) => {
     res.json(devices)
   } catch (err) {
     logger.error('[traccar.getDevices] Error', err)
+    res.status(400).send(String(err))
+  }
+}
+
+export const getAllGeofences = async (_req: Request, res: Response) => {
+  try {
+    const geofences = await traccarService.getGeofences()
+    res.json(geofences)
+  } catch (err) {
+    logger.error('[traccar.getAllGeofences] Error', err)
     res.status(400).send(String(err))
   }
 }
@@ -144,6 +184,26 @@ export const linkDevice = async (req: Request, res: Response) => {
   }
 }
 
+export const createGeofence = async (req: Request, res: Response) => {
+  try {
+    const geofence = await traccarService.createGeofence(sanitizeGeofencePayload(req.body))
+    res.json(geofence)
+  } catch (err) {
+    logger.error('[traccar.createGeofence] Error', err)
+    res.status(400).send(String(err))
+  }
+}
+
+export const updateGeofence = async (req: Request, res: Response) => {
+  try {
+    const geofence = await traccarService.updateGeofence(parseId(req.params.geofenceId, 'geofenceId'), sanitizeGeofencePayload(req.body))
+    res.json(geofence)
+  } catch (err) {
+    logger.error('[traccar.updateGeofence] Error', err)
+    res.status(400).send(String(err))
+  }
+}
+
 export const unlinkDevice = async (req: Request, res: Response) => {
   const { carId } = req.params
 
@@ -221,6 +281,46 @@ export const getGeofences = async (req: Request, res: Response) => {
     res.json(geofences)
   } catch (err) {
     logger.error('[traccar.getGeofences] Error', err)
+    res.status(400).send(String(err))
+  }
+}
+
+export const linkGeofence = async (req: Request, res: Response) => {
+  try {
+    const car = await getCarWithTracking(req.params.carId)
+    const geofenceId = parseId(req.params.geofenceId, 'geofenceId')
+
+    await traccarService.linkDeviceGeofence(car.tracking?.deviceId as number, geofenceId)
+
+    car.tracking = {
+      ...car.tracking,
+      lastSyncedAt: new Date(),
+    }
+
+    await car.save()
+    res.json(await traccarService.getGeofences(car.tracking?.deviceId as number))
+  } catch (err) {
+    logger.error('[traccar.linkGeofence] Error', err)
+    res.status(400).send(String(err))
+  }
+}
+
+export const unlinkGeofence = async (req: Request, res: Response) => {
+  try {
+    const car = await getCarWithTracking(req.params.carId)
+    const geofenceId = parseId(req.params.geofenceId, 'geofenceId')
+
+    await traccarService.unlinkDeviceGeofence(car.tracking?.deviceId as number, geofenceId)
+
+    car.tracking = {
+      ...car.tracking,
+      lastSyncedAt: new Date(),
+    }
+
+    await car.save()
+    res.json(await traccarService.getGeofences(car.tracking?.deviceId as number))
+  } catch (err) {
+    logger.error('[traccar.unlinkGeofence] Error', err)
     res.status(400).send(String(err))
   }
 }

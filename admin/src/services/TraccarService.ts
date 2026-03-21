@@ -19,6 +19,14 @@ export interface TraccarFleetItem {
   position: bookcarsTypes.TraccarPosition | null
 }
 
+export interface TraccarGeofenceEditorPayload {
+  name: string
+  description?: string
+  area: string
+  calendarId?: number
+  attributes?: Record<string, any>
+}
+
 export const getStatus = (): Promise<{ enabled: boolean, baseUrl: string }> =>
   axiosInstance
     .get('/api/status', { withCredentials: true })
@@ -32,6 +40,31 @@ export const getDevices = (): Promise<bookcarsTypes.TraccarDevice[]> =>
 export const getFleetOverview = (): Promise<TraccarFleetItem[]> =>
   axiosInstance
     .get('/api/fleet', { withCredentials: true })
+    .then((res) => res.data)
+
+export const getAllGeofences = (): Promise<bookcarsTypes.TraccarGeofence[]> =>
+  axiosInstance
+    .get('/api/geofences', { withCredentials: true })
+    .then((res) => res.data)
+
+export const createGeofence = (payload: TraccarGeofenceEditorPayload): Promise<bookcarsTypes.TraccarGeofence> =>
+  axiosInstance
+    .post('/api/geofences', payload, { withCredentials: true })
+    .then((res) => res.data)
+
+export const updateGeofence = (geofenceId: number, payload: TraccarGeofenceEditorPayload): Promise<bookcarsTypes.TraccarGeofence> =>
+  axiosInstance
+    .put(`/api/geofences/entity/${geofenceId}`, payload, { withCredentials: true })
+    .then((res) => res.data)
+
+export const linkGeofence = (carId: string, geofenceId: number): Promise<bookcarsTypes.TraccarGeofence[]> =>
+  axiosInstance
+    .post(`/api/geofences/${encodeURIComponent(carId)}/link/${geofenceId}`, null, { withCredentials: true })
+    .then((res) => res.data)
+
+export const unlinkGeofence = (carId: string, geofenceId: number): Promise<bookcarsTypes.TraccarGeofence[]> =>
+  axiosInstance
+    .post(`/api/geofences/${encodeURIComponent(carId)}/unlink/${geofenceId}`, null, { withCredentials: true })
     .then((res) => res.data)
 
 export const linkDevice = (carId: string, payload: TraccarLinkPayload): Promise<bookcarsTypes.TraccarCarTracking> =>

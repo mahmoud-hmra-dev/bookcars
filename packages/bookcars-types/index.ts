@@ -237,6 +237,16 @@ export interface TraccarGeofence {
   description?: string
   area?: string
   geojson?: any
+  calendarId?: number
+  attributes?: Record<string, any>
+}
+
+export interface UpsertTraccarGeofencePayload {
+  name: string
+  description?: string
+  area: string
+  calendarId?: number
+  attributes?: Record<string, any>
 }
 
 export interface CarTrackingSnapshot {

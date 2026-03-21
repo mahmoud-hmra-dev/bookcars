@@ -53,12 +53,13 @@ type GoogleLatLng = google.maps.LatLngLiteral
 type ParsedGeofence = {
   id: number | string
   name: string
-  shape: 'circle' | 'polygon' | 'rectangle' | 'geojson'
+  shape: 'circle' | 'polygon' | 'rectangle' | 'geojson' | 'polyline'
   center?: LatLngTuple
   radius?: number
   points?: LatLngTuple[]
   bounds?: [LatLngTuple, LatLngTuple]
   geojson?: any
+  lineWidth?: number
 }
 
 type FleetCarView = {
@@ -72,6 +73,8 @@ type FleetCarView = {
   isOnline: boolean
   lastSeen: string
 }
+
+type GeofenceEditorType = 'circle' | 'polygon' | 'polyline'
 
 const formatDateInput = (date: Date) => date.toISOString().slice(0, 16)
 const isFiniteCoordinate = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
@@ -133,6 +136,36 @@ const getStatusTone = (status?: string): 'default' | 'success' | 'warning' => {
 
 const toSearchText = (...parts: Array<string | undefined>) => parts.filter(Boolean).join(' ').toLowerCase()
 
+const formatPointList = (points: LatLngTuple[]) => points.map(([lat, lng]) => `${lat}, ${lng}`).join('\n')
+
+const parsePointList = (value: string) => value
+  .split('\n')
+  .map((line) => line.trim())
+  .filter(Boolean)
+  .map((line) => {
+    const [latText, lngText] = line.split(',').map((part) => part.trim())
+    const lat = Number.parseFloat(latText)
+    const lng = Number.parseFloat(lngText)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      throw new Error(commonStrings.FIELD_NOT_VALID)
+    }
+    return [lat, lng] as LatLngTuple
+  })
+
+const closePolygon = (points: LatLngTuple[]) => {
+  if (points.length < 2) {
+    return points
+  }
+
+  const first = points[0]
+  const last = points[points.length - 1]
+  if (first[0] === last[0] && first[1] === last[1]) {
+    return points
+  }
+
+  return [...points, first]
+}
+
 const parseGeofenceArea = (geofence: bookcarsTypes.TraccarGeofence, fallbackIndex: number): ParsedGeofence | null => {
   if (geofence.geojson) {
     const name = geofence.name || geofence.description || `Geofence ${fallbackIndex + 1}`
@@ -184,6 +217,15 @@ const parseGeofenceArea = (geofence: bookcarsTypes.TraccarGeofence, fallbackInde
     if (geometry?.type === 'Polygon' || geometry?.type === 'MultiPolygon') {
       return { id, name, shape: 'geojson', geojson: { type: 'Feature', properties: { name }, geometry } }
     }
+    if (geometry?.type === 'LineString') {
+      return {
+        id,
+        name,
+        shape: 'polyline',
+        points: (geometry.coordinates || []).map((coordinate) => [coordinate[1], coordinate[0]] as LatLngTuple),
+        lineWidth: typeof geofence.attributes?.polylineDistance === 'number' ? geofence.attributes.polylineDistance : undefined,
+      }
+    }
   } catch {
     // Leave as unsupported.
   }
@@ -197,6 +239,12 @@ const parseGeofenceArea = (geofence: bookcarsTypes.TraccarGeofence, fallbackInde
     for (let index = 0; index + 1 < values.length; index += 2) {
       points.push(normalizeLatLngOrder(values[index], values[index + 1]))
     }
+    if (shapeType === 'LINESTRING') {
+      return points.length >= 2
+        ? { id, name, shape: 'polyline', points, lineWidth: typeof geofence.attributes?.polylineDistance === 'number' ? geofence.attributes.polylineDistance : undefined }
+        : null
+    }
+
     return points.length >= 3 ? { id, name, shape: 'polygon', points } : null
   }
 
@@ -328,6 +376,9 @@ const GoogleTrackingMap = ({
         if (geofence.shape === 'polygon' && geofence.points) {
           return <PolygonF key={`${geofence.id}`} paths={geofence.points.map(toGoogleLatLng)} options={{ strokeColor: '#00897b', fillColor: '#4db6ac', fillOpacity: 0.18, strokeWeight: 2 }} />
         }
+        if (geofence.shape === 'polyline' && geofence.points) {
+          return <PolylineF key={`${geofence.id}`} path={geofence.points.map(toGoogleLatLng)} options={{ strokeColor: '#00897b', strokeWeight: 4, strokeOpacity: 0.9 }} />
+        }
         if (geofence.shape === 'geojson' && geofence.geojson) {
           return extractGeoJsonPaths(geofence.geojson).map((ring, index) => (
             <PolygonF key={`${geofence.id}-${index}`} paths={ring.map(toGoogleLatLng)} options={{ strokeColor: '#00897b', fillColor: '#4db6ac', fillOpacity: 0.18, strokeWeight: 2 }} />
@@ -380,10 +431,20 @@ const Tracking = () => {
   const [notes, setNotes] = useState('')
   const [positions, setPositions] = useState<bookcarsTypes.TraccarPosition[]>([])
   const [route, setRoute] = useState<bookcarsTypes.TraccarPosition[]>([])
+  const [allGeofences, setAllGeofences] = useState<bookcarsTypes.TraccarGeofence[]>([])
   const [geofences, setGeofences] = useState<bookcarsTypes.TraccarGeofence[]>([])
   const [alerts, setAlerts] = useState<bookcarsTypes.TraccarEvent[]>([])
   const [loading, setLoading] = useState(false)
   const [integrationEnabled, setIntegrationEnabled] = useState(true)
+  const [editingGeofenceId, setEditingGeofenceId] = useState<number | null>(null)
+  const [geofenceFormName, setGeofenceFormName] = useState('')
+  const [geofenceFormDescription, setGeofenceFormDescription] = useState('')
+  const [geofenceFormType, setGeofenceFormType] = useState<GeofenceEditorType>('circle')
+  const [geofenceFormCenterLat, setGeofenceFormCenterLat] = useState('')
+  const [geofenceFormCenterLng, setGeofenceFormCenterLng] = useState('')
+  const [geofenceFormRadius, setGeofenceFormRadius] = useState('200')
+  const [geofenceFormPoints, setGeofenceFormPoints] = useState('')
+  const [geofenceFormPolylineDistance, setGeofenceFormPolylineDistance] = useState('25')
 
   const now = useMemo(() => new Date(), [])
   const [from, setFrom] = useState(formatDateInput(new Date(now.getTime() - 24 * 60 * 60 * 1000)))
@@ -398,6 +459,34 @@ const Tracking = () => {
     setNotes(selectedCar?.tracking?.notes || '')
   }, [selectedCar])
 
+  useEffect(() => {
+    let active = true
+
+    const loadSelectedCarGeofences = async () => {
+      if (!selectedCar?.tracking?.deviceId || !integrationEnabled) {
+        setGeofences([])
+        return
+      }
+
+      try {
+        const data = await TraccarService.getGeofences(selectedCar._id)
+        if (active) {
+          setGeofences(data)
+        }
+      } catch {
+        if (active) {
+          setGeofences([])
+        }
+      }
+    }
+
+    void loadSelectedCarGeofences()
+
+    return () => {
+      active = false
+    }
+  }, [integrationEnabled, selectedCar])
+
   const geofenceLookup = useMemo(() => {
     const lookup = new Map<number, string>()
     geofences.forEach((geofence) => {
@@ -407,6 +496,139 @@ const Tracking = () => {
     })
     return lookup
   }, [geofences])
+
+  const linkedGeofenceIds = useMemo(() => (
+    new Set(geofences.map((geofence) => geofence.id).filter((id): id is number => typeof id === 'number'))
+  ), [geofences])
+
+  const resetGeofenceForm = () => {
+    setEditingGeofenceId(null)
+    setGeofenceFormName('')
+    setGeofenceFormDescription('')
+    setGeofenceFormType('circle')
+    setGeofenceFormCenterLat('')
+    setGeofenceFormCenterLng('')
+    setGeofenceFormRadius('200')
+    setGeofenceFormPoints('')
+    setGeofenceFormPolylineDistance('25')
+  }
+
+  const populateGeofenceForm = (geofence: bookcarsTypes.TraccarGeofence) => {
+    setEditingGeofenceId(typeof geofence.id === 'number' ? geofence.id : null)
+    setGeofenceFormName(geofence.name || '')
+    setGeofenceFormDescription(geofence.description || '')
+    setGeofenceFormCenterLat('')
+    setGeofenceFormCenterLng('')
+    setGeofenceFormRadius('200')
+    setGeofenceFormPoints('')
+    setGeofenceFormPolylineDistance(`${typeof geofence.attributes?.polylineDistance === 'number' ? geofence.attributes.polylineDistance : 25}`)
+
+    const area = geofence.area || ''
+    const circleMatch = area.match(/CIRCLE\s*\(\s*([-\d.]+)(?:\s+|,\s*)([-\d.]+)\s*,\s*([-\d.]+)\s*\)\s*$/i)
+    if (circleMatch) {
+      setGeofenceFormType('circle')
+      setGeofenceFormCenterLat(circleMatch[1])
+      setGeofenceFormCenterLng(circleMatch[2])
+      setGeofenceFormRadius(circleMatch[3])
+      return
+    }
+
+    try {
+      const geometry = wellknown.parse(area)
+      if (geometry?.type === 'LineString') {
+        setGeofenceFormType('polyline')
+        setGeofenceFormPoints(formatPointList((geometry.coordinates || []).map((coordinate) => [coordinate[1], coordinate[0]] as LatLngTuple)))
+        return
+      }
+
+      if (geometry?.type === 'Polygon') {
+        const ring = (geometry.coordinates?.[0] || []).map((coordinate) => [coordinate[1], coordinate[0]] as LatLngTuple)
+        setGeofenceFormType('polygon')
+        setGeofenceFormPoints(formatPointList(ring.length > 1 ? ring.slice(0, -1) : ring))
+        return
+      }
+    } catch {
+      // Fall back to free-form numeric parsing below.
+    }
+
+    const points = (area.match(/[+-]?\d+(?:\.\d+)?/g) || [])
+      .map((value) => Number.parseFloat(value))
+      .filter((value) => Number.isFinite(value))
+
+    if (area.toUpperCase().startsWith('LINESTRING') && points.length >= 4) {
+      const linePoints: LatLngTuple[] = []
+      for (let index = 0; index + 1 < points.length; index += 2) {
+        linePoints.push(normalizeLatLngOrder(points[index], points[index + 1]))
+      }
+      setGeofenceFormType('polyline')
+      setGeofenceFormPoints(formatPointList(linePoints))
+      return
+    }
+
+    if (points.length >= 6) {
+      const polygonPoints: LatLngTuple[] = []
+      for (let index = 0; index + 1 < points.length; index += 2) {
+        polygonPoints.push(normalizeLatLngOrder(points[index], points[index + 1]))
+      }
+      setGeofenceFormType('polygon')
+      setGeofenceFormPoints(formatPointList(polygonPoints.length > 1 ? polygonPoints.slice(0, -1) : polygonPoints))
+    }
+  }
+
+  const buildGeofencePayload = (): TraccarService.TraccarGeofenceEditorPayload => {
+    const name = geofenceFormName.trim()
+    if (!name) {
+      throw new Error(commonStrings.FIELD_NOT_VALID)
+    }
+
+    if (geofenceFormType === 'circle') {
+      const lat = Number.parseFloat(geofenceFormCenterLat)
+      const lng = Number.parseFloat(geofenceFormCenterLng)
+      const radius = Number.parseFloat(geofenceFormRadius)
+      if (![lat, lng, radius].every((value) => Number.isFinite(value))) {
+        throw new Error(commonStrings.FIELD_NOT_VALID)
+      }
+
+      return {
+        name,
+        description: geofenceFormDescription.trim() || undefined,
+        area: `CIRCLE (${lat} ${lng}, ${radius})`,
+        attributes: {},
+      }
+    }
+
+    const points = parsePointList(geofenceFormPoints)
+
+    if (geofenceFormType === 'polyline') {
+      if (points.length < 2) {
+        throw new Error(commonStrings.FIELD_NOT_VALID)
+      }
+
+      const polylineDistance = Number.parseFloat(geofenceFormPolylineDistance)
+      if (!Number.isFinite(polylineDistance) || polylineDistance <= 0) {
+        throw new Error(commonStrings.FIELD_NOT_VALID)
+      }
+
+      return {
+        name,
+        description: geofenceFormDescription.trim() || undefined,
+        area: `LINESTRING (${points.map(([lat, lng]) => `${lat} ${lng}`).join(', ')})`,
+        attributes: { polylineDistance },
+      }
+    }
+
+    if (points.length < 3) {
+      throw new Error(commonStrings.FIELD_NOT_VALID)
+    }
+
+    const closedPoints = closePolygon(points)
+    return {
+      name,
+      description: geofenceFormDescription.trim() || undefined,
+      area: `POLYGON ((${closedPoints.map(([lat, lng]) => `${lat} ${lng}`).join(', ')}))`,
+      attributes: {},
+    }
+  }
 
   const fleetOverviewByCarId = useMemo(() => {
     const lookup = new Map<string, TraccarService.TraccarFleetItem>()
@@ -459,6 +681,9 @@ const Tracking = () => {
   }, [fleetCars, fleetSearch])
 
   const selectedFleetCar = useMemo(() => fleetCars.find((item) => item.car._id === selectedCarId) || null, [fleetCars, selectedCarId])
+  const managedGeofences = useMemo(() => (
+    [...allGeofences].sort((left, right) => (left.name || '').localeCompare(right.name || ''))
+  ), [allGeofences])
   const currentPosition = positions[0] || selectedFleetCar?.position || null
   const currentPoint = useMemo(() => toLatLng(currentPosition), [currentPosition])
   const routePoints = useMemo(() => route.map((position) => toLatLng(position)).filter((point): point is LatLngTuple => point !== null), [route])
@@ -534,6 +759,14 @@ const Tracking = () => {
     setDevices(await TraccarService.getDevices())
   }
 
+  const loadAllGeofences = async () => {
+    if (!integrationEnabled) {
+      setAllGeofences([])
+      return
+    }
+    setAllGeofences(await TraccarService.getAllGeofences())
+  }
+
   const handleRefreshFleet = async () => {
     if (!integrationEnabled) {
       return
@@ -541,7 +774,22 @@ const Tracking = () => {
 
     setLoading(true)
     try {
-      await Promise.all([loadFleetOverview(), loadDevices()])
+      await Promise.all([loadFleetOverview(), loadDevices(), loadAllGeofences()])
+    } catch (err) {
+      helper.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleRefreshGeofenceLibrary = async () => {
+    if (!integrationEnabled) {
+      return
+    }
+
+    setLoading(true)
+    try {
+      await loadAllGeofences()
     } catch (err) {
       helper.error(err)
     } finally {
@@ -643,6 +891,62 @@ const Tracking = () => {
     }
   }
 
+  const handleSaveGeofence = async () => {
+    setLoading(true)
+    try {
+      const payload = buildGeofencePayload()
+      if (editingGeofenceId) {
+        await TraccarService.updateGeofence(editingGeofenceId, payload)
+      } else {
+        await TraccarService.createGeofence(payload)
+      }
+
+      await Promise.all([
+        loadAllGeofences(),
+        canLoadTracking && selectedCar ? TraccarService.getGeofences(selectedCar._id).then(setGeofences) : Promise.resolve(),
+      ])
+
+      resetGeofenceForm()
+      helper.info(commonStrings.UPDATED)
+    } catch (err) {
+      helper.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleLinkGeofence = async (geofenceId: number) => {
+    if (!selectedCar) {
+      return
+    }
+
+    setLoading(true)
+    try {
+      setGeofences(await TraccarService.linkGeofence(selectedCar._id, geofenceId))
+      helper.info(commonStrings.UPDATED)
+    } catch (err) {
+      helper.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleUnlinkGeofence = async (geofenceId: number) => {
+    if (!selectedCar) {
+      return
+    }
+
+    setLoading(true)
+    try {
+      setGeofences(await TraccarService.unlinkGeofence(selectedCar._id, geofenceId))
+      helper.info(commonStrings.UPDATED)
+    } catch (err) {
+      helper.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleFetchAlerts = async () => {
     if (!selectedCar) {
       return
@@ -703,9 +1007,10 @@ const Tracking = () => {
       }
 
       if (status.enabled) {
-        const [devicesResult, fleetResult] = await Promise.allSettled([
+        const [devicesResult, fleetResult, geofencesResult] = await Promise.allSettled([
           TraccarService.getDevices(),
           TraccarService.getFleetOverview(),
+          TraccarService.getAllGeofences(),
         ])
 
         if (devicesResult.status === 'fulfilled') {
@@ -713,6 +1018,9 @@ const Tracking = () => {
         }
         if (fleetResult.status === 'fulfilled') {
           setFleetOverview(fleetResult.value)
+        }
+        if (geofencesResult.status === 'fulfilled') {
+          setAllGeofences(geofencesResult.value)
         }
       }
     } catch (err) {
@@ -1034,6 +1342,156 @@ const Tracking = () => {
                     )
                   : (
                     <div className="tracking-empty">{strings.NO_DATA}</div>
+                    )}
+              </Paper>
+
+              <Paper className="tracking-card">
+                <div className="tracking-header">
+                  <div>
+                    <Typography variant="h6">{strings.GEOFENCE_MANAGER}</Typography>
+                    <Typography className="tracking-card-subtitle">
+                      {editingGeofenceId ? strings.EDIT_GEOFENCE : strings.CREATE_GEOFENCE}
+                    </Typography>
+                  </div>
+                  {editingGeofenceId && (
+                    <Button variant="text" onClick={resetGeofenceForm}>
+                      {strings.CANCEL_EDIT}
+                    </Button>
+                  )}
+                </div>
+
+                <div className="tracking-grid">
+                  <TextField
+                    label={strings.GEOFENCE_NAME}
+                    value={geofenceFormName}
+                    onChange={(event) => setGeofenceFormName(event.target.value)}
+                  />
+                  <FormControl>
+                    <InputLabel>{strings.GEOFENCE_TYPE}</InputLabel>
+                    <Select
+                      value={geofenceFormType}
+                      label={strings.GEOFENCE_TYPE}
+                      onChange={(event) => setGeofenceFormType(event.target.value as GeofenceEditorType)}
+                    >
+                      <MenuItem value="circle">{strings.GEOFENCE_TYPE_CIRCLE}</MenuItem>
+                      <MenuItem value="polygon">{strings.GEOFENCE_TYPE_POLYGON}</MenuItem>
+                      <MenuItem value="polyline">{strings.GEOFENCE_TYPE_POLYLINE}</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <TextField
+                    label={strings.DESCRIPTION}
+                    value={geofenceFormDescription}
+                    onChange={(event) => setGeofenceFormDescription(event.target.value)}
+                  />
+                </div>
+
+                {geofenceFormType === 'circle'
+                  ? (
+                    <div className="tracking-grid">
+                      <TextField label={strings.CENTER_LATITUDE} value={geofenceFormCenterLat} onChange={(event) => setGeofenceFormCenterLat(event.target.value)} />
+                      <TextField label={strings.CENTER_LONGITUDE} value={geofenceFormCenterLng} onChange={(event) => setGeofenceFormCenterLng(event.target.value)} />
+                      <TextField label={strings.RADIUS_METERS} value={geofenceFormRadius} onChange={(event) => setGeofenceFormRadius(event.target.value)} />
+                    </div>
+                    )
+                  : (
+                    <>
+                      <TextField
+                        label={strings.GEOFENCE_POINTS}
+                        value={geofenceFormPoints}
+                        onChange={(event) => setGeofenceFormPoints(event.target.value)}
+                        placeholder={strings.GEOFENCE_POINTS_HINT}
+                        fullWidth
+                        multiline
+                        minRows={4}
+                        className="tracking-geofence-points"
+                      />
+                      {geofenceFormType === 'polyline' && (
+                        <div className="tracking-grid">
+                          <TextField
+                            label={strings.POLYLINE_DISTANCE}
+                            value={geofenceFormPolylineDistance}
+                            onChange={(event) => setGeofenceFormPolylineDistance(event.target.value)}
+                          />
+                        </div>
+                      )}
+                    </>
+                    )}
+
+                <div className="tracking-actions">
+                  <Button variant="contained" className="btn-primary" onClick={handleSaveGeofence} disabled={!integrationEnabled}>
+                    {editingGeofenceId ? strings.UPDATE_GEOFENCE : strings.CREATE_GEOFENCE}
+                  </Button>
+                </div>
+              </Paper>
+
+              <Paper className="tracking-card">
+                <div className="tracking-header">
+                  <div>
+                    <Typography variant="h6">{strings.GEOFENCE_LIBRARY}</Typography>
+                    <Typography className="tracking-card-subtitle">{selectedCar?.name || strings.SELECT_CAR}</Typography>
+                  </div>
+                  <Button variant="contained" className="btn-primary" onClick={handleRefreshGeofenceLibrary} disabled={!integrationEnabled}>
+                    {strings.FETCH}
+                  </Button>
+                </div>
+
+                {managedGeofences.length > 0
+                  ? (
+                    <div className="tracking-list">
+                      {managedGeofences.map((geofence, index) => {
+                        const parsed = parseGeofenceArea(geofence, index)
+                        const linked = typeof geofence.id === 'number' && linkedGeofenceIds.has(geofence.id)
+
+                        return (
+                          <div key={geofence.id || `${geofence.name}-${index}`} className="tracking-list-item tracking-geofence-library-item">
+                            <div className="tracking-geofence-library-header">
+                              <div>
+                                <div>{geofence.name || geofence.description || `Geofence ${index + 1}`}</div>
+                                <div className="tracking-list-subtext">{parsed ? `${strings.SHAPE}: ${parsed.shape}` : strings.UNSUPPORTED_GEOFENCE}</div>
+                              </div>
+                              <Chip
+                                size="small"
+                                color={linked ? 'success' : 'default'}
+                                label={linked ? strings.LINKED_TO_SELECTED_CAR : strings.NOT_LINKED_TO_SELECTED_CAR}
+                              />
+                            </div>
+                            <div className="tracking-actions">
+                              <Button
+                                variant="text"
+                                onClick={() => populateGeofenceForm(geofence)}
+                                disabled={!integrationEnabled}
+                              >
+                                {strings.EDIT_GEOFENCE}
+                              </Button>
+                              {linked
+                                ? (
+                                  <Button
+                                    variant="contained"
+                                    className="btn-secondary"
+                                    onClick={() => typeof geofence.id === 'number' && handleUnlinkGeofence(geofence.id)}
+                                    disabled={!canLoadTracking || typeof geofence.id !== 'number'}
+                                  >
+                                    {strings.UNLINK_FROM_CAR}
+                                  </Button>
+                                  )
+                                : (
+                                  <Button
+                                    variant="contained"
+                                    className="btn-primary"
+                                    onClick={() => typeof geofence.id === 'number' && handleLinkGeofence(geofence.id)}
+                                    disabled={!canLoadTracking || typeof geofence.id !== 'number'}
+                                  >
+                                    {strings.LINK_TO_CAR}
+                                  </Button>
+                                  )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    )
+                  : (
+                    <div className="tracking-empty">{strings.NO_GEOFENCES}</div>
                     )}
               </Paper>
 

@@ -167,6 +167,14 @@ const normalizeGeofence = (geofence: bookcarsTypes.TraccarGeofence): bookcarsTyp
   geojson: geofence.geojson || geofenceAreaToGeoJson(geofence.area),
 })
 
+const sanitizeGeofencePayload = (payload: bookcarsTypes.UpsertTraccarGeofencePayload): bookcarsTypes.UpsertTraccarGeofencePayload => ({
+  name: payload.name.trim(),
+  description: payload.description?.trim(),
+  area: payload.area.trim(),
+  calendarId: payload.calendarId,
+  attributes: payload.attributes || {},
+})
+
 const getFallbackGeofenceIds = async (deviceId: number) => {
   const now = new Date()
   const from = new Date(now.getTime() - (GEOFENCE_FALLBACK_LOOKBACK_DAYS * 24 * 60 * 60 * 1000)).toISOString()
@@ -281,6 +289,28 @@ export const getGeofences = async (deviceId?: number): Promise<bookcarsTypes.Tra
       typeof geofence.id === 'number' && allowedGeofenceIds.has(geofence.id)
     ))).map(normalizeGeofence)
   }
+}
+
+export const createGeofence = async (payload: bookcarsTypes.UpsertTraccarGeofencePayload): Promise<bookcarsTypes.TraccarGeofence> => {
+  ensureEnabled()
+  const response = await getClient().post('/api/geofences', sanitizeGeofencePayload(payload))
+  return normalizeGeofence(response.data as bookcarsTypes.TraccarGeofence)
+}
+
+export const updateGeofence = async (geofenceId: number, payload: bookcarsTypes.UpsertTraccarGeofencePayload): Promise<bookcarsTypes.TraccarGeofence> => {
+  ensureEnabled()
+  const response = await getClient().put(`/api/geofences/${geofenceId}`, sanitizeGeofencePayload(payload))
+  return normalizeGeofence(response.data as bookcarsTypes.TraccarGeofence)
+}
+
+export const linkDeviceGeofence = async (deviceId: number, geofenceId: number) => {
+  ensureEnabled()
+  await getClient().post('/api/permissions', { deviceId, geofenceId })
+}
+
+export const unlinkDeviceGeofence = async (deviceId: number, geofenceId: number) => {
+  ensureEnabled()
+  await getClient().delete('/api/permissions', { data: { deviceId, geofenceId } })
 }
 
 export const getEvents = async (deviceId: number, from: string, to: string, type?: string): Promise<bookcarsTypes.TraccarEvent[]> => {
