@@ -17,7 +17,6 @@ import {
   Typography,
 } from '@mui/material'
 import DirectionsCarFilledIcon from '@mui/icons-material/DirectionsCarFilled'
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import MyLocationIcon from '@mui/icons-material/MyLocation'
 import PauseIcon from '@mui/icons-material/Pause'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
@@ -49,7 +48,6 @@ const CARS_FETCH_SIZE = 100
 
 type FleetMode = 'fleet' | 'single'
 type TrackingPanelSection = 'fleet' | 'vehicle' | 'route' | 'geofences' | 'alerts'
-type MobileSheetState = 'collapsed' | 'mid' | 'full'
 type LatLngTuple = [number, number]
 type GoogleLatLng = google.maps.LatLngLiteral
 
@@ -111,7 +109,6 @@ const PLAYBACK_SPEED_OPTIONS = [1, 2, 4, 8]
 const STOP_SPEED_THRESHOLD = 3
 const STOP_RADIUS_METERS = 120
 const STOP_MIN_DURATION_MS = 2 * 60 * 1000
-const MOBILE_LAYOUT_BREAKPOINT = 840
 
 const formatDateInput = (date: Date) => date.toISOString().slice(0, 16)
 const isFiniteCoordinate = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
@@ -1043,10 +1040,6 @@ const Tracking = () => {
   const [geofenceDraft, setGeofenceDraft] = useState<DraftGeofenceShape | null>(null)
   const [geofenceDrawingMode, setGeofenceDrawingMode] = useState<GeofenceEditorType | null>(null)
   const [mapFitRequestToken, setMapFitRequestToken] = useState(0)
-  const [isCompactViewport, setIsCompactViewport] = useState(false)
-  const [mobileSheetState, setMobileSheetState] = useState<MobileSheetState>('mid')
-  const [mobileDragOffset, setMobileDragOffset] = useState(0)
-  const mobileDragStateRef = React.useRef<{ pointerId: number, startY: number } | null>(null)
 
   const now = useMemo(() => new Date(), [])
   const [from, setFrom] = useState(formatDateInput(new Date(now.getTime() - 24 * 60 * 60 * 1000)))
@@ -1054,88 +1047,8 @@ const Tracking = () => {
 
   const selectedCar = useMemo(() => cars.find((item) => item._id === selectedCarId) || null, [cars, selectedCarId])
 
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return undefined
-    }
-
-    const mediaQuery = window.matchMedia(`(max-width: ${MOBILE_LAYOUT_BREAKPOINT}px)`)
-    const syncViewport = (event?: MediaQueryListEvent) => {
-      const matches = typeof event?.matches === 'boolean' ? event.matches : mediaQuery.matches
-      setIsCompactViewport(matches)
-      setMobileDragOffset(0)
-      if (!matches) {
-        setMobileSheetState('mid')
-      }
-    }
-
-    syncViewport()
-    if (typeof mediaQuery.addEventListener === 'function') {
-      mediaQuery.addEventListener('change', syncViewport)
-      return () => mediaQuery.removeEventListener('change', syncViewport)
-    }
-
-    mediaQuery.addListener(syncViewport)
-    return () => mediaQuery.removeListener(syncViewport)
-  }, [])
-
   const focusPanelSection = (section: TrackingPanelSection) => {
     setActivePanelSection(section)
-    if (isCompactViewport) {
-      setMobileSheetState('full')
-    }
-  }
-
-  const handlePanelHandlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!isCompactViewport) {
-      return
-    }
-
-    mobileDragStateRef.current = { pointerId: event.pointerId, startY: event.clientY }
-    setMobileDragOffset(0)
-    event.currentTarget.setPointerCapture(event.pointerId)
-  }
-
-  const handlePanelHandlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!isCompactViewport || !mobileDragStateRef.current || mobileDragStateRef.current.pointerId !== event.pointerId) {
-      return
-    }
-
-    setMobileDragOffset(event.clientY - mobileDragStateRef.current.startY)
-  }
-
-  const handlePanelHandlePointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!isCompactViewport || !mobileDragStateRef.current || mobileDragStateRef.current.pointerId !== event.pointerId) {
-      return
-    }
-
-    const deltaY = event.clientY - mobileDragStateRef.current.startY
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId)
-    }
-
-    mobileDragStateRef.current = null
-    setMobileDragOffset(0)
-
-    if (Math.abs(deltaY) < 18) {
-      setMobileSheetState((current) => (
-        current === 'collapsed'
-          ? 'mid'
-          : current === 'mid'
-            ? 'full'
-            : 'mid'
-      ))
-      return
-    }
-
-    if (deltaY < -54) {
-      setMobileSheetState((current) => (current === 'collapsed' ? 'mid' : 'full'))
-      return
-    }
-
-    if (deltaY > 54) {
-      setMobileSheetState((current) => (current === 'full' ? 'mid' : 'collapsed'))
-    }
   }
 
   useEffect(() => {
@@ -1525,9 +1438,6 @@ const Tracking = () => {
     ? (selectedFleetCar.deviceStatus || strings.TRACKING_ENABLED)
     : strings.TRACKING_NOT_LINKED
   const selectedStatusTone = selectedFleetCar?.isLinked ? getStatusTone(selectedFleetCar.deviceStatus) : 'default'
-  const panelInlineStyle = isCompactViewport && mobileDragOffset !== 0
-    ? { transform: `translateY(${Math.max(-220, Math.min(220, mobileDragOffset))}px)` }
-    : undefined
   const routeListPreview = routeFrames.slice(0, 10)
   const stopListPreview = detectedStops.slice(0, 6)
 
@@ -2724,20 +2634,7 @@ const Tracking = () => {
               )}
             </div>
 
-            <aside
-              className={`tracking-panel${isCompactViewport ? ` tracking-panel--mobile tracking-panel--mobile-${mobileSheetState}` : ''}`}
-              style={panelInlineStyle}
-            >
-              <div className="tracking-panel__handleWrap">
-                <div
-                  className="tracking-panel__handle"
-                  onPointerDown={handlePanelHandlePointerDown}
-                  onPointerMove={handlePanelHandlePointerMove}
-                  onPointerUp={handlePanelHandlePointerEnd}
-                  onPointerCancel={handlePanelHandlePointerEnd}
-                />
-              </div>
-
+            <aside className="tracking-panel">
               <div className="tracking-dock__topbar">
                 <div className="tracking-dock__brand">
                   <span>{strings.TITLE}</span>
@@ -2794,28 +2691,31 @@ const Tracking = () => {
                 </div>
               </div>
 
-              <div className="tracking-dock__sections">
-                {sectionItems.map((section) => {
-                  const isOpen = activePanelSection === section.id
+              <div className="tracking-sidebar">
+                <div className="tracking-sidebar__nav">
+                  {sectionItems.map((section) => {
+                    const isActive = activePanelSection === section.id
 
-                  return (
-                    <section key={section.id} className={`tracking-dock-section${isOpen ? ' is-open' : ''}`}>
-                      <button type="button" className="tracking-dock-section__header" onClick={() => focusPanelSection(section.id)}>
-                        <span className="tracking-dock-section__icon">{section.icon}</span>
-                        <span className="tracking-dock-section__copy">
+                    return (
+                      <button
+                        key={section.id}
+                        type="button"
+                        className={`tracking-sidebar__nav-item${isActive ? ' is-active' : ''}`}
+                        onClick={() => focusPanelSection(section.id)}
+                      >
+                        <span className="tracking-sidebar__nav-icon">{section.icon}</span>
+                        <span className="tracking-sidebar__nav-copy">
                           <strong>{section.title}</strong>
                           <em>{section.summary}</em>
                         </span>
-                        <ExpandMoreIcon className={`tracking-dock-section__chevron${isOpen ? ' is-open' : ''}`} />
                       </button>
-                      {isOpen && (
-                        <div className="tracking-dock-section__body">
-                          {renderSectionBody(section.id)}
-                        </div>
-                      )}
-                    </section>
-                  )
-                })}
+                    )
+                  })}
+                </div>
+
+                <div className="tracking-sidebar__content">
+                  {renderSectionBody(activePanelSection)}
+                </div>
               </div>
             </aside>
           </div>
