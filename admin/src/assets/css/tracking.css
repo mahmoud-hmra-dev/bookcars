@@ -1203,3 +1203,443 @@
     font-size: 0.84rem;
   }
 }
+
+.tracking-legend-dot--warning {
+  background: #f59e0b;
+}
+
+.tracking-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: calc(100vh - 88px);
+  min-height: calc(100vh - 88px);
+  padding: 12px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top right, rgba(14, 165, 233, 0.08), transparent 24%),
+    linear-gradient(180deg, #edf4fb 0%, #e7eef6 100%);
+}
+
+.tracking-workspace .tracking-info-alert {
+  margin-bottom: 0;
+  flex: 0 0 auto;
+}
+
+.tracking-shell {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  border-radius: 30px;
+  border: 1px solid #d5deea;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04)),
+    #d9e6f4;
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.16);
+}
+
+.tracking-shell__map {
+  position: absolute;
+  inset: 0;
+}
+
+.tracking-map-overlay--top {
+  top: 18px;
+  right: 18px;
+  width: min(360px, calc(100% - 500px));
+  min-width: 280px;
+}
+
+.tracking-map-badges {
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.tracking-map-badges .MuiChip-root {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(15, 23, 42, 0.78);
+  color: #f8fafc;
+  backdrop-filter: blur(14px);
+}
+
+.tracking-map-badges .MuiChip-label {
+  font-weight: 600;
+}
+
+.tracking-map-legend-card {
+  margin-left: auto;
+  max-width: 320px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.12);
+}
+
+.tracking-panel {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  bottom: 16px;
+  z-index: 430;
+  width: min(420px, 34vw);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 28px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.16);
+  transition: transform 0.24s ease, height 0.24s ease, box-shadow 0.24s ease;
+  will-change: transform, height;
+}
+
+.tracking-panel__handleWrap {
+  display: none;
+  justify-content: center;
+  padding-top: 2px;
+}
+
+.tracking-panel__handle {
+  display: block;
+  width: 58px;
+  height: 5px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  cursor: grab;
+}
+
+.tracking-panel__handle:active {
+  cursor: grabbing;
+}
+
+.tracking-dock__topbar,
+.tracking-dock__controls {
+  display: grid;
+  gap: 10px;
+}
+
+.tracking-dock__brand {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tracking-dock__brand span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #2563eb;
+}
+
+.tracking-dock__brand strong {
+  color: #0f172a;
+  font-size: 1.12rem;
+  line-height: 1.2;
+}
+
+.tracking-panel__actions--dock {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tracking-panel__actions--dock .MuiButton-root {
+  min-height: 42px;
+}
+
+.tracking-dock__summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tracking-dock__summary .tracking-panel__summary-item {
+  min-width: 0;
+  padding: 12px;
+  margin: 0;
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+}
+
+.tracking-dock__sections {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.tracking-dock-section {
+  flex: 0 0 auto;
+  min-height: 66px;
+  border: 1px solid #dfe7f0;
+  border-radius: 22px;
+  background: rgba(248, 250, 252, 0.88);
+  overflow: hidden;
+  transition: flex 0.22s ease, background 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+}
+
+.tracking-dock-section.is-open {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-color: #cad8ea;
+  background:
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.07), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 248, 252, 0.98) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.56);
+}
+
+.tracking-dock-section__header {
+  width: 100%;
+  border: 0;
+  padding: 14px 16px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.tracking-dock-section__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0f172a;
+  background: #eff6ff;
+}
+
+.tracking-dock-section.is-open .tracking-dock-section__icon {
+  color: #ffffff;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+}
+
+.tracking-dock-section__copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.tracking-dock-section__copy strong {
+  color: #0f172a;
+  font-size: 0.98rem;
+  line-height: 1.15;
+}
+
+.tracking-dock-section__copy em {
+  color: #64748b;
+  font-size: 0.77rem;
+  font-style: normal;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tracking-dock-section__chevron {
+  color: #64748b;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.tracking-dock-section__chevron.is-open {
+  transform: rotate(180deg);
+  color: #0f172a;
+}
+
+.tracking-dock-section__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 8px 8px;
+}
+
+.tracking-dock-section__body > * + * {
+  margin-top: 10px;
+}
+
+.tracking-card--embedded {
+  margin: 0;
+  border-radius: 20px;
+  border: 1px solid #dbe4ef;
+  background: rgba(248, 250, 252, 0.94);
+  box-shadow: none;
+}
+
+.tracking-grid--compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.tracking-panel .tracking-card {
+  margin-bottom: 0;
+}
+
+.tracking-panel .tracking-fleet-list {
+  max-height: none;
+  min-height: 0;
+}
+
+.tracking-panel .tracking-list {
+  margin-top: 12px;
+}
+
+.tracking-panel .tracking-list-item:last-child,
+.tracking-panel .tracking-geofence-library-item:last-child {
+  border-bottom: 0;
+}
+
+.tracking-panel .tracking-route-player {
+  border-color: #d8e5f3;
+  background:
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.07), transparent 30%),
+    linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+}
+
+.tracking-shell .tracking-map-playback-panel {
+  right: 18px;
+  left: auto;
+  bottom: 18px;
+  width: min(480px, calc(100% - 500px));
+}
+
+@media (max-width: 1120px) {
+  .tracking-panel {
+    width: min(390px, 38vw);
+  }
+
+  .tracking-map-overlay--top {
+    width: min(320px, calc(100% - 430px));
+  }
+
+  .tracking-shell .tracking-map-playback-panel {
+    width: min(420px, calc(100% - 430px));
+  }
+}
+
+@media (max-width: 840px) {
+  .tracking-workspace {
+    padding: 8px;
+    height: calc(100vh - 72px);
+    min-height: calc(100vh - 72px);
+  }
+
+  .tracking-shell {
+    border-radius: 24px;
+  }
+
+  .tracking-map-overlay--top {
+    left: 10px;
+    right: 10px;
+    width: auto;
+    min-width: 0;
+  }
+
+  .tracking-map-badges {
+    justify-content: flex-start;
+  }
+
+  .tracking-map-legend-card {
+    display: none;
+  }
+
+  .tracking-panel {
+    top: auto;
+    right: 8px;
+    left: 8px;
+    bottom: 8px;
+    width: auto;
+    max-width: none;
+    height: min(58vh, 560px);
+    padding: 10px;
+    border-radius: 28px 28px 20px 20px;
+  }
+
+  .tracking-panel__handleWrap {
+    display: flex;
+  }
+
+  .tracking-panel--mobile-collapsed {
+    height: 124px;
+  }
+
+  .tracking-panel--mobile-collapsed .tracking-panel__actions--dock,
+  .tracking-panel--mobile-collapsed .tracking-dock__summary,
+  .tracking-panel--mobile-collapsed .tracking-dock__sections {
+    display: none;
+  }
+
+  .tracking-panel--mobile-mid {
+    height: min(58vh, 560px);
+  }
+
+  .tracking-panel--mobile-full {
+    height: calc(100% - 16px);
+  }
+
+  .tracking-dock__topbar {
+    grid-template-columns: 1fr;
+  }
+
+  .tracking-panel__actions--dock {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tracking-dock__summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .tracking-dock-section__body {
+    padding: 0 4px 4px;
+  }
+
+  .tracking-shell .tracking-map-playback-panel {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .tracking-panel {
+    right: 0;
+    left: 0;
+    bottom: 0;
+    padding: 8px;
+    border-radius: 24px 24px 0 0;
+  }
+
+  .tracking-dock__brand strong {
+    font-size: 1rem;
+  }
+
+  .tracking-dock__summary,
+  .tracking-grid--compact {
+    grid-template-columns: 1fr;
+  }
+
+  .tracking-panel__actions--dock {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .tracking-dock-section__header {
+    padding: 12px 14px;
+  }
+
+  .tracking-dock-section__copy strong {
+    font-size: 0.92rem;
+  }
+
+  .tracking-dock-section__copy em {
+    font-size: 0.74rem;
+  }
+}
