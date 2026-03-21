@@ -1229,6 +1229,31 @@ const Tracking = () => {
     }
   }
 
+  const handleDeleteGeofence = async (geofenceId: number) => {
+    if (!window.confirm(strings.DELETE_GEOFENCE_CONFIRM)) {
+      return
+    }
+
+    setLoading(true)
+    try {
+      await TraccarService.deleteGeofence(geofenceId)
+      await Promise.all([
+        loadAllGeofences(),
+        canLoadTracking && selectedCar ? TraccarService.getGeofences(selectedCar._id).then(setGeofences) : Promise.resolve(),
+      ])
+
+      if (editingGeofenceId === geofenceId) {
+        resetGeofenceForm()
+      }
+
+      helper.info(strings.GEOFENCE_DELETED)
+    } catch (err) {
+      helper.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleFetchAlerts = async () => {
     if (!selectedCar) {
       return
@@ -1795,6 +1820,14 @@ const Tracking = () => {
                                 disabled={!integrationEnabled || !editable}
                               >
                                 {strings.EDIT_GEOFENCE}
+                              </Button>
+                              <Button
+                                variant="text"
+                                color="error"
+                                onClick={() => typeof geofence.id === 'number' && handleDeleteGeofence(geofence.id)}
+                                disabled={!integrationEnabled || typeof geofence.id !== 'number'}
+                              >
+                                {commonStrings.DELETE}
                               </Button>
                               {linked
                                 ? (

@@ -57,6 +57,11 @@ export const updateGeofence = (geofenceId: number, payload: TraccarGeofenceEdito
     .put(`/api/geofences/entity/${geofenceId}`, payload, { withCredentials: true })
     .then((res) => res.data)
 
+export const deleteGeofence = (geofenceId: number): Promise<void> =>
+  axiosInstance
+    .delete(`/api/geofences/entity/${geofenceId}`, { withCredentials: true })
+    .then(() => undefined)
+
 export const linkGeofence = (carId: string, geofenceId: number): Promise<bookcarsTypes.TraccarGeofence[]> =>
   axiosInstance
     .post(`/api/geofences/${encodeURIComponent(carId)}/link/${geofenceId}`, null, { withCredentials: true })

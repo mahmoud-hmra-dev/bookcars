@@ -303,6 +303,11 @@ export const updateGeofence = async (geofenceId: number, payload: bookcarsTypes.
   return normalizeGeofence(response.data as bookcarsTypes.TraccarGeofence)
 }
 
+export const deleteGeofence = async (geofenceId: number) => {
+  ensureEnabled()
+  await getClient().delete(`/api/geofences/${geofenceId}`)
+}
+
 export const linkDeviceGeofence = async (deviceId: number, geofenceId: number) => {
   ensureEnabled()
   await getClient().post('/api/permissions', { deviceId, geofenceId })

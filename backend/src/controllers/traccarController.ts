@@ -204,6 +204,16 @@ export const updateGeofence = async (req: Request, res: Response) => {
   }
 }
 
+export const deleteGeofence = async (req: Request, res: Response) => {
+  try {
+    await traccarService.deleteGeofence(parseId(req.params.geofenceId, 'geofenceId'))
+    res.status(204).send()
+  } catch (err) {
+    logger.error('[traccar.deleteGeofence] Error', err)
+    res.status(400).send(String(err))
+  }
+}
+
 export const unlinkDevice = async (req: Request, res: Response) => {
   const { carId } = req.params
 
