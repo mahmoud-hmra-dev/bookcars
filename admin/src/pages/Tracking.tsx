@@ -497,6 +497,7 @@ const GoogleTrackingMap = ({
   const draftPolygonRef = React.useRef<google.maps.Polygon | null>(null)
   const draftPolylineRef = React.useRef<google.maps.Polyline | null>(null)
   const draftPolylineListenersRef = React.useRef<google.maps.MapsEventListener[]>([])
+  const googleMaps = globalThis.google?.maps
 
   const clearDraftPolylineListeners = () => {
     draftPolylineListenersRef.current.forEach((listener) => listener.remove())
@@ -505,11 +506,11 @@ const GoogleTrackingMap = ({
 
   React.useEffect(() => {
     const map = mapRef.current
-    if (!map) {
+    if (!map || !googleMaps) {
       return
     }
 
-    const bounds = new google.maps.LatLngBounds()
+    const bounds = new googleMaps.LatLngBounds()
     let hasBounds = false
 
     const extend = (point: LatLngTuple) => {
@@ -551,12 +552,20 @@ const GoogleTrackingMap = ({
       map.setCenter(toGoogleLatLng(currentPoint || DEFAULT_CENTER))
       map.setZoom(currentPoint ? 12 : 7)
     }
-  }, [currentPoint, fleetMarkers, fitRequestToken, geofenceShapes, mapMode, routePathPoints])
+  }, [currentPoint, fleetMarkers, fitRequestToken, geofenceShapes, googleMaps, mapMode, routePathPoints])
 
   React.useEffect(() => () => clearDraftPolylineListeners(), [])
 
+  if (!env.GOOGLE_MAPS_API_KEY) {
+    return <div className="tracking-map-empty"><Typography variant="body2">Google Maps API key is missing.</Typography></div>
+  }
+
+  if (!isLoaded || !googleMaps) {
+    return <div className="tracking-map-empty"><Typography variant="body2">{commonStrings.LOADING}</Typography></div>
+  }
+
   const buildMarkerIcon = (color: string, scale: number): google.maps.Symbol => ({
-    path: google.maps.SymbolPath.CIRCLE,
+    path: googleMaps.SymbolPath.CIRCLE,
     fillColor: color,
     fillOpacity: 1,
     strokeColor: '#ffffff',
@@ -574,16 +583,16 @@ const GoogleTrackingMap = ({
     : 0
   const playbackVehicleIcon: google.maps.Icon = {
     url: buildVehicleSvgUrl('#f97316', '#fde68a', resolvedPlaybackHeading),
-    scaledSize: new google.maps.Size(44, 44),
-    anchor: new google.maps.Point(22, 22),
+    scaledSize: new googleMaps.Size(44, 44),
+    anchor: new googleMaps.Point(22, 22),
   }
   const currentVehicleIcon: google.maps.Icon = {
     url: buildVehicleSvgUrl('#0f172a', '#60a5fa', resolvedCurrentHeading),
-    scaledSize: new google.maps.Size(42, 42),
-    anchor: new google.maps.Point(21, 21),
+    scaledSize: new googleMaps.Size(42, 42),
+    anchor: new googleMaps.Point(21, 21),
   }
   const stopMarkerIcon: google.maps.Symbol = {
-    path: google.maps.SymbolPath.CIRCLE,
+    path: googleMaps.SymbolPath.CIRCLE,
     fillColor: '#f59e0b',
     fillOpacity: 1,
     strokeColor: '#ffffff',
@@ -593,10 +602,10 @@ const GoogleTrackingMap = ({
   const activeDrawingMode = drawingMode
     ? (
       drawingMode === 'circle'
-        ? google.maps.drawing.OverlayType.CIRCLE
+        ? googleMaps.drawing.OverlayType.CIRCLE
         : drawingMode === 'polygon'
-          ? google.maps.drawing.OverlayType.POLYGON
-          : google.maps.drawing.OverlayType.POLYLINE
+          ? googleMaps.drawing.OverlayType.POLYGON
+          : googleMaps.drawing.OverlayType.POLYLINE
     )
     : null
 
@@ -633,9 +642,9 @@ const GoogleTrackingMap = ({
     clearDraftPolylineListeners()
     const path = polyline.getPath()
     draftPolylineListenersRef.current = [
-      google.maps.event.addListener(path, 'insert_at', syncDraftPolyline),
-      google.maps.event.addListener(path, 'remove_at', syncDraftPolyline),
-      google.maps.event.addListener(path, 'set_at', syncDraftPolyline),
+      googleMaps.event.addListener(path, 'insert_at', syncDraftPolyline),
+      googleMaps.event.addListener(path, 'remove_at', syncDraftPolyline),
+      googleMaps.event.addListener(path, 'set_at', syncDraftPolyline),
     ]
   }
 
@@ -666,20 +675,12 @@ const GoogleTrackingMap = ({
     drawingControl: false,
   } satisfies google.maps.drawing.DrawingManagerOptions
 
-  const heatmapData = !isLoaded || !globalThis.google?.maps?.visualization
+  const heatmapData = !googleMaps.visualization
     ? []
     : heatmapPoints.map((item) => ({
-      location: new google.maps.LatLng(item.point[0], item.point[1]),
+      location: new googleMaps.LatLng(item.point[0], item.point[1]),
       weight: item.weight,
     }))
-
-  if (!env.GOOGLE_MAPS_API_KEY) {
-    return <div className="tracking-map-empty"><Typography variant="body2">Google Maps API key is missing.</Typography></div>
-  }
-
-  if (!isLoaded) {
-    return <div className="tracking-map-empty"><Typography variant="body2">{commonStrings.LOADING}</Typography></div>
-  }
 
   return (
     <GoogleMap
