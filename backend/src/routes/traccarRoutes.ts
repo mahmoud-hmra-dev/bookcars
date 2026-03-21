@@ -20,7 +20,9 @@ routes.route(routeNames.link).post(authJwt.verifyToken, authJwt.authAdmin, tracc
 routes.route(routeNames.unlink).post(authJwt.verifyToken, authJwt.authAdmin, traccarController.unlinkDevice)
 routes.route(routeNames.positions).get(authJwt.verifyToken, authJwt.authAdmin, traccarController.getCurrentPositions)
 routes.route(routeNames.route).get(authJwt.verifyToken, authJwt.authAdmin, traccarController.getRouteHistory)
+routes.route(routeNames.reports).get(authJwt.verifyToken, authJwt.authAdmin, traccarController.getVehicleReports)
 routes.route(routeNames.geofences).get(authJwt.verifyToken, authJwt.authAdmin, traccarController.getGeofences)
 routes.route(routeNames.geofenceAlerts).get(authJwt.verifyToken, authJwt.authAdmin, traccarController.getGeofenceAlerts)
+routes.route(routeNames.eventCenter).get(authJwt.verifyToken, authJwt.authAdmin, traccarController.getEventCenter)
 
 export default routes

@@ -47,7 +47,7 @@ const DEFAULT_CENTER: [number, number] = [33.8938, 35.5018]
 const CARS_FETCH_SIZE = 100
 
 type FleetMode = 'fleet' | 'single'
-type TrackingPanelSection = 'fleet' | 'vehicle' | 'route' | 'geofences' | 'alerts'
+type TrackingPanelSection = 'fleet' | 'vehicle' | 'route' | 'geofences' | 'events'
 type LatLngTuple = [number, number]
 type GoogleLatLng = google.maps.LatLngLiteral
 
@@ -65,13 +65,18 @@ type ParsedGeofence = {
 
 type FleetCarView = {
   car: bookcarsTypes.Car
-  snapshot?: TraccarService.TraccarFleetItem
+  snapshot?: bookcarsTypes.TraccarFleetItem
   position: bookcarsTypes.TraccarPosition | null
   currentPoint: LatLngTuple | null
   deviceName: string
   deviceStatus: string
   isLinked: boolean
   isOnline: boolean
+  isLive: boolean
+  movementStatus: bookcarsTypes.TraccarFleetStatus
+  stale: boolean
+  staleMinutes?: number
+  speedKmh: number
   lastSeen: string
 }
 
@@ -109,6 +114,22 @@ const PLAYBACK_SPEED_OPTIONS = [1, 2, 4, 8]
 const STOP_SPEED_THRESHOLD = 3
 const STOP_RADIUS_METERS = 120
 const STOP_MIN_DURATION_MS = 2 * 60 * 1000
+const LIVE_REFRESH_INTERVAL_MS = 30000
+const EVENT_CENTER_LIMIT = 80
+const EVENT_TYPE_OPTIONS = [
+  'all',
+  'geofenceEnter',
+  'geofenceExit',
+  'deviceOnline',
+  'deviceOffline',
+  'ignitionOn',
+  'ignitionOff',
+  'overspeed',
+  'alarm',
+  'motion',
+  'deviceMoving',
+  'deviceStopped',
+] as const
 
 const formatDateInput = (date: Date) => date.toISOString().slice(0, 16)
 const isFiniteCoordinate = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
@@ -141,6 +162,33 @@ const formatDuration = (durationMs: number) => {
     return `${hours}h`
   }
   return `${minutes}m`
+}
+
+const formatDistanceKm = (distanceMeters?: number | null) => {
+  if (typeof distanceMeters !== 'number' || !Number.isFinite(distanceMeters)) {
+    return '-'
+  }
+
+  return `${Math.round((distanceMeters / 1000) * 10) / 10} km`
+}
+
+const formatRelativeAge = (minutes?: number) => {
+  if (typeof minutes !== 'number' || !Number.isFinite(minutes)) {
+    return '-'
+  }
+
+  if (minutes < 1) {
+    return 'just now'
+  }
+
+  if (minutes < 60) {
+    return `${minutes}m ago`
+  }
+
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+
+  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m ago` : `${hours}h ago`
 }
 
 const getDateMs = (value?: Date | string | number | null) => {
@@ -248,6 +296,58 @@ const getStatusTone = (status?: string): 'default' | 'success' | 'warning' => {
   return 'warning'
 }
 
+const getMovementStatusLabel = (status?: bookcarsTypes.TraccarFleetStatus) => {
+  switch (status) {
+    case 'moving':
+      return strings.STATUS_MOVING
+    case 'idle':
+      return strings.STATUS_IDLE
+    case 'stopped':
+      return strings.STATUS_STOPPED
+    case 'offline':
+      return strings.STATUS_OFFLINE
+    case 'stale':
+      return strings.STATUS_STALE
+    case 'noGps':
+      return strings.STATUS_NO_GPS
+    case 'unlinked':
+      return strings.STATUS_UNLINKED
+    default:
+      return strings.NO_DATA
+  }
+}
+
+const getEventTypeLabel = (type?: string) => {
+  switch (type) {
+    case 'geofenceEnter':
+      return strings.EVENT_GEOFENCE_ENTER
+    case 'geofenceExit':
+      return strings.EVENT_GEOFENCE_EXIT
+    case 'deviceOnline':
+      return strings.EVENT_DEVICE_ONLINE
+    case 'deviceOffline':
+      return strings.EVENT_DEVICE_OFFLINE
+    case 'ignitionOn':
+      return strings.EVENT_IGNITION_ON
+    case 'ignitionOff':
+      return strings.EVENT_IGNITION_OFF
+    case 'overspeed':
+      return strings.EVENT_OVERSPEED
+    case 'alarm':
+      return strings.EVENT_ALARM
+    case 'motion':
+      return strings.EVENT_MOTION
+    case 'deviceMoving':
+      return strings.EVENT_DEVICE_MOVING
+    case 'deviceStopped':
+      return strings.EVENT_DEVICE_STOPPED
+    case 'all':
+      return strings.ALL_EVENTS
+    default:
+      return type || strings.NO_DATA
+  }
+}
+
 const getFleetStatusMeta = (item: FleetCarView, selectedCarId?: string) => {
   if (item.car._id === selectedCarId) {
     return {
@@ -271,11 +371,10 @@ const getFleetStatusMeta = (item: FleetCarView, selectedCarId?: string) => {
     }
   }
 
-  const normalizedStatus = item.deviceStatus.trim().toLowerCase()
-  if (normalizedStatus === 'online') {
+  if (item.movementStatus === 'moving') {
     return {
-      key: 'online',
-      label: item.deviceStatus || strings.TRACKING_ENABLED,
+      key: 'moving',
+      label: getMovementStatusLabel(item.movementStatus),
       markerColor: '#10b981',
       accentColor: '#d1fae5',
       clusterColor: '#059669',
@@ -283,10 +382,54 @@ const getFleetStatusMeta = (item: FleetCarView, selectedCarId?: string) => {
     }
   }
 
-  if (!normalizedStatus || normalizedStatus === 'offline') {
+  if (item.movementStatus === 'idle') {
+    return {
+      key: 'idle',
+      label: getMovementStatusLabel(item.movementStatus),
+      markerColor: '#f59e0b',
+      accentColor: '#fef3c7',
+      clusterColor: '#d97706',
+      chipTone: 'warning' as const,
+    }
+  }
+
+  if (item.movementStatus === 'stopped') {
+    return {
+      key: 'stopped',
+      label: getMovementStatusLabel(item.movementStatus),
+      markerColor: '#2563eb',
+      accentColor: '#dbeafe',
+      clusterColor: '#1d4ed8',
+      chipTone: 'default' as const,
+    }
+  }
+
+  if (item.movementStatus === 'stale') {
+    return {
+      key: 'stale',
+      label: getMovementStatusLabel(item.movementStatus),
+      markerColor: '#fb923c',
+      accentColor: '#ffedd5',
+      clusterColor: '#ea580c',
+      chipTone: 'warning' as const,
+    }
+  }
+
+  if (item.movementStatus === 'noGps') {
+    return {
+      key: 'nogps',
+      label: getMovementStatusLabel(item.movementStatus),
+      markerColor: '#7c3aed',
+      accentColor: '#ede9fe',
+      clusterColor: '#6d28d9',
+      chipTone: 'default' as const,
+    }
+  }
+
+  if (item.movementStatus === 'offline') {
     return {
       key: 'offline',
-      label: item.deviceStatus || strings.TRACKING_DISABLED,
+      label: getMovementStatusLabel(item.movementStatus),
       markerColor: '#64748b',
       accentColor: '#e2e8f0',
       clusterColor: '#475569',
@@ -295,12 +438,12 @@ const getFleetStatusMeta = (item: FleetCarView, selectedCarId?: string) => {
   }
 
   return {
-    key: 'warning',
-    label: item.deviceStatus,
-    markerColor: '#f59e0b',
-    accentColor: '#fef3c7',
-    clusterColor: '#d97706',
-    chipTone: 'warning' as const,
+    key: 'default',
+    label: getMovementStatusLabel(item.movementStatus),
+    markerColor: '#475569',
+    accentColor: '#e2e8f0',
+    clusterColor: '#334155',
+    chipTone: 'default' as const,
   }
 }
 
@@ -980,7 +1123,7 @@ const GoogleTrackingMap = ({
                     title={item.car.name}
                     onClick={() => onMarkerClick(item.car._id)}
                     icon={fleetMarkerIcon}
-                    zIndex={item.car._id === selectedFleetCar?.car._id ? 120 : statusMeta.key === 'online' ? 80 : 40}
+                    zIndex={item.car._id === selectedFleetCar?.car._id ? 120 : item.movementStatus === 'moving' ? 80 : 40}
                   />
                 )
               })}
@@ -1009,16 +1152,23 @@ const Tracking = () => {
   const [user, setUser] = useState<bookcarsTypes.User>()
   const [cars, setCars] = useState<bookcarsTypes.Car[]>([])
   const [devices, setDevices] = useState<bookcarsTypes.TraccarDevice[]>([])
-  const [fleetOverview, setFleetOverview] = useState<TraccarService.TraccarFleetItem[]>([])
+  const [fleetOverview, setFleetOverview] = useState<bookcarsTypes.TraccarFleetItem[]>([])
+  const [fleetHealth, setFleetHealth] = useState<bookcarsTypes.TraccarFleetHealth | null>(null)
   const [selectedCarId, setSelectedCarId] = useState('')
   const [mapMode, setMapMode] = useState<FleetMode>('fleet')
   const [fleetSearch, setFleetSearch] = useState('')
+  const [fleetStatusFilter, setFleetStatusFilter] = useState<'all' | bookcarsTypes.TraccarFleetStatus>('all')
+  const [fleetLinkFilter, setFleetLinkFilter] = useState<'all' | 'linked' | 'unlinked'>('all')
+  const [fleetSupplierFilter, setFleetSupplierFilter] = useState('all')
+  const [liveRefreshEnabled, setLiveRefreshEnabled] = useState(true)
+  const [lastOperationalRefreshAt, setLastOperationalRefreshAt] = useState<Date | null>(null)
   const [trackingEnabled, setTrackingEnabled] = useState(false)
   const [deviceId, setDeviceId] = useState('')
   const [deviceName, setDeviceName] = useState('')
   const [notes, setNotes] = useState('')
   const [positions, setPositions] = useState<bookcarsTypes.TraccarPosition[]>([])
   const [route, setRoute] = useState<bookcarsTypes.TraccarPosition[]>([])
+  const [vehicleReports, setVehicleReports] = useState<bookcarsTypes.TraccarVehicleReportBundle>({ summary: null, trips: [], stops: [] })
   const [snappedRoute, setSnappedRoute] = useState<RouteSnapState>({ displayPoints: [], playbackPoints: [], mode: 'idle' })
   const [playbackIndex, setPlaybackIndex] = useState(0)
   const [playbackPlaying, setPlaybackPlaying] = useState(false)
@@ -1028,7 +1178,9 @@ const Tracking = () => {
   const [activePanelSection, setActivePanelSection] = useState<TrackingPanelSection>('fleet')
   const [allGeofences, setAllGeofences] = useState<bookcarsTypes.TraccarGeofence[]>([])
   const [geofences, setGeofences] = useState<bookcarsTypes.TraccarGeofence[]>([])
-  const [alerts, setAlerts] = useState<bookcarsTypes.TraccarEvent[]>([])
+  const [eventScope, setEventScope] = useState<'fleet' | 'vehicle'>('fleet')
+  const [eventTypeFilter, setEventTypeFilter] = useState<(typeof EVENT_TYPE_OPTIONS)[number]>('all')
+  const [eventCenterItems, setEventCenterItems] = useState<bookcarsTypes.TraccarEventCenterEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [integrationEnabled, setIntegrationEnabled] = useState(true)
   const [editingGeofenceId, setEditingGeofenceId] = useState<number | null>(null)
@@ -1085,16 +1237,6 @@ const Tracking = () => {
       active = false
     }
   }, [integrationEnabled, selectedCar])
-
-  const geofenceLookup = useMemo(() => {
-    const lookup = new Map<number, string>()
-    geofences.forEach((geofence) => {
-      if (typeof geofence.id === 'number' && geofence.name) {
-        lookup.set(geofence.id, geofence.name)
-      }
-    })
-    return lookup
-  }, [geofences])
 
   const linkedGeofenceIds = useMemo(() => (
     new Set(geofences.map((geofence) => geofence.id).filter((id): id is number => typeof id === 'number'))
@@ -1266,7 +1408,7 @@ const Tracking = () => {
   }
 
   const fleetOverviewByCarId = useMemo(() => {
-    const lookup = new Map<string, TraccarService.TraccarFleetItem>()
+    const lookup = new Map<string, bookcarsTypes.TraccarFleetItem>()
     fleetOverview.forEach((item) => lookup.set(item.carId, item))
     return lookup
   }, [fleetOverview])
@@ -1277,6 +1419,9 @@ const Tracking = () => {
       const position = car._id === selectedCarId && positions[0] ? positions[0] : snapshot?.position || null
       const deviceStatus = snapshot?.deviceStatus || car.tracking?.status || ''
       const isLinked = typeof car.tracking?.deviceId === 'number'
+      const movementStatus = snapshot?.movementStatus || (isLinked ? 'offline' : 'unlinked')
+      const stale = !!snapshot?.stale
+      const speedKmh = snapshot?.speedKmh || 0
 
       return {
         car,
@@ -1287,13 +1432,30 @@ const Tracking = () => {
         deviceStatus,
         isLinked,
         isOnline: deviceStatus.trim().toLowerCase() === 'online',
-        lastSeen: formatTimestamp(getPositionTimestamp(position) || snapshot?.lastSyncedAt),
+        isLive: !!position,
+        movementStatus,
+        stale,
+        staleMinutes: snapshot?.staleMinutes,
+        speedKmh,
+        lastSeen: formatTimestamp(snapshot?.lastPositionAt || getPositionTimestamp(position) || snapshot?.lastDeviceUpdate || snapshot?.lastSyncedAt),
       }
     })
 
     result.sort((left, right) => {
-      if (left.isOnline !== right.isOnline) {
-        return left.isOnline ? -1 : 1
+      const statusPriority = {
+        moving: 0,
+        idle: 1,
+        stopped: 2,
+        stale: 3,
+        noGps: 4,
+        offline: 5,
+        unlinked: 6,
+      } as const
+
+      const leftPriority = statusPriority[left.movementStatus]
+      const rightPriority = statusPriority[right.movementStatus]
+      if (leftPriority !== rightPriority) {
+        return leftPriority - rightPriority
       }
       if (left.isLinked !== right.isLinked) {
         return left.isLinked ? -1 : 1
@@ -1304,16 +1466,24 @@ const Tracking = () => {
     return result
   }, [cars, fleetOverviewByCarId, positions, selectedCarId])
 
+  const supplierOptions = useMemo(() => (
+    [...new Set(
+      cars
+        .map((car) => car.supplier?.fullName?.trim())
+        .filter((name): name is string => !!name),
+    )].sort((left, right) => left.localeCompare(right))
+  ), [cars])
+
   const filteredFleetCars = useMemo(() => {
     const query = fleetSearch.trim().toLowerCase()
-    if (!query) {
-      return fleetCars
-    }
 
     return fleetCars.filter((item) => (
-      toSearchText(item.car.name, item.car.licensePlate, item.deviceName, item.car.supplier?.fullName).includes(query)
+      (query === '' || toSearchText(item.car.name, item.car.licensePlate, item.deviceName, item.car.supplier?.fullName).includes(query))
+      && (fleetStatusFilter === 'all' || item.movementStatus === fleetStatusFilter)
+      && (fleetLinkFilter === 'all' || (fleetLinkFilter === 'linked' ? item.isLinked : !item.isLinked))
+      && (fleetSupplierFilter === 'all' || (item.car.supplier?.fullName || '') === fleetSupplierFilter)
     ))
-  }, [fleetCars, fleetSearch])
+  }, [fleetCars, fleetLinkFilter, fleetSearch, fleetStatusFilter, fleetSupplierFilter])
 
   const selectedFleetCar = useMemo(() => fleetCars.find((item) => item.car._id === selectedCarId) || null, [fleetCars, selectedCarId])
   const managedGeofences = useMemo(() => (
@@ -1346,8 +1516,6 @@ const Tracking = () => {
       ? geofenceShapes
       : geofenceShapes.filter((shape) => `${shape.id}` !== `${editingGeofenceId}`)
   ), [editingGeofenceId, geofenceShapes])
-  const routeStart = routeFrames.length > 0 ? routeFrames[0].position : null
-  const routeEnd = routeFrames.length > 1 ? routeFrames[routeFrames.length - 1].position : routeFrames[0]?.position || null
   const routeStartPoint = routePathPoints[0] || null
   const routeEndPoint = routePathPoints.length > 1 ? routePathPoints[routePathPoints.length - 1] : routePathPoints[0] || null
   const boundedPlaybackIndex = routeFrames.length > 0 ? Math.min(playbackIndex, routeFrames.length - 1) : 0
@@ -1424,22 +1592,53 @@ const Tracking = () => {
     const slowBias = frame.speed <= STOP_SPEED_THRESHOLD ? 6 : Math.max(1, 5 - (frame.speed / 12))
     return { point, weight: slowBias }
   }), [routeFrames, snappedRoute.playbackPoints])
+  const routeStopDurationMs = useMemo(() => (
+    vehicleReports.stops.length > 0
+      ? vehicleReports.stops.reduce((sum, stop) => sum + (stop.duration || 0), 0)
+      : detectedStops.reduce((sum, stop) => sum + stop.durationMs, 0)
+  ), [detectedStops, vehicleReports.stops])
+  const routeDistanceMeters = vehicleReports.summary?.distance
+    ?? vehicleReports.trips.reduce((sum, trip) => sum + (trip.distance || 0), 0)
+  const routeAverageSpeed = vehicleReports.summary?.averageSpeed
+  const routeMaxSpeed = vehicleReports.summary?.maxSpeed
+  const fleetStatusCounts = useMemo(() => ({
+    moving: fleetCars.filter((item) => item.movementStatus === 'moving').length,
+    idle: fleetCars.filter((item) => item.movementStatus === 'idle').length,
+    stopped: fleetCars.filter((item) => item.movementStatus === 'stopped').length,
+    stale: fleetCars.filter((item) => item.movementStatus === 'stale').length,
+    offline: fleetCars.filter((item) => item.movementStatus === 'offline').length,
+    noGps: fleetCars.filter((item) => item.movementStatus === 'noGps').length,
+    unlinked: fleetCars.filter((item) => item.movementStatus === 'unlinked').length,
+  }), [fleetCars])
   const geofenceDraftReady = hasDraftGeofenceGeometry(geofenceDraft)
   const geofenceDraftPointCount = geofenceDraft?.type === 'circle' ? 0 : geofenceDraft?.points.length || 0
 
-  const linkedCarsCount = fleetCars.filter((item) => item.isLinked).length
-  const liveCarsCount = fleetCars.filter((item) => item.currentPoint).length
-  const onlineCarsCount = fleetCars.filter((item) => item.isOnline).length
+  const linkedCarsCount = fleetHealth?.linkedCars ?? fleetCars.filter((item) => item.isLinked).length
+  const liveCarsCount = fleetHealth?.liveCars ?? fleetCars.filter((item) => item.currentPoint).length
+  const onlineCarsCount = fleetHealth?.onlineCars ?? fleetCars.filter((item) => item.isOnline).length
   const canLoadTracking = !!selectedCar?.tracking?.deviceId && integrationEnabled
   const hasMapData = mapMode === 'fleet'
     ? liveCarsCount > 0
     : !!currentPoint || routePathPoints.length > 0 || visibleGeofenceShapes.length > 0 || geofenceDraftReady || geofenceDrawingMode !== null
   const selectedStatusLabel = selectedFleetCar?.isLinked
-    ? (selectedFleetCar.deviceStatus || strings.TRACKING_ENABLED)
+    ? getMovementStatusLabel(selectedFleetCar.movementStatus)
     : strings.TRACKING_NOT_LINKED
-  const selectedStatusTone = selectedFleetCar?.isLinked ? getStatusTone(selectedFleetCar.deviceStatus) : 'default'
+  const selectedStatusTone = selectedFleetCar?.movementStatus === 'moving'
+    ? 'success'
+    : selectedFleetCar?.movementStatus === 'idle' || selectedFleetCar?.movementStatus === 'stale'
+      ? 'warning'
+      : 'default'
   const routeListPreview = routeFrames.slice(0, 10)
-  const stopListPreview = detectedStops.slice(0, 6)
+  const stopListPreview = (vehicleReports.stops.length > 0
+    ? vehicleReports.stops.slice(0, 6).map((stop, index) => ({
+      id: `report-stop-${index}-${stop.startTime || stop.endTime || index}`,
+      point: [stop.latitude || 0, stop.longitude || 0] as LatLngTuple,
+      startedAt: getDateMs(stop.startTime),
+      endedAt: getDateMs(stop.endTime),
+      durationMs: stop.duration || 0,
+      pointCount: 0,
+    }))
+    : detectedStops.slice(0, 6))
 
   useEffect(() => {
     let active = true
@@ -1509,11 +1708,11 @@ const Tracking = () => {
   const resetTrackingData = () => {
     setPositions([])
     setRoute([])
+    setVehicleReports({ summary: null, trips: [], stops: [] })
     setSnappedRoute({ displayPoints: [], playbackPoints: [], mode: 'idle' })
     setPlaybackPlaying(false)
     setPlaybackIndex(0)
     setGeofences([])
-    setAlerts([])
   }
 
   const selectCar = (carId: string) => {
@@ -1555,9 +1754,14 @@ const Tracking = () => {
   const loadFleetOverview = async () => {
     if (!integrationEnabled) {
       setFleetOverview([])
+      setFleetHealth(null)
       return
     }
-    setFleetOverview(await TraccarService.getFleetOverview())
+
+    const data = await TraccarService.getFleetOverview()
+    setFleetOverview(data.items)
+    setFleetHealth(data.health)
+    setLastOperationalRefreshAt(new Date(data.health.lastRefreshAt))
   }
 
   const loadDevices = async () => {
@@ -1576,19 +1780,69 @@ const Tracking = () => {
     setAllGeofences(await TraccarService.getAllGeofences())
   }
 
-  const handleRefreshFleet = async () => {
+  const loadEventCenter = async (scope = eventScope) => {
+    if (!integrationEnabled) {
+      setEventCenterItems([])
+      return
+    }
+
+    const scopedCarId = scope === 'vehicle' ? selectedCar?._id : undefined
+    if (scope === 'vehicle' && !scopedCarId) {
+      setEventCenterItems([])
+      return
+    }
+
+    setEventCenterItems(await TraccarService.getEventCenter({
+      carId: scopedCarId,
+      from: new Date(from).toISOString(),
+      to: new Date(to).toISOString(),
+      types: eventTypeFilter === 'all' ? undefined : [eventTypeFilter],
+      limit: EVENT_CENTER_LIMIT,
+    }))
+  }
+
+  const refreshOperationalData = async ({
+    includeMetadata = false,
+    includeEventCenter = true,
+    silent = false,
+  }: {
+    includeMetadata?: boolean
+    includeEventCenter?: boolean
+    silent?: boolean
+  } = {}) => {
     if (!integrationEnabled) {
       return
     }
 
-    setLoading(true)
-    try {
-      await Promise.all([loadFleetOverview(), loadDevices(), loadAllGeofences()])
-    } catch (err) {
-      helper.error(err)
-    } finally {
-      setLoading(false)
+    if (!silent) {
+      setLoading(true)
     }
+
+    try {
+      const tasks: Promise<unknown>[] = [loadFleetOverview()]
+
+      if (includeEventCenter) {
+        tasks.push(loadEventCenter())
+      }
+
+      if (includeMetadata) {
+        tasks.push(loadDevices(), loadAllGeofences())
+      }
+
+      await Promise.all(tasks)
+    } catch (err) {
+      if (!silent) {
+        helper.error(err)
+      }
+    } finally {
+      if (!silent) {
+        setLoading(false)
+      }
+    }
+  }
+
+  const handleRefreshFleet = async () => {
+    await refreshOperationalData({ includeMetadata: true })
   }
 
   const handleRefreshGeofenceLibrary = async () => {
@@ -1682,7 +1936,13 @@ const Tracking = () => {
 
     setLoading(true)
     try {
-      setRoute(await TraccarService.getRoute(selectedCar._id, new Date(from).toISOString(), new Date(to).toISOString()))
+      const [routeData, reportsData] = await Promise.all([
+        TraccarService.getRoute(selectedCar._id, new Date(from).toISOString(), new Date(to).toISOString()),
+        TraccarService.getVehicleReports(selectedCar._id, new Date(from).toISOString(), new Date(to).toISOString()),
+      ])
+
+      setRoute(routeData)
+      setVehicleReports(reportsData)
       setMapMode('single')
       setMapFitRequestToken((prev) => prev + 1)
     } catch (err) {
@@ -1791,15 +2051,11 @@ const Tracking = () => {
     }
   }
 
-  const handleFetchAlerts = async () => {
-    focusPanelSection('alerts')
-    if (!selectedCar) {
-      return
-    }
-
+  const handleFetchEvents = async () => {
+    focusPanelSection('events')
     setLoading(true)
     try {
-      setAlerts(await TraccarService.getGeofenceAlerts(selectedCar._id, new Date(from).toISOString(), new Date(to).toISOString()))
+      await loadEventCenter()
     } catch (err) {
       helper.error(err)
     } finally {
@@ -1815,17 +2071,25 @@ const Tracking = () => {
 
     setLoading(true)
     try {
-      const [currentData, routeData, geofenceData, alertData] = await Promise.all([
+      const [currentData, routeData, geofenceData, reportsData, eventData] = await Promise.all([
         TraccarService.getPositions(selectedCar._id),
         TraccarService.getRoute(selectedCar._id, new Date(from).toISOString(), new Date(to).toISOString()),
         TraccarService.getGeofences(selectedCar._id),
-        TraccarService.getGeofenceAlerts(selectedCar._id, new Date(from).toISOString(), new Date(to).toISOString()),
+        TraccarService.getVehicleReports(selectedCar._id, new Date(from).toISOString(), new Date(to).toISOString()),
+        TraccarService.getEventCenter({
+          carId: selectedCar._id,
+          from: new Date(from).toISOString(),
+          to: new Date(to).toISOString(),
+          types: eventTypeFilter === 'all' ? undefined : [eventTypeFilter],
+          limit: EVENT_CENTER_LIMIT,
+        }),
       ])
 
       setPositions(currentData)
       setRoute(routeData)
       setGeofences(geofenceData)
-      setAlerts(alertData)
+      setVehicleReports(reportsData)
+      setEventCenterItems(eventData)
       setMapMode('single')
       setMapFitRequestToken((prev) => prev + 1)
     } catch (err) {
@@ -1855,20 +2119,30 @@ const Tracking = () => {
       }
 
       if (status.enabled) {
-        const [devicesResult, fleetResult, geofencesResult] = await Promise.allSettled([
+        const [devicesResult, fleetResult, geofencesResult, eventCenterResult] = await Promise.allSettled([
           TraccarService.getDevices(),
           TraccarService.getFleetOverview(),
           TraccarService.getAllGeofences(),
+          TraccarService.getEventCenter({
+            from: new Date(from).toISOString(),
+            to: new Date(to).toISOString(),
+            limit: EVENT_CENTER_LIMIT,
+          }),
         ])
 
         if (devicesResult.status === 'fulfilled') {
           setDevices(devicesResult.value)
         }
         if (fleetResult.status === 'fulfilled') {
-          setFleetOverview(fleetResult.value)
+          setFleetOverview(fleetResult.value.items)
+          setFleetHealth(fleetResult.value.health)
+          setLastOperationalRefreshAt(new Date(fleetResult.value.health.lastRefreshAt))
         }
         if (geofencesResult.status === 'fulfilled') {
           setAllGeofences(geofencesResult.value)
+        }
+        if (eventCenterResult.status === 'fulfilled') {
+          setEventCenterItems(eventCenterResult.value)
         }
       }
     } catch (err) {
@@ -1878,6 +2152,28 @@ const Tracking = () => {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (!user || !integrationEnabled || !liveRefreshEnabled) {
+      return
+    }
+
+    const timer = window.setInterval(() => {
+      void refreshOperationalData({ silent: true, includeEventCenter: activePanelSection === 'events' })
+    }, LIVE_REFRESH_INTERVAL_MS)
+
+    return () => {
+      window.clearInterval(timer)
+    }
+  }, [activePanelSection, eventScope, eventTypeFilter, from, integrationEnabled, liveRefreshEnabled, selectedCarId, to, user])
+
+  useEffect(() => {
+    if (!user || !integrationEnabled || activePanelSection !== 'events') {
+      return
+    }
+
+    void loadEventCenter().catch(() => {})
+  }, [activePanelSection, eventScope, eventTypeFilter, from, integrationEnabled, selectedCarId, to, user])
 
   const sectionItems = [
     {
@@ -1905,10 +2201,10 @@ const Tracking = () => {
       summary: `${managedGeofences.length} ${strings.GEOFENCES}`,
     },
     {
-      id: 'alerts' as const,
+      id: 'events' as const,
       icon: <WarningAmberIcon fontSize="small" />,
-      title: strings.GEOFENCE_ALERTS,
-      summary: alerts.length > 0 ? `${alerts.length} ${strings.GEOFENCE_ALERTS}` : strings.NO_DATA,
+      title: strings.EVENT_CENTER,
+      summary: eventCenterItems.length > 0 ? `${eventCenterItems.length} ${strings.EVENT_CENTER}` : strings.NO_DATA,
     },
   ]
 
@@ -1916,86 +2212,175 @@ const Tracking = () => {
     switch (section) {
       case 'fleet':
         return (
-          <Paper className="tracking-card tracking-card--embedded tracking-fleet-roster-card">
-            <div className="tracking-header">
-              <div>
-                <Typography variant="h6">{strings.LIVE_FLEET}</Typography>
-                <Typography className="tracking-card-subtitle">{`${filteredFleetCars.length}/${cars.length} ${commonStrings.CARS}`}</Typography>
+          <>
+            <Paper className="tracking-card tracking-card--embedded tracking-console-card">
+              <div className="tracking-header">
+                <div>
+                  <Typography variant="h6">{strings.LIVE_FLEET}</Typography>
+                  <Typography className="tracking-card-subtitle">{strings.FLEET_CONSOLE_SUBTITLE}</Typography>
+                </div>
+                <Chip size="small" color={liveRefreshEnabled ? 'success' : 'default'} label={liveRefreshEnabled ? strings.LIVE_REFRESH_ON : strings.LIVE_REFRESH_OFF} />
               </div>
-              <Chip size="small" label={`${liveCarsCount} ${strings.CURRENT_POSITION}`} />
-            </div>
 
-            <TextField
-              value={fleetSearch}
-              onChange={(event) => setFleetSearch(event.target.value)}
-              placeholder={strings.SEARCH_CARS}
-              fullWidth
-              size="small"
-              className="tracking-search"
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon fontSize="small" />
-                  </InputAdornment>
-                ),
-              }}
-            />
+              <div className="tracking-console-card__subheader">
+                <FormControlLabel
+                  control={<Switch checked={liveRefreshEnabled} onChange={(event) => setLiveRefreshEnabled(event.target.checked)} />}
+                  label={strings.LIVE_REFRESH}
+                />
+                <span>{`${strings.LAST_UPDATE}: ${lastOperationalRefreshAt ? formatTimestamp(lastOperationalRefreshAt) : strings.NO_DATA}`}</span>
+              </div>
 
-            <div className="tracking-actions tracking-actions--compact">
-              <Button variant="contained" className="btn-primary" onClick={handleRefreshFleet} disabled={!integrationEnabled}>
-                {strings.REFRESH_FLEET}
-              </Button>
-              <Button variant="outlined" onClick={() => setMapMode('fleet')}>
-                {strings.FLEET_MODE}
-              </Button>
-            </div>
-
-            <div className="tracking-fleet-list">
-              {filteredFleetCars.map((item) => {
-                const statusMeta = getFleetStatusMeta(item, selectedCarId)
-
-                return (
+              <div className="tracking-status-strip">
+                {[
+                  { value: 'all' as const, label: strings.ALL_STATUSES, count: fleetCars.length },
+                  { value: 'moving' as const, label: strings.STATUS_MOVING, count: fleetStatusCounts.moving },
+                  { value: 'idle' as const, label: strings.STATUS_IDLE, count: fleetStatusCounts.idle },
+                  { value: 'stopped' as const, label: strings.STATUS_STOPPED, count: fleetStatusCounts.stopped },
+                  { value: 'stale' as const, label: strings.STATUS_STALE, count: fleetStatusCounts.stale },
+                  { value: 'offline' as const, label: strings.STATUS_OFFLINE, count: fleetStatusCounts.offline },
+                ].map((option) => (
                   <button
                     type="button"
-                    key={item.car._id}
-                    className={`tracking-fleet-item${item.car._id === selectedCarId ? ' tracking-fleet-item--active' : ''}`}
-                    onClick={() => {
-                      selectCar(item.car._id)
-                      setMapMode('single')
-                    }}
+                    key={option.value}
+                    className={`tracking-status-pill${fleetStatusFilter === option.value ? ' is-active' : ''}`}
+                    onClick={() => setFleetStatusFilter(option.value)}
                   >
-                    <div className="tracking-fleet-avatar-shell">
-                      <div className="tracking-fleet-avatar" style={{ background: `linear-gradient(135deg, ${statusMeta.markerColor} 0%, ${statusMeta.clusterColor} 100%)` }}>
-                        {item.car.name.slice(0, 1)}
-                      </div>
-                    </div>
-
-                    <div className="tracking-fleet-body">
-                      <div className="tracking-fleet-row">
-                        <Typography className="tracking-fleet-name">{item.car.name}</Typography>
-                        <Chip
-                          size="small"
-                          color={statusMeta.chipTone}
-                          label={statusMeta.label}
-                        />
-                      </div>
-                      <Typography className="tracking-list-subtext">{item.car.licensePlate || strings.NO_DATA}</Typography>
-                      <div className="tracking-fleet-meta">
-                        <span>{item.deviceName || item.car.supplier?.fullName || strings.NO_DATA}</span>
-                        <span>{item.lastSeen}</span>
-                      </div>
-                    </div>
+                    <strong>{option.count}</strong>
+                    <span>{option.label}</span>
                   </button>
-                )
-              })}
-            </div>
-          </Paper>
+                ))}
+              </div>
+
+              <div className="tracking-fleet-filters">
+                <TextField
+                  value={fleetSearch}
+                  onChange={(event) => setFleetSearch(event.target.value)}
+                  placeholder={strings.SEARCH_CARS}
+                  fullWidth
+                  size="small"
+                  className="tracking-search"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon fontSize="small" />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+
+                <FormControl size="small">
+                  <InputLabel>{strings.STATUS_FILTER}</InputLabel>
+                  <Select
+                    value={fleetStatusFilter}
+                    label={strings.STATUS_FILTER}
+                    onChange={(event) => setFleetStatusFilter(event.target.value as 'all' | bookcarsTypes.TraccarFleetStatus)}
+                  >
+                    <MenuItem value="all">{strings.ALL_STATUSES}</MenuItem>
+                    <MenuItem value="moving">{strings.STATUS_MOVING}</MenuItem>
+                    <MenuItem value="idle">{strings.STATUS_IDLE}</MenuItem>
+                    <MenuItem value="stopped">{strings.STATUS_STOPPED}</MenuItem>
+                    <MenuItem value="stale">{strings.STATUS_STALE}</MenuItem>
+                    <MenuItem value="offline">{strings.STATUS_OFFLINE}</MenuItem>
+                    <MenuItem value="noGps">{strings.STATUS_NO_GPS}</MenuItem>
+                    <MenuItem value="unlinked">{strings.STATUS_UNLINKED}</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <FormControl size="small">
+                  <InputLabel>{strings.LINK_FILTER}</InputLabel>
+                  <Select
+                    value={fleetLinkFilter}
+                    label={strings.LINK_FILTER}
+                    onChange={(event) => setFleetLinkFilter(event.target.value as 'all' | 'linked' | 'unlinked')}
+                  >
+                    <MenuItem value="all">{strings.ALL_LINKS}</MenuItem>
+                    <MenuItem value="linked">{strings.LINKED_ONLY}</MenuItem>
+                    <MenuItem value="unlinked">{strings.UNLINKED_ONLY}</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <FormControl size="small">
+                  <InputLabel>{strings.SUPPLIER_FILTER}</InputLabel>
+                  <Select
+                    value={fleetSupplierFilter}
+                    label={strings.SUPPLIER_FILTER}
+                    onChange={(event) => setFleetSupplierFilter(event.target.value)}
+                  >
+                    <MenuItem value="all">{strings.ALL_SUPPLIERS}</MenuItem>
+                    {supplierOptions.map((supplier) => (
+                      <MenuItem key={supplier} value={supplier}>{supplier}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </div>
+
+              <div className="tracking-actions tracking-actions--compact">
+                <Button variant="contained" className="btn-primary" onClick={handleRefreshFleet} disabled={!integrationEnabled}>
+                  {strings.REFRESH_FLEET}
+                </Button>
+                <Button variant="outlined" onClick={() => setMapMode('fleet')}>
+                  {strings.FLEET_MODE}
+                </Button>
+              </div>
+            </Paper>
+
+            <Paper className="tracking-card tracking-card--embedded tracking-fleet-roster-card">
+              <div className="tracking-header">
+                <div>
+                  <Typography variant="h6">{strings.FLEET_ROSTER}</Typography>
+                  <Typography className="tracking-card-subtitle">{`${filteredFleetCars.length}/${cars.length} ${commonStrings.CARS}`}</Typography>
+                </div>
+                <Chip size="small" label={`${fleetHealth?.movingCars ?? fleetStatusCounts.moving} ${strings.STATUS_MOVING}`} />
+              </div>
+
+              <div className="tracking-fleet-list tracking-fleet-list--dense">
+                {filteredFleetCars.map((item) => {
+                  const statusMeta = getFleetStatusMeta(item, selectedCarId)
+
+                  return (
+                    <button
+                      type="button"
+                      key={item.car._id}
+                      className={`tracking-fleet-item${item.car._id === selectedCarId ? ' tracking-fleet-item--active' : ''}`}
+                      onClick={() => {
+                        selectCar(item.car._id)
+                        setMapMode('single')
+                      }}
+                    >
+                      <div className="tracking-fleet-avatar-shell">
+                        <div className="tracking-fleet-avatar" style={{ background: `linear-gradient(135deg, ${statusMeta.markerColor} 0%, ${statusMeta.clusterColor} 100%)` }}>
+                          {item.car.name.slice(0, 1)}
+                        </div>
+                      </div>
+
+                      <div className="tracking-fleet-body">
+                        <div className="tracking-fleet-row">
+                          <Typography className="tracking-fleet-name">{item.car.name}</Typography>
+                          <div className="tracking-fleet-chips">
+                            <Chip size="small" color={statusMeta.chipTone} label={statusMeta.label} />
+                            {item.stale && <Chip size="small" label={formatRelativeAge(item.staleMinutes)} />}
+                          </div>
+                        </div>
+                        <Typography className="tracking-list-subtext">{item.car.licensePlate || strings.NO_DATA}</Typography>
+                        <div className="tracking-fleet-meta tracking-fleet-meta--grid">
+                          <span>{item.deviceName || item.car.supplier?.fullName || strings.NO_DATA}</span>
+                          <span>{`${strings.SPEED}: ${formatNumber(item.speedKmh, ' km/h')}`}</span>
+                          <span>{`${strings.LAST_SEEN}: ${item.lastSeen}`}</span>
+                          <span>{`${strings.REFRESH_AGE}: ${formatRelativeAge(item.staleMinutes)}`}</span>
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </Paper>
+          </>
         )
 
       case 'vehicle':
         return (
           <>
-            <Paper className="tracking-card tracking-card--embedded">
+            <Paper className="tracking-card tracking-card--embedded tracking-console-card">
               <div className="tracking-header">
                 <div>
                   <Typography variant="h6">{strings.SELECTED_VEHICLE}</Typography>
@@ -2017,7 +2402,23 @@ const Tracking = () => {
                   <span>{strings.TIME}</span>
                   <strong>{formatTimestamp(getPositionTimestamp(currentPosition))}</strong>
                 </div>
+                <div className="tracking-panel__summary-item">
+                  <span>{strings.SPEED}</span>
+                  <strong>{formatNumber(selectedFleetCar?.speedKmh, ' km/h')}</strong>
+                </div>
+                <div className="tracking-panel__summary-item">
+                  <span>{strings.IGNITION}</span>
+                  <strong>{selectedFleetCar?.snapshot?.ignition === undefined ? '-' : selectedFleetCar.snapshot.ignition ? strings.ON : strings.OFF}</strong>
+                </div>
+                <div className="tracking-panel__summary-item">
+                  <span>{strings.BATTERY}</span>
+                  <strong>{formatNumber(selectedFleetCar?.snapshot?.batteryLevel, '%')}</strong>
+                </div>
               </div>
+
+              {selectedFleetCar?.snapshot?.address && (
+                <div className="tracking-inline-note">{selectedFleetCar.snapshot.address}</div>
+              )}
 
               <div className="tracking-actions tracking-actions--compact">
                 <Button variant="contained" className="btn-primary" onClick={handleFetchPositions} disabled={!canLoadTracking}>
@@ -2141,6 +2542,33 @@ const Tracking = () => {
             {routeFrames.length > 0
               ? (
                 <>
+                  <div className="tracking-grid tracking-grid--compact">
+                    <div className="tracking-panel__summary-item">
+                      <span>{strings.ROUTE_DISTANCE}</span>
+                      <strong>{formatDistanceKm(routeDistanceMeters)}</strong>
+                    </div>
+                    <div className="tracking-panel__summary-item">
+                      <span>{strings.AVG_SPEED}</span>
+                      <strong>{formatNumber(routeAverageSpeed, ' km/h')}</strong>
+                    </div>
+                    <div className="tracking-panel__summary-item">
+                      <span>{strings.MAX_SPEED}</span>
+                      <strong>{formatNumber(routeMaxSpeed, ' km/h')}</strong>
+                    </div>
+                    <div className="tracking-panel__summary-item">
+                      <span>{strings.TRIPS}</span>
+                      <strong>{vehicleReports.trips.length}</strong>
+                    </div>
+                    <div className="tracking-panel__summary-item">
+                      <span>{strings.STOPS}</span>
+                      <strong>{vehicleReports.stops.length || detectedStops.length}</strong>
+                    </div>
+                    <div className="tracking-panel__summary-item">
+                      <span>{strings.STOP_DURATION}</span>
+                      <strong>{routeStopDurationMs > 0 ? formatDuration(routeStopDurationMs) : '-'}</strong>
+                    </div>
+                  </div>
+
                   <div className="tracking-route-player">
                     <div className="tracking-route-player__stats">
                       <div className="tracking-route-player__stat">
@@ -2213,7 +2641,7 @@ const Tracking = () => {
                   <div className="tracking-route-stops">
                     <div className="tracking-header">
                       <Typography variant="subtitle1">{strings.STOP_DETECTION}</Typography>
-                      <Chip size="small" label={`${detectedStops.length} ${strings.STOPS}`} />
+                      <Chip size="small" label={`${vehicleReports.stops.length || detectedStops.length} ${strings.STOPS}`} />
                     </div>
 
                     {stopListPreview.length > 0
@@ -2231,6 +2659,26 @@ const Tracking = () => {
                         <div className="tracking-empty">{strings.NO_STOPS}</div>
                         )}
                   </div>
+
+                  {vehicleReports.trips.length > 0 && (
+                    <div className="tracking-route-stops">
+                      <div className="tracking-header">
+                        <Typography variant="subtitle1">{strings.TRIPS}</Typography>
+                        <Chip size="small" label={`${vehicleReports.trips.length} ${strings.TRIPS}`} />
+                      </div>
+
+                      <div className="tracking-list">
+                        {vehicleReports.trips.slice(0, 6).map((trip, index) => (
+                          <div key={`${trip.startTime || index}-${trip.endTime || index}`} className="tracking-list-item">
+                            <div>{`${formatTimestamp(trip.startTime)} -> ${formatTimestamp(trip.endTime)}`}</div>
+                            <div className="tracking-list-subtext">
+                              {`${formatDistanceKm(trip.distance)} • ${formatDuration(trip.duration || 0)}`}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="tracking-list">
                     {routeListPreview.map((frame, index) => (
@@ -2479,14 +2927,35 @@ const Tracking = () => {
           </>
         )
 
-      case 'alerts':
+      case 'events':
         return (
-          <Paper className="tracking-card tracking-card--embedded">
+          <Paper className="tracking-card tracking-card--embedded tracking-console-card">
             <div className="tracking-header">
-              <Typography variant="h6">{strings.GEOFENCE_ALERTS}</Typography>
-              <Button variant="contained" className="btn-primary" onClick={handleFetchAlerts} disabled={!canLoadTracking}>
+              <div>
+                <Typography variant="h6">{strings.EVENT_CENTER}</Typography>
+                <Typography className="tracking-card-subtitle">{strings.EVENT_CENTER_SUBTITLE}</Typography>
+              </div>
+              <Button variant="contained" className="btn-primary" onClick={handleFetchEvents} disabled={!integrationEnabled || (eventScope === 'vehicle' && !canLoadTracking)}>
                 {strings.FETCH}
               </Button>
+            </div>
+
+            <div className="tracking-segmented-control">
+              <button
+                type="button"
+                className={`tracking-segmented-control__item${eventScope === 'fleet' ? ' is-active' : ''}`}
+                onClick={() => setEventScope('fleet')}
+              >
+                {strings.FLEET_EVENTS}
+              </button>
+              <button
+                type="button"
+                className={`tracking-segmented-control__item${eventScope === 'vehicle' ? ' is-active' : ''}`}
+                onClick={() => setEventScope('vehicle')}
+                disabled={!selectedCar}
+              >
+                {strings.VEHICLE_EVENTS}
+              </button>
             </div>
 
             <div className="tracking-grid">
@@ -2494,13 +2963,34 @@ const Tracking = () => {
               <TextField label={strings.TO} type="datetime-local" value={to} onChange={(event) => setTo(event.target.value)} />
             </div>
 
-            {alerts.length > 0
+            <div className="tracking-event-filters">
+              {EVENT_TYPE_OPTIONS.map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  className={`tracking-filter-chip${eventTypeFilter === type ? ' is-active' : ''}`}
+                  onClick={() => setEventTypeFilter(type)}
+                >
+                  {getEventTypeLabel(type)}
+                </button>
+              ))}
+            </div>
+
+            {eventCenterItems.length > 0
               ? (
-                <div className="tracking-list">
-                  {alerts.map((alert, index) => (
-                    <div key={alert.id || `${alert.geofenceId}-${index}`} className="tracking-list-item">
-                      <div>{formatTimestamp(alert.eventTime || '')}</div>
-                      <div className="tracking-list-subtext">{geofenceLookup.get(alert.geofenceId || -1) || alert.geofenceId || alert.type}</div>
+                <div className="tracking-list tracking-list--events">
+                  {eventCenterItems.map((event, index) => (
+                    <div key={event.id || `${event.deviceId}-${event.eventTime}-${index}`} className="tracking-list-item tracking-event-item">
+                      <div className="tracking-event-item__head">
+                        <strong>{event.carName || selectedCar?.name || strings.NO_DATA}</strong>
+                        <Chip size="small" label={getEventTypeLabel(event.type)} />
+                      </div>
+                      <div className="tracking-list-subtext">{formatTimestamp(event.eventTime)}</div>
+                      <div className="tracking-event-item__meta">
+                        <span>{event.geofenceName || event.address || event.deviceName || strings.NO_DATA}</span>
+                        {typeof event.speed === 'number' && <span>{`${strings.SPEED}: ${formatNumber(event.speed, ' km/h')}`}</span>}
+                        {event.licensePlate && <span>{event.licensePlate}</span>}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -2560,22 +3050,44 @@ const Tracking = () => {
                   )}
 
               <div className="tracking-map-overlay tracking-map-overlay--top">
-                <div className="tracking-map-badges">
-                  <Chip color={integrationEnabled ? 'success' : 'error'} label={integrationEnabled ? strings.LIVE_FLEET : strings.INTEGRATION_DISABLED} />
-                  <Chip label={`${linkedCarsCount} ${strings.LINKED_DEVICES}`} />
-                  <Chip label={`${onlineCarsCount} ${strings.ONLINE_DEVICES}`} />
-                  {selectedCar && <Chip color={selectedStatusTone} label={selectedCar.name} />}
+                <div className="tracking-map-badges tracking-map-badges--stack">
+                  <div className="tracking-map-kpi-grid">
+                    <div className="tracking-map-kpi-card">
+                      <span>{strings.LIVE_FLEET}</span>
+                      <strong>{fleetHealth?.totalCars ?? fleetCars.length}</strong>
+                      <em>{`${linkedCarsCount} ${strings.LINKED_DEVICES}`}</em>
+                    </div>
+                    <div className="tracking-map-kpi-card">
+                      <span>{strings.STATUS_MOVING}</span>
+                      <strong>{fleetHealth?.movingCars ?? fleetStatusCounts.moving}</strong>
+                      <em>{`${onlineCarsCount} ${strings.ONLINE_DEVICES}`}</em>
+                    </div>
+                    <div className="tracking-map-kpi-card">
+                      <span>{strings.STATUS_IDLE}</span>
+                      <strong>{fleetHealth?.idleCars ?? fleetStatusCounts.idle}</strong>
+                      <em>{`${fleetHealth?.stoppedCars ?? fleetStatusCounts.stopped} ${strings.STATUS_STOPPED}`}</em>
+                    </div>
+                    <div className="tracking-map-kpi-card">
+                      <span>{strings.STATUS_STALE}</span>
+                      <strong>{fleetHealth?.staleCars ?? fleetStatusCounts.stale}</strong>
+                      <em>{lastOperationalRefreshAt ? formatTimestamp(lastOperationalRefreshAt) : strings.NO_DATA}</em>
+                    </div>
+                  </div>
+                  <div className="tracking-map-badges">
+                    <Chip color={integrationEnabled ? 'success' : 'error'} label={integrationEnabled ? strings.SYSTEM_ONLINE : strings.INTEGRATION_DISABLED} />
+                    {selectedCar && <Chip color={selectedStatusTone} label={`${selectedCar.name} • ${selectedStatusLabel}`} />}
+                  </div>
                 </div>
                 <div className="tracking-map-legend-card">
-                  <Typography className="tracking-map-legend-title">{mapMode === 'fleet' ? strings.MAP_OVERVIEW : strings.SELECTED_VEHICLE}</Typography>
+                  <Typography className="tracking-map-legend-title">{mapMode === 'fleet' ? strings.FLEET_LEGEND : strings.SELECTED_VEHICLE}</Typography>
                   <div className="tracking-map-legend">
                     {mapMode === 'fleet'
                       ? (
                         <>
-                          <span><i className="tracking-legend-dot tracking-legend-dot--fleet" /> {strings.ONLINE_DEVICES}</span>
+                          <span><i className="tracking-legend-dot tracking-legend-dot--fleet" /> {strings.STATUS_MOVING}</span>
+                          <span><i className="tracking-legend-dot tracking-legend-dot--warning" /> {strings.STATUS_IDLE}</span>
                           <span><i className="tracking-legend-dot tracking-legend-dot--selected" /> {strings.SELECTED_VEHICLE}</span>
-                          <span><i className="tracking-legend-dot tracking-legend-dot--warning" /> {strings.TRACKING_ENABLED}</span>
-                          <span><i className="tracking-legend-dot tracking-legend-dot--offline" /> {strings.TRACKING_DISABLED}</span>
+                          <span><i className="tracking-legend-dot tracking-legend-dot--offline" /> {strings.STATUS_OFFLINE}</span>
                         </>
                         )
                       : (
@@ -2634,12 +3146,20 @@ const Tracking = () => {
               )}
             </div>
 
-            <aside className="tracking-panel">
-              <div className="tracking-dock__topbar">
-                <div className="tracking-dock__brand">
+            <aside className="tracking-panel tracking-panel--product">
+              <div className="tracking-panel__hero">
+                <div className="tracking-panel__hero-copy">
                   <span>{strings.TITLE}</span>
-                  <strong>{mapMode === 'fleet' ? strings.LIVE_FLEET : selectedCar?.name || strings.SELECT_CAR}</strong>
+                  <strong>{strings.TRACKING_WORKSPACE}</strong>
+                  <p>{strings.TRACKING_WORKSPACE_SUBTITLE}</p>
                 </div>
+                <div className="tracking-panel__hero-chips">
+                  <Chip size="small" color={integrationEnabled ? 'success' : 'default'} label={integrationEnabled ? strings.SYSTEM_ONLINE : strings.SYSTEM_OFFLINE} />
+                  <Chip size="small" label={`${fleetHealth?.staleCars ?? fleetStatusCounts.stale} ${strings.STATUS_STALE}`} />
+                </div>
+              </div>
+
+              <div className="tracking-panel__primary">
                 <ToggleButtonGroup
                   value={mapMode}
                   exclusive
@@ -2650,9 +3170,7 @@ const Tracking = () => {
                   <ToggleButton value="fleet">{strings.FLEET_MODE}</ToggleButton>
                   <ToggleButton value="single">{strings.SINGLE_MODE}</ToggleButton>
                 </ToggleButtonGroup>
-              </div>
 
-              <div className="tracking-dock__controls">
                 <FormControl className="tracking-car-select">
                   <InputLabel>{strings.SELECT_CAR}</InputLabel>
                   <Select
@@ -2674,20 +3192,24 @@ const Tracking = () => {
                     {strings.LOAD_SNAPSHOT}
                   </Button>
                 </div>
-              </div>
 
-              <div className="tracking-dock__summary">
-                <div className="tracking-panel__summary-item">
-                  <span>{strings.SELECTED_VEHICLE}</span>
-                  <strong>{selectedCar?.name || strings.NO_DATA}</strong>
-                </div>
-                <div className="tracking-panel__summary-item">
-                  <span>{strings.DEVICE_STATUS}</span>
-                  <strong>{selectedStatusLabel}</strong>
-                </div>
-                <div className="tracking-panel__summary-item">
-                  <span>{strings.CURRENT_POSITION}</span>
-                  <strong>{currentPoint ? `${formatCoordinate(currentPosition?.latitude)}, ${formatCoordinate(currentPosition?.longitude)}` : '-'}</strong>
+                <div className="tracking-ops-metrics">
+                  <div className="tracking-panel__summary-item">
+                    <span>{strings.SELECTED_VEHICLE}</span>
+                    <strong>{selectedCar?.name || strings.NO_DATA}</strong>
+                  </div>
+                  <div className="tracking-panel__summary-item">
+                    <span>{strings.DEVICE_STATUS}</span>
+                    <strong>{selectedStatusLabel}</strong>
+                  </div>
+                  <div className="tracking-panel__summary-item">
+                    <span>{strings.CURRENT_POSITION}</span>
+                    <strong>{currentPoint ? `${formatCoordinate(currentPosition?.latitude)}, ${formatCoordinate(currentPosition?.longitude)}` : '-'}</strong>
+                  </div>
+                  <div className="tracking-panel__summary-item">
+                    <span>{strings.LAST_UPDATE}</span>
+                    <strong>{lastOperationalRefreshAt ? formatTimestamp(lastOperationalRefreshAt) : strings.NO_DATA}</strong>
+                  </div>
                 </div>
               </div>
 
@@ -2713,7 +3235,7 @@ const Tracking = () => {
                   })}
                 </div>
 
-                <div className="tracking-sidebar__content">
+                <div className="tracking-sidebar__content tracking-sidebar__content--product">
                   {renderSectionBody(activePanelSection)}
                 </div>
               </div>

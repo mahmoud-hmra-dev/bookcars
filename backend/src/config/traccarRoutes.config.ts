@@ -10,8 +10,10 @@ const routes = {
   unlink: '/api/unlink/:carId',
   positions: '/api/positions/:carId',
   route: '/api/route/:carId',
+  reports: '/api/reports/:carId',
   geofences: '/api/geofences/:carId',
   geofenceAlerts: '/api/geofence-alerts/:carId',
+  eventCenter: '/api/events-center',
 }
 
 export default routes

@@ -8,23 +8,20 @@ export interface TraccarLinkPayload {
   enabled?: boolean
 }
 
-export interface TraccarFleetItem {
-  carId: string
-  deviceId: number
-  trackingEnabled: boolean
-  deviceName?: string
-  deviceStatus?: string
-  lastEventType?: string
-  lastSyncedAt?: Date | string
-  position: bookcarsTypes.TraccarPosition | null
-}
-
 export interface TraccarGeofenceEditorPayload {
   name: string
   description?: string
   area: string
   calendarId?: number
   attributes?: Record<string, any>
+}
+
+export interface TraccarEventCenterParams {
+  carId?: string
+  from: string
+  to: string
+  types?: string[]
+  limit?: number
 }
 
 export const getStatus = (): Promise<{ enabled: boolean, baseUrl: string }> =>
@@ -37,7 +34,7 @@ export const getDevices = (): Promise<bookcarsTypes.TraccarDevice[]> =>
     .get('/api/devices', { withCredentials: true })
     .then((res) => res.data)
 
-export const getFleetOverview = (): Promise<TraccarFleetItem[]> =>
+export const getFleetOverview = (): Promise<{ items: bookcarsTypes.TraccarFleetItem[], health: bookcarsTypes.TraccarFleetHealth }> =>
   axiosInstance
     .get('/api/fleet', { withCredentials: true })
     .then((res) => res.data)
@@ -92,6 +89,11 @@ export const getRoute = (carId: string, from: string, to: string): Promise<bookc
     .get(`/api/route/${encodeURIComponent(carId)}`, { params: { from, to }, withCredentials: true })
     .then((res) => res.data)
 
+export const getVehicleReports = (carId: string, from: string, to: string): Promise<bookcarsTypes.TraccarVehicleReportBundle> =>
+  axiosInstance
+    .get(`/api/reports/${encodeURIComponent(carId)}`, { params: { from, to }, withCredentials: true })
+    .then((res) => res.data)
+
 export const getGeofences = (carId: string): Promise<bookcarsTypes.TraccarGeofence[]> =>
   axiosInstance
     .get(`/api/geofences/${encodeURIComponent(carId)}`, { withCredentials: true })
@@ -100,4 +102,15 @@ export const getGeofences = (carId: string): Promise<bookcarsTypes.TraccarGeofen
 export const getGeofenceAlerts = (carId: string, from: string, to: string): Promise<bookcarsTypes.TraccarEvent[]> =>
   axiosInstance
     .get(`/api/geofence-alerts/${encodeURIComponent(carId)}`, { params: { from, to }, withCredentials: true })
+    .then((res) => res.data)
+
+export const getEventCenter = (params: TraccarEventCenterParams): Promise<bookcarsTypes.TraccarEventCenterEntry[]> =>
+  axiosInstance
+    .get('/api/events-center', {
+      params: {
+        ...params,
+        types: params.types && params.types.length > 0 ? params.types.join(',') : undefined,
+      },
+      withCredentials: true,
+    })
     .then((res) => res.data)

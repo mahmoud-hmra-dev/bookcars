@@ -213,6 +213,21 @@ const getFallbackGeofenceIds = async (deviceId: number) => {
   return geofenceIds
 }
 
+const getEventsFromReports = async (params: {
+  deviceId: number | number[]
+  from: string
+  to: string
+  type?: string | string[]
+}) => {
+  const response = await getClient().get('/api/reports/events', { params })
+  return response.data as bookcarsTypes.TraccarEvent[]
+}
+
+const mapListReport = async <T>(path: string, deviceId: number, from: string, to: string) => {
+  const response = await getClient().get(path, { params: { deviceId, from, to } })
+  return (response.data || []) as T[]
+}
+
 export const isConfigured = () => env.TRACCAR_ENABLED && !!env.TRACCAR_USERNAME && !!env.TRACCAR_PASSWORD
 
 export const getDevices = async (): Promise<bookcarsTypes.TraccarDevice[]> => {
@@ -367,6 +382,55 @@ export const getEvents = async (deviceId: number, from: string, to: string, type
       return []
     }
   }
+}
+
+export const getFleetEvents = async (
+  deviceIds: number[],
+  from: string,
+  to: string,
+  types?: string[],
+): Promise<bookcarsTypes.TraccarEvent[]> => {
+  ensureEnabled()
+
+  const filteredDeviceIds = [...new Set(deviceIds.filter((deviceId) => Number.isFinite(deviceId)))]
+  if (!filteredDeviceIds.length) {
+    return []
+  }
+
+  try {
+    return await getEventsFromReports({
+      deviceId: filteredDeviceIds,
+      from,
+      to,
+      type: types && types.length > 0 ? types : undefined,
+    })
+  } catch (error) {
+    if (!isNotFoundError(error)) {
+      throw error
+    }
+
+    const batches = await Promise.all(
+      filteredDeviceIds.map((deviceId) => getEvents(deviceId, from, to, types && types.length === 1 ? types[0] : undefined)),
+    )
+
+    return batches.flat()
+  }
+}
+
+export const getStops = async (deviceId: number, from: string, to: string): Promise<bookcarsTypes.TraccarStopReport[]> => {
+  ensureEnabled()
+  return mapListReport<bookcarsTypes.TraccarStopReport>('/api/reports/stops', deviceId, from, to)
+}
+
+export const getTrips = async (deviceId: number, from: string, to: string): Promise<bookcarsTypes.TraccarTripReport[]> => {
+  ensureEnabled()
+  return mapListReport<bookcarsTypes.TraccarTripReport>('/api/reports/trips', deviceId, from, to)
+}
+
+export const getSummary = async (deviceId: number, from: string, to: string): Promise<bookcarsTypes.TraccarSummaryReport | null> => {
+  ensureEnabled()
+  const items = await mapListReport<bookcarsTypes.TraccarSummaryReport>('/api/reports/summary', deviceId, from, to)
+  return items[0] || null
 }
 
 export const getSnapshot = async (deviceId: number) => {

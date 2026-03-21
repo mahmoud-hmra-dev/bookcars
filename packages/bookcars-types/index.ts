@@ -241,6 +241,116 @@ export interface TraccarGeofence {
   attributes?: Record<string, any>
 }
 
+export type TraccarFleetStatus =
+  | 'moving'
+  | 'idle'
+  | 'stopped'
+  | 'offline'
+  | 'stale'
+  | 'noGps'
+  | 'unlinked'
+
+export interface TraccarFleetItem {
+  carId: string
+  carName?: string
+  supplierName?: string
+  licensePlate?: string
+  deviceId?: number
+  trackingEnabled: boolean
+  deviceName?: string
+  deviceStatus?: string
+  movementStatus?: TraccarFleetStatus
+  stale?: boolean
+  staleMinutes?: number
+  lastEventType?: string
+  lastSyncedAt?: Date | string
+  lastPositionAt?: Date | string
+  lastDeviceUpdate?: Date | string
+  ignition?: boolean
+  motion?: boolean
+  speedKmh?: number
+  odometer?: number
+  batteryLevel?: number
+  address?: string
+  position: TraccarPosition | null
+}
+
+export interface TraccarFleetHealth {
+  totalCars: number
+  linkedCars: number
+  liveCars: number
+  onlineCars: number
+  movingCars: number
+  idleCars: number
+  stoppedCars: number
+  offlineCars: number
+  staleCars: number
+  noGpsCars: number
+  unlinkedCars: number
+  lastRefreshAt: Date | string
+}
+
+export interface TraccarEventCenterEntry {
+  id?: number | string
+  carId?: string
+  carName?: string
+  supplierName?: string
+  licensePlate?: string
+  deviceId?: number
+  deviceName?: string
+  geofenceId?: number
+  geofenceName?: string
+  type?: string
+  eventTime?: Date | string
+  positionId?: number
+  address?: string
+  speed?: number
+  attributes?: Record<string, any>
+  event: TraccarEvent
+}
+
+export interface TraccarStopReport {
+  deviceId?: number
+  startTime?: Date | string
+  endTime?: Date | string
+  duration?: number
+  engineHours?: number
+  latitude?: number
+  longitude?: number
+  address?: string
+}
+
+export interface TraccarTripReport {
+  deviceId?: number
+  startTime?: Date | string
+  endTime?: Date | string
+  duration?: number
+  distance?: number
+  averageSpeed?: number
+  maxSpeed?: number
+  startLatitude?: number
+  startLongitude?: number
+  startAddress?: string
+  endLatitude?: number
+  endLongitude?: number
+  endAddress?: string
+}
+
+export interface TraccarSummaryReport {
+  deviceId?: number
+  distance?: number
+  averageSpeed?: number
+  maxSpeed?: number
+  engineHours?: number
+  spentFuel?: number
+}
+
+export interface TraccarVehicleReportBundle {
+  summary: TraccarSummaryReport | null
+  trips: TraccarTripReport[]
+  stops: TraccarStopReport[]
+}
+
 export interface UpsertTraccarGeofencePayload {
   name: string
   description?: string

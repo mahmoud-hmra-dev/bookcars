@@ -71,6 +71,152 @@ const getPositionDate = (position?: bookcarsTypes.TraccarPosition | null) => {
   return Number.isFinite(date) ? date : 0
 }
 
+const getPositionTimestamp = (position?: bookcarsTypes.TraccarPosition | null) => (
+  position?.deviceTime || position?.fixTime || position?.serverTime
+)
+
+const FLEET_STALE_AFTER_MINUTES = 15
+const MOVING_SPEED_KMH = 8
+const STOPPED_SPEED_KMH = 1
+const DEFAULT_EVENT_LIMIT = 80
+
+const getTrackedCars = () => Car.find({
+  'tracking.enabled': true,
+  'tracking.deviceId': { $exists: true, $ne: null },
+}).populate('supplier', 'fullName')
+
+const getDateValue = (value?: Date | string | number | null) => {
+  if (!value) {
+    return 0
+  }
+
+  const date = new Date(value).getTime()
+  return Number.isFinite(date) ? date : 0
+}
+
+const getPositionAttributes = (position?: bookcarsTypes.TraccarPosition | null) => position?.attributes || {}
+
+const getBooleanAttribute = (source: Record<string, any>, keys: string[]) => {
+  for (const key of keys) {
+    const value = source[key]
+    if (typeof value === 'boolean') {
+      return value
+    }
+    if (typeof value === 'number') {
+      return value > 0
+    }
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase()
+      if (['true', 'yes', 'on', '1'].includes(normalized)) {
+        return true
+      }
+      if (['false', 'no', 'off', '0'].includes(normalized)) {
+        return false
+      }
+    }
+  }
+
+  return undefined
+}
+
+const getNumberAttribute = (source: Record<string, any>, keys: string[]) => {
+  for (const key of keys) {
+    const value = source[key]
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value
+    }
+    if (typeof value === 'string') {
+      const parsed = Number.parseFloat(value)
+      if (Number.isFinite(parsed)) {
+        return parsed
+      }
+    }
+  }
+
+  return undefined
+}
+
+const resolveFleetStatus = ({
+  isLinked,
+  deviceStatus,
+  position,
+  stale,
+  speedKmh,
+  ignition,
+  motion,
+}: {
+  isLinked: boolean
+  deviceStatus?: string
+  position: bookcarsTypes.TraccarPosition | null
+  stale: boolean
+  speedKmh: number
+  ignition?: boolean
+  motion?: boolean
+}): bookcarsTypes.TraccarFleetStatus => {
+  if (!isLinked) {
+    return 'unlinked'
+  }
+
+  const normalizedDeviceStatus = deviceStatus?.trim().toLowerCase()
+  if (normalizedDeviceStatus === 'offline') {
+    return 'offline'
+  }
+
+  if (!position) {
+    return normalizedDeviceStatus === 'online' ? 'noGps' : 'offline'
+  }
+
+  if (stale) {
+    return 'stale'
+  }
+
+  if (speedKmh >= MOVING_SPEED_KMH || motion === true) {
+    return 'moving'
+  }
+
+  if (speedKmh > STOPPED_SPEED_KMH || ignition === true) {
+    return 'idle'
+  }
+
+  return 'stopped'
+}
+
+const buildFleetHealth = (items: bookcarsTypes.TraccarFleetItem[]): bookcarsTypes.TraccarFleetHealth => ({
+  totalCars: items.length,
+  linkedCars: items.filter((item) => typeof item.deviceId === 'number').length,
+  liveCars: items.filter((item) => !!item.position).length,
+  onlineCars: items.filter((item) => item.deviceStatus?.trim().toLowerCase() === 'online').length,
+  movingCars: items.filter((item) => item.movementStatus === 'moving').length,
+  idleCars: items.filter((item) => item.movementStatus === 'idle').length,
+  stoppedCars: items.filter((item) => item.movementStatus === 'stopped').length,
+  offlineCars: items.filter((item) => item.movementStatus === 'offline').length,
+  staleCars: items.filter((item) => item.movementStatus === 'stale').length,
+  noGpsCars: items.filter((item) => item.movementStatus === 'noGps').length,
+  unlinkedCars: items.filter((item) => item.movementStatus === 'unlinked').length,
+  lastRefreshAt: new Date(),
+})
+
+const parseEventTypes = (value: unknown) => {
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => `${entry}`.split(',')).map((entry) => entry.trim()).filter(Boolean)
+  }
+
+  if (typeof value === 'string') {
+    return value.split(',').map((entry) => entry.trim()).filter(Boolean)
+  }
+
+  return []
+}
+
+const getSupplierName = (car: any) => {
+  const supplier = car?.supplier
+  if (supplier && typeof supplier === 'object' && typeof supplier.fullName === 'string') {
+    return supplier.fullName
+  }
+
+  return undefined
+}
+
 export const getDevices = async (_req: Request, res: Response) => {
   try {
     const devices = await traccarService.getDevices()
@@ -93,13 +239,13 @@ export const getAllGeofences = async (_req: Request, res: Response) => {
 
 export const getFleetOverview = async (_req: Request, res: Response) => {
   try {
-    const cars = await Car.find({
-      'tracking.enabled': true,
-      'tracking.deviceId': { $exists: true, $ne: null },
-    })
+    const cars = await getTrackedCars()
 
     if (!cars.length) {
-      res.json([])
+      res.json({
+        items: [],
+        health: buildFleetHealth([]),
+      })
       return
     }
 
@@ -129,21 +275,64 @@ export const getFleetOverview = async (_req: Request, res: Response) => {
       }
     }
 
-    res.json(cars.map((car) => {
+    const now = Date.now()
+    const items = cars.map((car) => {
       const linkedDeviceId = car.tracking?.deviceId as number
       const device = deviceById.get(linkedDeviceId)
+      const position = latestPositionByDeviceId.get(linkedDeviceId) || null
+      const positionAttributes = getPositionAttributes(position)
+      const speedKmh = typeof position?.speed === 'number' && Number.isFinite(position.speed)
+        ? Math.round(position.speed * 1.852 * 100) / 100
+        : 0
+      const ignition = getBooleanAttribute(positionAttributes, ['ignition', 'ignitionOn', 'io239'])
+      const motion = getBooleanAttribute(positionAttributes, ['motion', 'moving'])
+      const batteryLevel = getNumberAttribute(positionAttributes, ['batteryLevel', 'battery', 'charge'])
+      const odometer = getNumberAttribute(positionAttributes, ['odometer', 'totalDistance'])
+      const lastPositionAt = getPositionTimestamp(position)
+      const lastDeviceUpdate = device?.lastUpdate
+      const lastSeenAt = Math.max(getDateValue(lastPositionAt), getDateValue(lastDeviceUpdate), getDateValue(car.tracking?.lastSyncedAt))
+      const staleMinutes = lastSeenAt > 0 ? Math.max(0, Math.round((now - lastSeenAt) / 60000)) : undefined
+      const stale = typeof staleMinutes === 'number' ? staleMinutes >= FLEET_STALE_AFTER_MINUTES : false
+      const movementStatus = resolveFleetStatus({
+        isLinked: typeof linkedDeviceId === 'number',
+        deviceStatus: device?.status || car.tracking?.status,
+        position,
+        stale,
+        speedKmh,
+        ignition,
+        motion,
+      })
 
       return {
         carId: String(car._id),
+        carName: car.name,
+        supplierName: getSupplierName(car),
+        licensePlate: car.licensePlate,
         deviceId: linkedDeviceId,
         trackingEnabled: !!car.tracking?.enabled,
         deviceName: device?.name || car.tracking?.deviceName,
         deviceStatus: device?.status || car.tracking?.status,
+        movementStatus,
+        stale,
+        staleMinutes,
         lastEventType: car.tracking?.lastEventType,
         lastSyncedAt: car.tracking?.lastSyncedAt,
-        position: latestPositionByDeviceId.get(linkedDeviceId) || null,
-      }
-    }))
+        lastPositionAt,
+        lastDeviceUpdate,
+        ignition,
+        motion,
+        speedKmh,
+        odometer,
+        batteryLevel,
+        address: position?.address,
+        position,
+      } satisfies bookcarsTypes.TraccarFleetItem
+    })
+
+    res.json({
+      items,
+      health: buildFleetHealth(items),
+    })
   } catch (err) {
     logger.error('[traccar.getFleetOverview] Error', err)
     res.status(400).send(String(err))
@@ -360,6 +549,133 @@ export const getGeofenceAlerts = async (req: Request, res: Response) => {
     res.json(events)
   } catch (err) {
     logger.error('[traccar.getGeofenceAlerts] Error', err)
+    res.status(400).send(String(err))
+  }
+}
+
+export const getEventCenter = async (req: Request, res: Response) => {
+  try {
+    const now = new Date()
+    const from = parseDate(req.query.from as string | undefined, new Date(now.getTime() - 24 * 60 * 60 * 1000))
+    const to = parseDate(req.query.to as string | undefined, now)
+    const limitValue = Number.parseInt(req.query.limit as string, 10)
+    const limit = Number.isFinite(limitValue) && limitValue > 0 ? limitValue : DEFAULT_EVENT_LIMIT
+    const eventTypes = parseEventTypes(req.query.types)
+
+    const cars = req.query.carId
+      ? [await getCarWithTracking(req.query.carId as string)]
+      : await getTrackedCars()
+
+    if (!cars.length) {
+      res.json([])
+      return
+    }
+
+    const geofencesPromise = traccarService.getGeofences().catch(() => [])
+    const deviceById = new Map<number, {
+      carId: string
+      carName?: string
+      supplierName?: string
+      licensePlate?: string
+      deviceName?: string
+    }>()
+
+    for (const car of cars) {
+      const deviceId = car.tracking?.deviceId
+      if (typeof deviceId !== 'number') {
+        continue
+      }
+
+      deviceById.set(deviceId, {
+        carId: String(car._id),
+        carName: car.name,
+        supplierName: getSupplierName(car),
+        licensePlate: car.licensePlate,
+        deviceName: car.tracking?.deviceName,
+      })
+    }
+
+    const deviceIds = [...deviceById.keys()]
+    const [events, geofences] = await Promise.all([
+      traccarService.getFleetEvents(deviceIds, from.toISOString(), to.toISOString(), eventTypes.length > 0 ? eventTypes : undefined),
+      geofencesPromise,
+    ])
+
+    const geofenceLookup = new Map<number, string>()
+    geofences.forEach((geofence) => {
+      if (typeof geofence.id === 'number' && geofence.name) {
+        geofenceLookup.set(geofence.id, geofence.name)
+      }
+    })
+
+    const enriched = (events
+      .map((event): bookcarsTypes.TraccarEventCenterEntry | null => {
+        const deviceId = event.deviceId
+        const meta = typeof deviceId === 'number' ? deviceById.get(deviceId) : undefined
+        if (!meta) {
+          return null
+        }
+
+        const speed = getNumberAttribute(event.attributes || {}, ['speed'])
+        const address = typeof event.attributes?.address === 'string' ? event.attributes.address : undefined
+
+        return {
+          id: event.id,
+          carId: meta.carId,
+          carName: meta.carName,
+          supplierName: meta.supplierName,
+          licensePlate: meta.licensePlate,
+          deviceId,
+          deviceName: meta.deviceName,
+          geofenceId: event.geofenceId,
+          geofenceName: typeof event.geofenceId === 'number' ? geofenceLookup.get(event.geofenceId) : undefined,
+          type: event.type,
+          eventTime: event.eventTime,
+          positionId: getNumberAttribute(event.attributes || {}, ['positionId']),
+          address,
+          speed,
+          attributes: event.attributes,
+          event,
+        } satisfies bookcarsTypes.TraccarEventCenterEntry
+      })
+      .filter(Boolean) as bookcarsTypes.TraccarEventCenterEntry[])
+      .sort((left, right) => getDateValue(right.eventTime) - getDateValue(left.eventTime))
+      .slice(0, limit)
+
+    res.json(enriched)
+  } catch (err) {
+    logger.error('[traccar.getEventCenter] Error', err)
+    res.status(400).send(String(err))
+  }
+}
+
+export const getVehicleReports = async (req: Request, res: Response) => {
+  try {
+    const car = await getCarWithTracking(req.params.carId)
+    const now = new Date()
+    const from = parseDate(req.query.from as string | undefined, new Date(now.getTime() - 24 * 60 * 60 * 1000))
+    const to = parseDate(req.query.to as string | undefined, now)
+
+    const [summary, trips, stops] = await Promise.all([
+      traccarService.getSummary(car.tracking?.deviceId as number, from.toISOString(), to.toISOString()).catch(() => null),
+      traccarService.getTrips(car.tracking?.deviceId as number, from.toISOString(), to.toISOString()).catch(() => []),
+      traccarService.getStops(car.tracking?.deviceId as number, from.toISOString(), to.toISOString()).catch(() => []),
+    ])
+
+    car.tracking = {
+      ...car.tracking,
+      lastSyncedAt: new Date(),
+    }
+
+    await car.save()
+
+    res.json({
+      summary,
+      trips,
+      stops,
+    } satisfies bookcarsTypes.TraccarVehicleReportBundle)
+  } catch (err) {
+    logger.error('[traccar.getVehicleReports] Error', err)
     res.status(400).send(String(err))
   }
 }
