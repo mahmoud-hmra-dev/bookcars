@@ -336,15 +336,64 @@ export const parseEditableGeofence = (geofence: bookcarsTypes.TraccarGeofence): 
       : null
   }
 
+  const geometry = geofence.geojson?.type === 'Feature' ? geofence.geojson.geometry : geofence.geojson
+  if (geometry?.type === 'LineString') {
+    const points = (geometry.coordinates || []).map((coordinate: [number, number]) => [coordinate[1], coordinate[0]] as LatLngTuple)
+    return points.length >= 2 ? { type: 'polyline', points } : null
+  }
+
+  if (geometry?.type === 'Polygon') {
+    const ring = (geometry.coordinates?.[0] || []).map((coordinate: [number, number]) => [coordinate[1], coordinate[0]] as LatLngTuple)
+    const points = openPolygon(ring)
+    return points.length >= 3 ? { type: 'polygon', points } : null
+  }
+
+  if (geometry?.type === 'MultiPolygon') {
+    const ring = (geometry.coordinates?.[0]?.[0] || []).map((coordinate: [number, number]) => [coordinate[1], coordinate[0]] as LatLngTuple)
+    const points = openPolygon(ring)
+    return points.length >= 3 ? { type: 'polygon', points } : null
+  }
+
+  if (area.toUpperCase().startsWith('RECTANGLE')) {
+    const values = (area.match(/[+-]?\d+(?:\.\d+)?/g) || [])
+      .map((value) => Number.parseFloat(value))
+      .filter((value) => Number.isFinite(value))
+
+    if (values.length >= 4) {
+      const [lat1, lng1] = normalizeLatLngOrder(values[0], values[1])
+      const [lat2, lng2] = normalizeLatLngOrder(values[2], values[3])
+      const north = Math.max(lat1, lat2)
+      const south = Math.min(lat1, lat2)
+      const east = Math.max(lng1, lng2)
+      const west = Math.min(lng1, lng2)
+
+      return {
+        type: 'polygon',
+        points: [
+          [north, west],
+          [north, east],
+          [south, east],
+          [south, west],
+        ],
+      }
+    }
+  }
+
   try {
-    const geometry = wellknown.parse(area)
-    if (geometry?.type === 'LineString') {
-      const points = (geometry.coordinates || []).map((coordinate) => [coordinate[1], coordinate[0]] as LatLngTuple)
+    const wktGeometry = wellknown.parse(area)
+    if (wktGeometry?.type === 'LineString') {
+      const points = (wktGeometry.coordinates || []).map((coordinate) => [coordinate[1], coordinate[0]] as LatLngTuple)
       return points.length >= 2 ? { type: 'polyline', points } : null
     }
 
-    if (geometry?.type === 'Polygon') {
-      const ring = (geometry.coordinates?.[0] || []).map((coordinate) => [coordinate[1], coordinate[0]] as LatLngTuple)
+    if (wktGeometry?.type === 'Polygon') {
+      const ring = (wktGeometry.coordinates?.[0] || []).map((coordinate) => [coordinate[1], coordinate[0]] as LatLngTuple)
+      const points = openPolygon(ring)
+      return points.length >= 3 ? { type: 'polygon', points } : null
+    }
+
+    if (wktGeometry?.type === 'MultiPolygon') {
+      const ring = (wktGeometry.coordinates?.[0]?.[0] || []).map((coordinate) => [coordinate[1], coordinate[0]] as LatLngTuple)
       const points = openPolygon(ring)
       return points.length >= 3 ? { type: 'polygon', points } : null
     }
@@ -496,7 +545,9 @@ export const buildGeofencePayload = ({
   }
 
   if (draft.type === 'circle') {
-    const radius = Number.parseFloat(radiusText)
+    const radius = Number.isFinite(draft.radius) && draft.radius > 0
+      ? draft.radius
+      : Number.parseFloat(radiusText)
     if (![draft.center[0], draft.center[1], radius].every((value) => Number.isFinite(value)) || radius <= 0) {
       throw new Error('Invalid geofence radius')
     }

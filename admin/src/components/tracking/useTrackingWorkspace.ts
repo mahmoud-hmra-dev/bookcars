@@ -159,11 +159,23 @@ export const useTrackingWorkspace = () => {
       .filter((shape): shape is ParsedGeofence => shape !== null)
   ), [linkedGeofences])
 
+  const allGeofenceShapes = useMemo(() => (
+    managedGeofences
+      .map((geofence, index) => parseGeofenceArea(geofence, index))
+      .filter((shape): shape is ParsedGeofence => shape !== null)
+  ), [managedGeofences])
+
   const visibleGeofenceShapes = useMemo(() => (
-    editingGeofenceId === null
-      ? geofenceShapes
-      : geofenceShapes.filter((shape) => `${shape.id}` !== `${editingGeofenceId}`)
-  ), [editingGeofenceId, geofenceShapes])
+    (() => {
+      const baseShapes = sidebarView === 'vehicle' && activeTab === 'geofences'
+        ? allGeofenceShapes
+        : geofenceShapes
+
+      return editingGeofenceId === null
+        ? baseShapes
+        : baseShapes.filter((shape) => `${shape.id}` !== `${editingGeofenceId}`)
+    })()
+  ), [activeTab, allGeofenceShapes, editingGeofenceId, geofenceShapes, sidebarView])
 
   const routeFrames = useMemo(() => buildRouteFrames(route), [route])
   const rawRoutePoints = useMemo(() => routeFrames.map((frame) => frame.point), [routeFrames])
@@ -541,7 +553,11 @@ export const useTrackingWorkspace = () => {
   }
 
   const handleStartZoneDrawing = () => {
-    setZoneDrawingMode((current) => (current === zoneFormType ? null : zoneFormType))
+    const nextDrawingMode = zoneDrawingMode === zoneFormType ? null : zoneFormType
+    if (nextDrawingMode) {
+      setZoneDraft(null)
+    }
+    setZoneDrawingMode(nextDrawingMode)
     focusMap('selected')
   }
 
@@ -738,6 +754,15 @@ export const useTrackingWorkspace = () => {
     setDeviceName(selectedCar.tracking?.deviceName || '')
     setNotes(selectedCar.tracking?.notes || '')
   }, [selectedCar])
+
+  useEffect(() => {
+    if (zoneDraft?.type !== 'circle') {
+      return
+    }
+
+    const nextRadius = `${Math.round(zoneDraft.radius * 100) / 100}`
+    setZoneFormRadius((current) => (current === nextRadius ? current : nextRadius))
+  }, [zoneDraft])
 
   useEffect(() => {
     const match = commandTypes.find((type) => type.type === selectedCommandType)
