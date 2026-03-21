@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
   Alert,
-  BottomNavigation,
-  BottomNavigationAction,
   Button,
   Chip,
   FormControl,
@@ -14,6 +12,8 @@ import {
   Paper,
   Select,
   Switch,
+  Tab,
+  Tabs,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
@@ -3168,43 +3168,46 @@ const Tracking = () => {
   }
 
   const renderPanelNavigation = () => (
-    <div className={`tracking-sidebar__nav${isMobileLayout ? ' tracking-sidebar__nav--mobile' : ''}`}>
-      {sectionItems.map((section) => {
-        const isActive = activePanelSection === section.id
-
-        return (
-          <button
+    <Paper className="tracking-pane__tabs" elevation={0}>
+      <Tabs
+        value={activePanelSection}
+        onChange={(_event, value: TrackingPanelSection) => focusPanelSection(value)}
+        variant="scrollable"
+        scrollButtons="auto"
+        allowScrollButtonsMobile
+        className="tracking-pane__tabs-control"
+      >
+        {sectionItems.map((section) => (
+          <Tab
             key={section.id}
-            type="button"
-            className={`tracking-sidebar__nav-item${isActive ? ' is-active' : ''}`}
-            onClick={() => focusPanelSection(section.id)}
-          >
-            <span className="tracking-sidebar__nav-icon">{section.icon}</span>
-            <span className="tracking-sidebar__nav-copy">
-              <strong>{section.title}</strong>
-              <em>{section.summary}</em>
-            </span>
-          </button>
-        )
-      })}
-    </div>
+            value={section.id}
+            icon={section.icon}
+            iconPosition="start"
+            label={section.title}
+            className="tracking-pane__tab"
+          />
+        ))}
+      </Tabs>
+      <div className="tracking-pane__tabs-summary">
+        {sectionItems.find((section) => section.id === activePanelSection)?.summary || strings.NO_DATA}
+      </div>
+    </Paper>
   )
 
   const renderOperationsHeader = () => (
     <>
-      <div className="tracking-pane__hero">
-        <div className="tracking-pane__hero-copy">
+      <div className="tracking-pane__topbar">
+        <div className="tracking-pane__topbar-copy">
           <span>{strings.TITLE}</span>
           <strong>{strings.TRACKING_WORKSPACE}</strong>
-          <p>{strings.TRACKING_WORKSPACE_SUBTITLE}</p>
         </div>
-        <div className="tracking-pane__hero-chips">
+        <div className="tracking-pane__topbar-chips">
           <Chip size="small" color={integrationEnabled ? 'success' : 'default'} label={integrationEnabled ? strings.SYSTEM_ONLINE : strings.SYSTEM_OFFLINE} />
           <Chip size="small" label={`${fleetHealth?.staleCars ?? fleetStatusCounts.stale} ${strings.STATUS_STALE}`} />
         </div>
       </div>
 
-      <div className="tracking-pane__toolbar">
+      <Paper className="tracking-pane__toolbar" elevation={0}>
         <ToggleButtonGroup
           value={mapMode}
           exclusive
@@ -3256,7 +3259,7 @@ const Tracking = () => {
             <strong>{lastOperationalRefreshAt ? formatTimestamp(lastOperationalRefreshAt) : strings.NO_DATA}</strong>
           </div>
         </div>
-      </div>
+      </Paper>
     </>
   )
 
@@ -3426,24 +3429,6 @@ const Tracking = () => {
                 </div>
               )}
             </div>
-
-            {isMobileLayout && (
-              <BottomNavigation
-                showLabels
-                value={activePanelSection}
-                onChange={(_event, value: TrackingPanelSection) => setActivePanelSection(value)}
-                className="tracking-mobile-nav"
-              >
-                {sectionItems.map((section) => (
-                  <BottomNavigationAction
-                    key={section.id}
-                    value={section.id}
-                    icon={section.icon}
-                    label={section.title}
-                  />
-                ))}
-              </BottomNavigation>
-            )}
 
             <aside className="tracking-pane">
               {renderOperationsHeader()}
