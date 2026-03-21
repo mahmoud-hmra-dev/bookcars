@@ -291,6 +291,19 @@ export const getGeofences = async (deviceId?: number): Promise<bookcarsTypes.Tra
   }
 }
 
+export const getGeofence = async (geofenceId: number): Promise<bookcarsTypes.TraccarGeofence> => {
+  ensureEnabled()
+  const response = await getClient().get('/api/geofences', { params: { id: geofenceId } })
+  const geofences = (response.data as bookcarsTypes.TraccarGeofence[]).map(normalizeGeofence)
+  const geofence = geofences.find((item) => item.id === geofenceId)
+
+  if (!geofence) {
+    throw new Error('Geofence not found')
+  }
+
+  return geofence
+}
+
 export const createGeofence = async (payload: bookcarsTypes.UpsertTraccarGeofencePayload): Promise<bookcarsTypes.TraccarGeofence> => {
   ensureEnabled()
   const response = await getClient().post('/api/geofences', sanitizeGeofencePayload(payload))
@@ -299,7 +312,19 @@ export const createGeofence = async (payload: bookcarsTypes.UpsertTraccarGeofenc
 
 export const updateGeofence = async (geofenceId: number, payload: bookcarsTypes.UpsertTraccarGeofencePayload): Promise<bookcarsTypes.TraccarGeofence> => {
   ensureEnabled()
-  const response = await getClient().put(`/api/geofences/${geofenceId}`, sanitizeGeofencePayload(payload))
+  const current = await getGeofence(geofenceId)
+  const next = sanitizeGeofencePayload(payload)
+  const response = await getClient().put(`/api/geofences/${geofenceId}`, {
+    id: geofenceId,
+    name: next.name,
+    description: next.description ?? current.description,
+    area: next.area,
+    calendarId: next.calendarId ?? current.calendarId,
+    attributes: {
+      ...(current.attributes || {}),
+      ...(next.attributes || {}),
+    },
+  })
   return normalizeGeofence(response.data as bookcarsTypes.TraccarGeofence)
 }
 

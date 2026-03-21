@@ -21,22 +21,27 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime'
 import DirectionsCarFilledIcon from '@mui/icons-material/DirectionsCarFilled'
 import LinkIcon from '@mui/icons-material/Link'
 import MyLocationIcon from '@mui/icons-material/MyLocation'
+import PauseIcon from '@mui/icons-material/Pause'
+import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import RadarIcon from '@mui/icons-material/Radar'
+import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import RouteIcon from '@mui/icons-material/Route'
 import SearchIcon from '@mui/icons-material/Search'
 import SensorsIcon from '@mui/icons-material/Sensors'
 import SpeedIcon from '@mui/icons-material/Speed'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
-import { CircleF, DrawingManager, GoogleMap, InfoWindow, MarkerF, PolygonF, PolylineF, RectangleF, type Libraries, useJsApiLoader } from '@react-google-maps/api'
+import { CircleF, DrawingManager, GoogleMap, HeatmapLayer, InfoWindow, MarkerF, PolygonF, PolylineF, RectangleF, type Libraries, useJsApiLoader } from '@react-google-maps/api'
 import * as bookcarsTypes from ':bookcars-types'
 import * as bookcarsHelper from ':bookcars-helper'
 import wellknown from 'wellknown'
+import { Slider } from '@mui/material'
 import Layout from '@/components/Layout'
 import Backdrop from '@/components/SimpleBackdrop'
 import env from '@/config/env.config'
 import { strings as commonStrings } from '@/lang/common'
 import { strings } from '@/lang/tracking'
 import * as helper from '@/utils/helper'
+import { snapRouteToRoads, type RoadPoint } from '@/utils/googleRoads'
 import * as CarService from '@/services/CarService'
 import * as SupplierService from '@/services/SupplierService'
 import * as TraccarService from '@/services/TraccarService'
@@ -79,8 +84,35 @@ type DraftGeofenceShape =
   | { type: 'circle', center: LatLngTuple, radius: number }
   | { type: 'polygon', points: LatLngTuple[] }
   | { type: 'polyline', points: LatLngTuple[] }
+type RouteFrame = {
+  point: LatLngTuple
+  position: bookcarsTypes.TraccarPosition
+  timestampMs: number
+  speed: number
+}
+type RouteHeatmapPoint = {
+  point: LatLngTuple
+  weight: number
+}
+type DetectedStop = {
+  id: string
+  point: LatLngTuple
+  startedAt: number
+  endedAt: number
+  durationMs: number
+  pointCount: number
+}
+type RouteSnapState = {
+  displayPoints: LatLngTuple[]
+  playbackPoints: LatLngTuple[]
+  mode: 'idle' | 'loading' | 'snapped' | 'raw'
+}
 
-const GOOGLE_MAP_LIBRARIES: Libraries = ['drawing']
+const GOOGLE_MAP_LIBRARIES: Libraries = ['drawing', 'visualization']
+const PLAYBACK_SPEED_OPTIONS = [1, 2, 4, 8]
+const STOP_SPEED_THRESHOLD = 3
+const STOP_RADIUS_METERS = 120
+const STOP_MIN_DURATION_MS = 2 * 60 * 1000
 
 const formatDateInput = (date: Date) => date.toISOString().slice(0, 16)
 const isFiniteCoordinate = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
@@ -92,13 +124,36 @@ const fromGoogleLatLng = (point: google.maps.LatLng | google.maps.LatLngLiteral)
 )
 const fromGooglePath = (path: google.maps.MVCArray<google.maps.LatLng>) => path.getArray().map(fromGoogleLatLng)
 
-const formatTimestamp = (value?: Date | string | null) => {
+const formatTimestamp = (value?: Date | string | number | null) => {
   if (!value) {
     return '-'
   }
 
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? `${value}` : date.toLocaleString()
+}
+
+const formatDuration = (durationMs: number) => {
+  const totalMinutes = Math.max(1, Math.round(durationMs / 60000))
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+
+  if (hours > 0 && minutes > 0) {
+    return `${hours}h ${minutes}m`
+  }
+  if (hours > 0) {
+    return `${hours}h`
+  }
+  return `${minutes}m`
+}
+
+const getDateMs = (value?: Date | string | number | null) => {
+  if (!value) {
+    return 0
+  }
+
+  const date = new Date(value).getTime()
+  return Number.isFinite(date) ? date : 0
 }
 
 const normalizeLatLngOrder = (first: number, second: number): LatLngTuple => {
@@ -132,6 +187,59 @@ const extractResultPage = (data: unknown) => {
 const getPositionTimestamp = (position?: bookcarsTypes.TraccarPosition | null) => (
   position?.deviceTime || position?.fixTime || position?.serverTime
 )
+
+const calculateBearing = (from: LatLngTuple, to: LatLngTuple) => {
+  const fromLat = from[0] * (Math.PI / 180)
+  const fromLng = from[1] * (Math.PI / 180)
+  const toLat = to[0] * (Math.PI / 180)
+  const toLng = to[1] * (Math.PI / 180)
+  const deltaLng = toLng - fromLng
+
+  const y = Math.sin(deltaLng) * Math.cos(toLat)
+  const x = (
+    Math.cos(fromLat) * Math.sin(toLat)
+    - Math.sin(fromLat) * Math.cos(toLat) * Math.cos(deltaLng)
+  )
+
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360
+}
+
+const haversineDistanceMeters = (from: LatLngTuple, to: LatLngTuple) => {
+  const earthRadius = 6371000
+  const lat1 = from[0] * (Math.PI / 180)
+  const lat2 = to[0] * (Math.PI / 180)
+  const deltaLat = (to[0] - from[0]) * (Math.PI / 180)
+  const deltaLng = (to[1] - from[1]) * (Math.PI / 180)
+
+  const a = (
+    Math.sin(deltaLat / 2) ** 2
+    + Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) ** 2
+  )
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return earthRadius * c
+}
+
+const buildVehicleSvgUrl = (bodyColor: string, accentColor: string, rotation: number) => {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72">
+      <defs>
+        <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+          <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="rgba(15,23,42,0.35)"/>
+        </filter>
+      </defs>
+      <g transform="rotate(${rotation} 36 36)" filter="url(#shadow)">
+        <path d="M36 7C24 7 17 15 17 25v21c0 6 5 11 11 11h16c6 0 11-5 11-11V25C55 15 48 7 36 7Z" fill="${bodyColor}" stroke="#ffffff" stroke-width="3" stroke-linejoin="round"/>
+        <path d="M27 17h18c4 0 7 3 7 7v8H20v-8c0-4 3-7 7-7Z" fill="${accentColor}" fill-opacity="0.95"/>
+        <path d="M24 37h24v8c0 3-3 6-6 6H30c-3 0-6-3-6-6v-8Z" fill="#ffffff" fill-opacity="0.18"/>
+        <circle cx="28" cy="47" r="4" fill="#0f172a" stroke="#ffffff" stroke-width="2"/>
+        <circle cx="44" cy="47" r="4" fill="#0f172a" stroke="#ffffff" stroke-width="2"/>
+        <path d="M36 6l7 10H29L36 6Z" fill="#ffffff" fill-opacity="0.9"/>
+      </g>
+    </svg>
+  `.trim()
+
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
+}
 
 const getStatusTone = (status?: string): 'default' | 'success' | 'warning' => {
   const normalized = status?.trim().toLowerCase()
@@ -336,9 +444,16 @@ const GoogleTrackingMap = ({
   selectedFleetCar,
   currentPoint,
   currentPosition,
-  routePoints,
+  routePathPoints,
   routeStartPoint,
   routeEndPoint,
+  playbackPoint,
+  playbackPosition,
+  playbackHeading,
+  heatmapPoints,
+  showHeatmap,
+  stopMarkers,
+  showStops,
   geofenceShapes,
   draftGeofence,
   drawingMode,
@@ -352,9 +467,16 @@ const GoogleTrackingMap = ({
   selectedFleetCar: FleetCarView | null
   currentPoint: LatLngTuple | null
   currentPosition: bookcarsTypes.TraccarPosition | null
-  routePoints: LatLngTuple[]
+  routePathPoints: LatLngTuple[]
   routeStartPoint: LatLngTuple | null
   routeEndPoint: LatLngTuple | null
+  playbackPoint: LatLngTuple | null
+  playbackPosition: bookcarsTypes.TraccarPosition | null
+  playbackHeading: number | null
+  heatmapPoints: RouteHeatmapPoint[]
+  showHeatmap: boolean
+  stopMarkers: DetectedStop[]
+  showStops: boolean
   geofenceShapes: ParsedGeofence[]
   draftGeofence: DraftGeofenceShape | null
   drawingMode: GeofenceEditorType | null
@@ -401,7 +523,7 @@ const GoogleTrackingMap = ({
       if (currentPoint) {
         extend(currentPoint)
       }
-      routePoints.forEach(extend)
+      routePathPoints.forEach(extend)
       geofenceShapes.forEach((shape) => {
         if (shape.center) {
           extend(shape.center)
@@ -429,7 +551,7 @@ const GoogleTrackingMap = ({
       map.setCenter(toGoogleLatLng(currentPoint || DEFAULT_CENTER))
       map.setZoom(currentPoint ? 12 : 7)
     }
-  }, [currentPoint, fleetMarkers, fitRequestToken, geofenceShapes, mapMode, routePoints])
+  }, [currentPoint, fleetMarkers, fitRequestToken, geofenceShapes, mapMode, routePathPoints])
 
   React.useEffect(() => () => clearDraftPolylineListeners(), [])
 
@@ -450,8 +572,32 @@ const GoogleTrackingMap = ({
     scale,
   })
 
-  const infoPoint = mapMode === 'fleet' ? selectedFleetCar?.currentPoint || null : currentPoint
-  const infoPosition = mapMode === 'fleet' ? selectedFleetCar?.position || null : currentPosition
+  const infoPoint = mapMode === 'fleet' ? selectedFleetCar?.currentPoint || null : playbackPoint || currentPoint
+  const infoPosition = mapMode === 'fleet' ? selectedFleetCar?.position || null : playbackPosition || currentPosition
+  const resolvedPlaybackHeading = typeof playbackPosition?.course === 'number' && Number.isFinite(playbackPosition.course)
+    ? playbackPosition.course
+    : playbackHeading || 0
+  const resolvedCurrentHeading = typeof currentPosition?.course === 'number' && Number.isFinite(currentPosition.course)
+    ? currentPosition.course
+    : 0
+  const playbackVehicleIcon: google.maps.Icon = {
+    url: buildVehicleSvgUrl('#f97316', '#fde68a', resolvedPlaybackHeading),
+    scaledSize: new google.maps.Size(44, 44),
+    anchor: new google.maps.Point(22, 22),
+  }
+  const currentVehicleIcon: google.maps.Icon = {
+    url: buildVehicleSvgUrl('#0f172a', '#60a5fa', resolvedCurrentHeading),
+    scaledSize: new google.maps.Size(42, 42),
+    anchor: new google.maps.Point(21, 21),
+  }
+  const stopMarkerIcon: google.maps.Symbol = {
+    path: google.maps.SymbolPath.CIRCLE,
+    fillColor: '#f59e0b',
+    fillOpacity: 1,
+    strokeColor: '#ffffff',
+    strokeWeight: 2,
+    scale: 7,
+  }
   const activeDrawingMode = drawingMode
     ? (
       drawingMode === 'circle'
@@ -528,6 +674,17 @@ const GoogleTrackingMap = ({
     drawingControl: false,
   } satisfies google.maps.drawing.DrawingManagerOptions
 
+  const heatmapData = useMemo(() => {
+    if (!isLoaded || !globalThis.google?.maps?.visualization) {
+      return []
+    }
+
+    return heatmapPoints.map((item) => ({
+      location: new google.maps.LatLng(item.point[0], item.point[1]),
+      weight: item.weight,
+    }))
+  }, [heatmapPoints, isLoaded])
+
   return (
     <GoogleMap
       mapContainerClassName="tracking-map"
@@ -538,6 +695,24 @@ const GoogleTrackingMap = ({
       }}
       options={{ streetViewControl: false, mapTypeControl: false, fullscreenControl: true }}
     >
+      {mapMode === 'single' && showHeatmap && heatmapData.length > 0 && (
+        <HeatmapLayer
+          data={heatmapData}
+          options={{
+            radius: 26,
+            opacity: 0.55,
+            gradient: [
+              'rgba(59,130,246,0)',
+              'rgba(59,130,246,0.35)',
+              'rgba(14,165,233,0.55)',
+              'rgba(250,204,21,0.7)',
+              'rgba(249,115,22,0.88)',
+              'rgba(220,38,38,0.96)',
+            ],
+          }}
+        />
+      )}
+
       {mapMode === 'single' && activeDrawingMode && (
         <DrawingManager
           drawingMode={activeDrawingMode}
@@ -649,10 +824,26 @@ const GoogleTrackingMap = ({
         />
       )}
 
-      {mapMode === 'single' && routePoints.length > 1 && <PolylineF path={routePoints.map(toGoogleLatLng)} options={{ strokeColor: '#1976d2', strokeWeight: 4, strokeOpacity: 0.9 }} />}
-      {mapMode === 'single' && routeStartPoint && routePoints.length > 1 && <MarkerF position={toGoogleLatLng(routeStartPoint)} title={strings.ROUTE_START} icon={buildMarkerIcon('#2e7d32', 7)} />}
-      {mapMode === 'single' && routeEndPoint && routePoints.length > 1 && <MarkerF position={toGoogleLatLng(routeEndPoint)} title={strings.ROUTE_END} icon={buildMarkerIcon('#6a1b9a', 7)} />}
-      {mapMode === 'single' && currentPoint && <MarkerF position={toGoogleLatLng(currentPoint)} title={selectedFleetCar?.car.name || strings.SELECT_CAR} icon={buildMarkerIcon('#d32f2f', 8)} />}
+      {mapMode === 'single' && routePathPoints.length > 1 && <PolylineF path={routePathPoints.map(toGoogleLatLng)} options={{ strokeColor: '#1976d2', strokeWeight: 4, strokeOpacity: 0.9 }} />}
+      {mapMode === 'single' && routeStartPoint && routePathPoints.length > 1 && <MarkerF position={toGoogleLatLng(routeStartPoint)} title={strings.ROUTE_START} icon={buildMarkerIcon('#2e7d32', 7)} />}
+      {mapMode === 'single' && routeEndPoint && routePathPoints.length > 1 && <MarkerF position={toGoogleLatLng(routeEndPoint)} title={strings.ROUTE_END} icon={buildMarkerIcon('#6a1b9a', 7)} />}
+      {mapMode === 'single' && showStops && stopMarkers.map((stop, index) => (
+        <MarkerF
+          key={stop.id}
+          position={toGoogleLatLng(stop.point)}
+          title={`${strings.STOP_DETECTION} ${index + 1}: ${formatDuration(stop.durationMs)}`}
+          icon={stopMarkerIcon}
+          label={{ text: `${index + 1}`, color: '#111827', fontWeight: '700' }}
+        />
+      ))}
+      {mapMode === 'single' && playbackPoint && (
+        <MarkerF
+          position={toGoogleLatLng(playbackPoint)}
+          title={strings.ROUTE_PLAYBACK}
+          icon={playbackVehicleIcon}
+        />
+      )}
+      {mapMode === 'single' && currentPoint && !playbackPoint && <MarkerF position={toGoogleLatLng(currentPoint)} title={selectedFleetCar?.car.name || strings.SELECT_CAR} icon={currentVehicleIcon} />}
       {mapMode === 'fleet' && fleetMarkers.map((item) => (
         <MarkerF
           key={item.car._id}
@@ -693,6 +884,12 @@ const Tracking = () => {
   const [notes, setNotes] = useState('')
   const [positions, setPositions] = useState<bookcarsTypes.TraccarPosition[]>([])
   const [route, setRoute] = useState<bookcarsTypes.TraccarPosition[]>([])
+  const [snappedRoute, setSnappedRoute] = useState<RouteSnapState>({ displayPoints: [], playbackPoints: [], mode: 'idle' })
+  const [playbackIndex, setPlaybackIndex] = useState(0)
+  const [playbackPlaying, setPlaybackPlaying] = useState(false)
+  const [playbackSpeed, setPlaybackSpeed] = useState(4)
+  const [showHeatmap, setShowHeatmap] = useState(true)
+  const [showStops, setShowStops] = useState(true)
   const [allGeofences, setAllGeofences] = useState<bookcarsTypes.TraccarGeofence[]>([])
   const [geofences, setGeofences] = useState<bookcarsTypes.TraccarGeofence[]>([])
   const [alerts, setAlerts] = useState<bookcarsTypes.TraccarEvent[]>([])
@@ -897,6 +1094,35 @@ const Tracking = () => {
     }
   }
 
+  const handlePlaybackToggle = () => {
+    if (routeFrames.length < 2) {
+      return
+    }
+
+    if (boundedPlaybackIndex >= routeFrames.length - 1) {
+      setPlaybackIndex(0)
+    }
+
+    setPlaybackPlaying((current) => !current)
+    setMapMode('single')
+    setMapFitRequestToken((prev) => prev + 1)
+  }
+
+  const handlePlaybackReplay = () => {
+    setPlaybackPlaying(false)
+    setPlaybackIndex(0)
+    if (routeFrames.length > 0) {
+      setMapMode('single')
+      setMapFitRequestToken((prev) => prev + 1)
+    }
+  }
+
+  const handlePlaybackScrub = (_event: Event, value: number | number[]) => {
+    const nextIndex = Array.isArray(value) ? value[0] : value
+    setPlaybackPlaying(false)
+    setPlaybackIndex(nextIndex)
+  }
+
   const fleetOverviewByCarId = useMemo(() => {
     const lookup = new Map<string, TraccarService.TraccarFleetItem>()
     fleetOverview.forEach((item) => lookup.set(item.carId, item))
@@ -953,17 +1179,109 @@ const Tracking = () => {
   ), [allGeofences])
   const currentPosition = positions[0] || selectedFleetCar?.position || null
   const currentPoint = useMemo(() => toLatLng(currentPosition), [currentPosition])
-  const routePoints = useMemo(() => route.map((position) => toLatLng(position)).filter((point): point is LatLngTuple => point !== null), [route])
+  const routeFrames = useMemo<RouteFrame[]>(() => route
+    .map((position) => {
+      const point = toLatLng(position)
+      if (!point) {
+        return null
+      }
+
+      return {
+        point,
+        position,
+        timestampMs: getDateMs(getPositionTimestamp(position)),
+        speed: typeof position.speed === 'number' && Number.isFinite(position.speed) ? position.speed : 0,
+      }
+    })
+    .filter((frame): frame is RouteFrame => frame !== null), [route])
+  const rawRoutePoints = useMemo(() => routeFrames.map((frame) => frame.point), [routeFrames])
+  const routePathPoints = useMemo(() => (
+    snappedRoute.displayPoints.length > 1 ? snappedRoute.displayPoints : rawRoutePoints
+  ), [rawRoutePoints, snappedRoute.displayPoints])
   const geofenceShapes = useMemo(() => geofences.map(parseGeofenceArea).filter((shape): shape is ParsedGeofence => shape !== null), [geofences])
   const visibleGeofenceShapes = useMemo(() => (
     editingGeofenceId === null
       ? geofenceShapes
       : geofenceShapes.filter((shape) => `${shape.id}` !== `${editingGeofenceId}`)
   ), [editingGeofenceId, geofenceShapes])
-  const routeStart = route.length > 0 ? route[0] : null
-  const routeEnd = route.length > 1 ? route[route.length - 1] : route[0] || null
-  const routeStartPoint = useMemo(() => toLatLng(routeStart), [routeStart])
-  const routeEndPoint = useMemo(() => toLatLng(routeEnd), [routeEnd])
+  const routeStart = routeFrames.length > 0 ? routeFrames[0].position : null
+  const routeEnd = routeFrames.length > 1 ? routeFrames[routeFrames.length - 1].position : routeFrames[0]?.position || null
+  const routeStartPoint = routePathPoints[0] || null
+  const routeEndPoint = routePathPoints.length > 1 ? routePathPoints[routePathPoints.length - 1] : routePathPoints[0] || null
+  const boundedPlaybackIndex = routeFrames.length > 0 ? Math.min(playbackIndex, routeFrames.length - 1) : 0
+  const playbackFrame = routeFrames[boundedPlaybackIndex] || null
+  const playbackPoint = snappedRoute.playbackPoints[boundedPlaybackIndex] || playbackFrame?.point || null
+  const nextPlaybackPoint = snappedRoute.playbackPoints[boundedPlaybackIndex + 1] || routeFrames[boundedPlaybackIndex + 1]?.point || null
+  const playbackHeading = playbackPoint && nextPlaybackPoint
+    ? calculateBearing(playbackPoint, nextPlaybackPoint)
+    : null
+  const playbackSpeedKmh = playbackFrame ? playbackFrame.speed * 1.852 : 0
+  const playbackProgress = routeFrames.length > 1
+    ? Math.round((boundedPlaybackIndex / (routeFrames.length - 1)) * 100)
+    : 0
+  const detectedStops = useMemo<DetectedStop[]>(() => {
+    const stops: DetectedStop[] = []
+    let cluster: Array<{ frame: RouteFrame, point: LatLngTuple }> = []
+
+    const flushCluster = () => {
+      if (cluster.length < 2) {
+        cluster = []
+        return
+      }
+
+      const startedAt = cluster[0].frame.timestampMs
+      const endedAt = cluster[cluster.length - 1].frame.timestampMs
+      const durationMs = endedAt > startedAt ? endedAt - startedAt : 0
+
+      if (durationMs < STOP_MIN_DURATION_MS) {
+        cluster = []
+        return
+      }
+
+      const centerLat = cluster.reduce((sum, item) => sum + item.point[0], 0) / cluster.length
+      const centerLng = cluster.reduce((sum, item) => sum + item.point[1], 0) / cluster.length
+      stops.push({
+        id: `stop-${startedAt}-${endedAt}-${stops.length}`,
+        point: [centerLat, centerLng],
+        startedAt,
+        endedAt,
+        durationMs,
+        pointCount: cluster.length,
+      })
+      cluster = []
+    }
+
+    routeFrames.forEach((frame, index) => {
+      const point = snappedRoute.playbackPoints[index] || frame.point
+      const isSlow = frame.speed <= STOP_SPEED_THRESHOLD
+
+      if (!isSlow) {
+        flushCluster()
+        return
+      }
+
+      if (cluster.length === 0) {
+        cluster = [{ frame, point }]
+        return
+      }
+
+      const anchorPoint = cluster[0].point
+      if (haversineDistanceMeters(anchorPoint, point) <= STOP_RADIUS_METERS) {
+        cluster.push({ frame, point })
+      } else {
+        flushCluster()
+        cluster = [{ frame, point }]
+      }
+    })
+
+    flushCluster()
+    return stops
+  }, [routeFrames, snappedRoute.playbackPoints])
+  const heatmapPoints = useMemo<RouteHeatmapPoint[]>(() => routeFrames.map((frame, index) => {
+    const point = snappedRoute.playbackPoints[index] || frame.point
+    const slowBias = frame.speed <= STOP_SPEED_THRESHOLD ? 6 : Math.max(1, 5 - (frame.speed / 12))
+    return { point, weight: slowBias }
+  }), [routeFrames, snappedRoute.playbackPoints])
   const latestAlert = alerts[0]
   const geofenceDraftReady = hasDraftGeofenceGeometry(geofenceDraft)
   const geofenceDraftPointCount = geofenceDraft?.type === 'circle' ? 0 : geofenceDraft?.points.length || 0
@@ -974,11 +1292,79 @@ const Tracking = () => {
   const canLoadTracking = !!selectedCar?.tracking?.deviceId && integrationEnabled
   const hasMapData = mapMode === 'fleet'
     ? liveCarsCount > 0
-    : !!currentPoint || routePoints.length > 0 || visibleGeofenceShapes.length > 0 || geofenceDraftReady || geofenceDrawingMode !== null
+    : !!currentPoint || routePathPoints.length > 0 || visibleGeofenceShapes.length > 0 || geofenceDraftReady || geofenceDrawingMode !== null
+
+  useEffect(() => {
+    let active = true
+
+    setPlaybackPlaying(false)
+    setPlaybackIndex(0)
+
+    if (rawRoutePoints.length < 2) {
+      setSnappedRoute({ displayPoints: rawRoutePoints, playbackPoints: rawRoutePoints, mode: 'idle' })
+      return () => {
+        active = false
+      }
+    }
+
+    setSnappedRoute({ displayPoints: rawRoutePoints, playbackPoints: rawRoutePoints, mode: 'loading' })
+
+    const snapRoute = async () => {
+      try {
+        const result = await snapRouteToRoads(rawRoutePoints as RoadPoint[], env.GOOGLE_MAPS_API_KEY)
+        if (active) {
+          setSnappedRoute({
+            displayPoints: result.displayPoints,
+            playbackPoints: result.playbackPoints,
+            mode: 'snapped',
+          })
+        }
+      } catch {
+        if (active) {
+          setSnappedRoute({ displayPoints: rawRoutePoints, playbackPoints: rawRoutePoints, mode: 'raw' })
+        }
+      }
+    }
+
+    void snapRoute()
+
+    return () => {
+      active = false
+    }
+  }, [rawRoutePoints])
+
+  useEffect(() => {
+    if (!playbackPlaying || routeFrames.length < 2) {
+      return
+    }
+
+    if (boundedPlaybackIndex >= routeFrames.length - 1) {
+      setPlaybackPlaying(false)
+      return
+    }
+
+    const currentFrame = routeFrames[boundedPlaybackIndex]
+    const nextFrame = routeFrames[boundedPlaybackIndex + 1]
+    const deltaMs = currentFrame.timestampMs > 0 && nextFrame.timestampMs > currentFrame.timestampMs
+      ? nextFrame.timestampMs - currentFrame.timestampMs
+      : 4000
+    const delay = Math.max(140, Math.min(1200, deltaMs / playbackSpeed))
+
+    const timer = window.setTimeout(() => {
+      setPlaybackIndex((current) => Math.min(current + 1, routeFrames.length - 1))
+    }, delay)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [boundedPlaybackIndex, playbackPlaying, playbackSpeed, routeFrames])
 
   const resetTrackingData = () => {
     setPositions([])
     setRoute([])
+    setSnappedRoute({ displayPoints: [], playbackPoints: [], mode: 'idle' })
+    setPlaybackPlaying(false)
+    setPlaybackIndex(0)
     setGeofences([])
     setAlerts([])
   }
@@ -1482,9 +1868,16 @@ const Tracking = () => {
                         selectedFleetCar={selectedFleetCar}
                         currentPoint={currentPoint}
                         currentPosition={currentPosition}
-                        routePoints={routePoints}
+                        routePathPoints={routePathPoints}
                         routeStartPoint={routeStartPoint}
                         routeEndPoint={routeEndPoint}
+                        playbackPoint={playbackPoint}
+                        playbackPosition={playbackFrame?.position || null}
+                        playbackHeading={playbackHeading}
+                        heatmapPoints={heatmapPoints}
+                        showHeatmap={showHeatmap}
+                        stopMarkers={detectedStops}
+                        showStops={showStops}
                         geofenceShapes={visibleGeofenceShapes}
                         draftGeofence={geofenceDraft}
                         drawingMode={geofenceDrawingMode}
@@ -1494,6 +1887,50 @@ const Tracking = () => {
                         onDraftGeofenceDrawn={handleDraftGeofenceDrawn}
                       />
                       )}
+
+                  {mapMode === 'single' && routeFrames.length > 0 && (
+                    <div className="tracking-map-playback-panel">
+                      <div className="tracking-map-playback-panel__row">
+                        <strong>{strings.ROUTE_PLAYBACK}</strong>
+                        <span>{`${playbackProgress}%`}</span>
+                      </div>
+                      <div className="tracking-map-playback-panel__stats">
+                        <span>{formatTimestamp(getPositionTimestamp(playbackFrame?.position || null))}</span>
+                        <span>{`${formatNumber(playbackSpeedKmh, ' km/h')}`}</span>
+                        <span>{`${boundedPlaybackIndex + 1}/${routeFrames.length}`}</span>
+                      </div>
+                      <div className="tracking-map-playback-panel__controls">
+                        <Button
+                          size="small"
+                          variant="contained"
+                          className="btn-primary"
+                          onClick={handlePlaybackToggle}
+                          disabled={routeFrames.length < 2}
+                          startIcon={playbackPlaying ? <PauseIcon /> : <PlayArrowIcon />}
+                        >
+                          {playbackPlaying ? strings.ROUTE_PAUSE : strings.ROUTE_PLAYBACK}
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={handlePlaybackReplay}
+                          disabled={routeFrames.length < 2}
+                          startIcon={<RestartAltIcon />}
+                        >
+                          {strings.PLAYBACK_RESTART}
+                        </Button>
+                      </div>
+                      <Slider
+                        min={0}
+                        max={Math.max(routeFrames.length - 1, 0)}
+                        value={boundedPlaybackIndex}
+                        onChange={handlePlaybackScrub}
+                        step={1}
+                        disabled={routeFrames.length < 2}
+                        size="small"
+                      />
+                    </div>
+                  )}
                 </div>
               </Paper>
 
@@ -1511,7 +1948,7 @@ const Tracking = () => {
                   <Box className="tracking-stat-icon tracking-stat-icon--route"><RouteIcon /></Box>
                   <div>
                     <Typography className="tracking-stat-label">{strings.ROUTE_POINTS}</Typography>
-                    <Typography variant="h6">{routePoints.length}</Typography>
+                    <Typography variant="h6">{routeFrames.length}</Typography>
                     <Typography className="tracking-stat-note">{routeStart ? formatTimestamp(getPositionTimestamp(routeStart)) : strings.NO_DATA}</Typography>
                   </div>
                 </Paper>
@@ -1896,16 +2333,135 @@ const Tracking = () => {
                   <TextField label={strings.TO} type="datetime-local" value={to} onChange={(event) => setTo(event.target.value)} />
                 </div>
 
-                {route.length > 0
+                {routeFrames.length > 0 && snappedRoute.mode !== 'idle' && (
+                  <Alert
+                    severity={snappedRoute.mode === 'loading' ? 'info' : snappedRoute.mode === 'snapped' ? 'success' : 'warning'}
+                    className="tracking-inline-alert"
+                  >
+                    {snappedRoute.mode === 'loading'
+                      ? strings.ROUTE_SNAP_LOADING
+                      : snappedRoute.mode === 'snapped'
+                        ? strings.ROUTE_SNAP_READY
+                      : strings.ROUTE_SNAP_FALLBACK}
+                  </Alert>
+                )}
+
+                {routeFrames.length > 0 && (
+                  <div className="tracking-route-visibility">
+                    <FormControlLabel
+                      control={<Switch checked={showHeatmap} onChange={(event) => setShowHeatmap(event.target.checked)} />}
+                      label={strings.HEATMAP}
+                    />
+                    <FormControlLabel
+                      control={<Switch checked={showStops} onChange={(event) => setShowStops(event.target.checked)} />}
+                      label={`${strings.STOP_DETECTION} (${detectedStops.length})`}
+                    />
+                  </div>
+                )}
+
+                {routeFrames.length > 0
                   ? (
-                    <div className="tracking-list">
-                      {route.slice(0, 10).map((position, index) => (
-                        <div key={position.id || `${position.latitude}-${position.longitude}-${index}`} className="tracking-list-item">
-                          <div>{formatTimestamp(getPositionTimestamp(position))}</div>
-                          <div className="tracking-list-subtext">{`${formatCoordinate(position.latitude)}, ${formatCoordinate(position.longitude)}`}</div>
+                    <>
+                      <div className="tracking-route-player">
+                        <div className="tracking-route-player__stats">
+                          <div className="tracking-route-player__stat">
+                            <span>{strings.PLAYBACK_POSITION}</span>
+                            <strong>{`${boundedPlaybackIndex + 1}/${routeFrames.length}`}</strong>
+                          </div>
+                          <div className="tracking-route-player__stat">
+                            <span>{strings.SPEED}</span>
+                            <strong>{`${formatNumber(playbackSpeedKmh, ' km/h')}`}</strong>
+                          </div>
+                          <div className="tracking-route-player__stat">
+                            <span>{strings.TIME}</span>
+                            <strong>{formatTimestamp(getPositionTimestamp(playbackFrame?.position || null))}</strong>
+                          </div>
                         </div>
-                      ))}
-                    </div>
+
+                        <div className="tracking-route-player__controls">
+                          <Button
+                            variant="contained"
+                            className="btn-primary"
+                            onClick={handlePlaybackToggle}
+                            disabled={routeFrames.length < 2}
+                            startIcon={playbackPlaying ? <PauseIcon /> : <PlayArrowIcon />}
+                          >
+                            {playbackPlaying ? strings.ROUTE_PAUSE : strings.ROUTE_PLAYBACK}
+                          </Button>
+                          <Button
+                            variant="outlined"
+                            onClick={handlePlaybackReplay}
+                            disabled={routeFrames.length < 2}
+                            startIcon={<RestartAltIcon />}
+                          >
+                            {strings.PLAYBACK_RESTART}
+                          </Button>
+                        </div>
+
+                        <div className="tracking-route-player__toolbar">
+                          <div className="tracking-route-player__speed">
+                            <span>{strings.PLAYBACK_SPEED}</span>
+                            <ToggleButtonGroup
+                              value={playbackSpeed}
+                              exclusive
+                              size="small"
+                              onChange={(_event, value: number | null) => value && setPlaybackSpeed(value)}
+                            >
+                              {PLAYBACK_SPEED_OPTIONS.map((speed) => (
+                                <ToggleButton key={speed} value={speed}>{`${speed}x`}</ToggleButton>
+                              ))}
+                            </ToggleButtonGroup>
+                          </div>
+                          <div className="tracking-route-player__progress">
+                            <span>{`${strings.PLAYBACK_PROGRESS}: ${playbackProgress}%`}</span>
+                          </div>
+                        </div>
+
+                        <Slider
+                          min={0}
+                          max={Math.max(routeFrames.length - 1, 0)}
+                          value={boundedPlaybackIndex}
+                          onChange={handlePlaybackScrub}
+                          step={1}
+                          marks={[
+                            { value: 0, label: strings.ROUTE_START },
+                            { value: Math.max(routeFrames.length - 1, 0), label: strings.ROUTE_END },
+                          ]}
+                          disabled={routeFrames.length < 2}
+                        />
+                      </div>
+
+                      <div className="tracking-route-stops">
+                        <div className="tracking-header">
+                          <Typography variant="subtitle1">{strings.STOP_DETECTION}</Typography>
+                          <Chip size="small" label={`${detectedStops.length} ${strings.STOPS}`} />
+                        </div>
+
+                        {detectedStops.length > 0
+                          ? (
+                            <div className="tracking-list">
+                              {detectedStops.slice(0, 6).map((stop) => (
+                                <div key={stop.id} className="tracking-list-item">
+                                  <div>{`${formatTimestamp(stop.startedAt)} -> ${formatTimestamp(stop.endedAt)}`}</div>
+                                  <div className="tracking-list-subtext">{`${strings.STOP_DURATION}: ${formatDuration(stop.durationMs)}`}</div>
+                                </div>
+                              ))}
+                            </div>
+                            )
+                          : (
+                            <div className="tracking-empty">{strings.NO_STOPS}</div>
+                            )}
+                      </div>
+
+                      <div className="tracking-list">
+                        {routeFrames.slice(0, 10).map((frame, index) => (
+                          <div key={frame.position.id || `${frame.position.latitude}-${frame.position.longitude}-${index}`} className="tracking-list-item">
+                            <div>{formatTimestamp(getPositionTimestamp(frame.position))}</div>
+                            <div className="tracking-list-subtext">{`${formatCoordinate(frame.position.latitude)}, ${formatCoordinate(frame.position.longitude)}`}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
                     )
                   : (
                     <div className="tracking-empty">{strings.NO_DATA}</div>
