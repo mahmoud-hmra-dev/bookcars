@@ -219,8 +219,14 @@ export const getDevice = async (deviceId: number): Promise<bookcarsTypes.Traccar
   return response.data
 }
 
-export const getPositions = async (deviceId: number): Promise<bookcarsTypes.TraccarPosition[]> => {
+export const getPositions = async (deviceId?: number): Promise<bookcarsTypes.TraccarPosition[]> => {
   ensureEnabled()
+
+  if (typeof deviceId !== 'number') {
+    const response = await getClient().get('/api/positions')
+    return response.data
+  }
+
   try {
     const response = await getClient().get('/api/positions', { params: { deviceId } })
     return response.data

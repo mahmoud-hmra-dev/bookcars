@@ -1,27 +1,33 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   Alert,
   Box,
   Button,
   Chip,
-  Divider,
   FormControl,
   FormControlLabel,
+  InputAdornment,
   InputLabel,
   MenuItem,
   Paper,
   Select,
   Switch,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material'
-import RoomIcon from '@mui/icons-material/Room'
-import RouteIcon from '@mui/icons-material/Route'
-import RadarIcon from '@mui/icons-material/Radar'
-import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import AccessTimeIcon from '@mui/icons-material/AccessTime'
+import DirectionsCarFilledIcon from '@mui/icons-material/DirectionsCarFilled'
+import LinkIcon from '@mui/icons-material/Link'
+import MyLocationIcon from '@mui/icons-material/MyLocation'
+import RadarIcon from '@mui/icons-material/Radar'
+import RouteIcon from '@mui/icons-material/Route'
+import SearchIcon from '@mui/icons-material/Search'
+import SensorsIcon from '@mui/icons-material/Sensors'
 import SpeedIcon from '@mui/icons-material/Speed'
-import { GoogleMap, InfoWindow, MarkerF, PolygonF, PolylineF, RectangleF, CircleF, useJsApiLoader } from '@react-google-maps/api'
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+import { CircleF, GoogleMap, InfoWindow, MarkerF, PolygonF, PolylineF, RectangleF, useJsApiLoader } from '@react-google-maps/api'
 import * as bookcarsTypes from ':bookcars-types'
 import * as bookcarsHelper from ':bookcars-helper'
 import wellknown from 'wellknown'
@@ -31,18 +37,17 @@ import env from '@/config/env.config'
 import { strings as commonStrings } from '@/lang/common'
 import { strings } from '@/lang/tracking'
 import * as helper from '@/utils/helper'
-import * as SupplierService from '@/services/SupplierService'
 import * as CarService from '@/services/CarService'
+import * as SupplierService from '@/services/SupplierService'
 import * as TraccarService from '@/services/TraccarService'
 
 import '@/assets/css/tracking.css'
 
-const formatDateInput = (date: Date) => date.toISOString().slice(0, 16)
 const DEFAULT_CENTER: [number, number] = [33.8938, 35.5018]
+const CARS_FETCH_SIZE = 100
 
-
+type FleetMode = 'fleet' | 'single'
 type LatLngTuple = [number, number]
-
 type GoogleLatLng = google.maps.LatLngLiteral
 
 type ParsedGeofence = {
@@ -56,11 +61,34 @@ type ParsedGeofence = {
   geojson?: any
 }
 
+type FleetCarView = {
+  car: bookcarsTypes.Car
+  snapshot?: TraccarService.TraccarFleetItem
+  position: bookcarsTypes.TraccarPosition | null
+  currentPoint: LatLngTuple | null
+  deviceName: string
+  deviceStatus: string
+  isLinked: boolean
+  isOnline: boolean
+  lastSeen: string
+}
+
+const formatDateInput = (date: Date) => date.toISOString().slice(0, 16)
 const isFiniteCoordinate = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
+const formatCoordinate = (value?: number) => (typeof value === 'number' && Number.isFinite(value) ? value.toFixed(6) : '-')
+const formatNumber = (value?: number, suffix = '') => (typeof value === 'number' && Number.isFinite(value) ? `${Math.round(value * 100) / 100}${suffix}` : '-')
+const toGoogleLatLng = (point: LatLngTuple): GoogleLatLng => ({ lat: point[0], lng: point[1] })
+
+const formatTimestamp = (value?: Date | string | null) => {
+  if (!value) {
+    return '-'
+  }
+
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? `${value}` : date.toLocaleString()
+}
 
 const normalizeLatLngOrder = (first: number, second: number): LatLngTuple => {
-  // For WKT/GeoJSON, coordinates are commonly [lng, lat].
-  // If only one ordering is geographically valid, normalize to [lat, lng].
   if (Math.abs(first) > 90 && Math.abs(second) <= 90) {
     return [second, first]
   }
@@ -76,21 +104,41 @@ const toLatLng = (position?: bookcarsTypes.TraccarPosition | null): LatLngTuple 
   return [position.latitude, position.longitude]
 }
 
+const extractResultPage = (data: unknown) => {
+  const payload = Array.isArray(data) && data.length > 0
+    ? data[0] as { resultData?: bookcarsTypes.Car[], pageInfo?: Array<{ totalRecords?: number }> }
+    : undefined
+  const rows = Array.isArray(payload?.resultData) ? payload.resultData : []
+  const totalRecords = Array.isArray(payload?.pageInfo) && payload.pageInfo.length > 0
+    ? (payload.pageInfo[0]?.totalRecords || 0)
+    : rows.length
+
+  return { rows, totalRecords }
+}
+
+const getPositionTimestamp = (position?: bookcarsTypes.TraccarPosition | null) => (
+  position?.deviceTime || position?.fixTime || position?.serverTime
+)
+
+const getStatusTone = (status?: string): 'default' | 'success' | 'warning' => {
+  const normalized = status?.trim().toLowerCase()
+  if (normalized === 'online') {
+    return 'success'
+  }
+  if (!normalized || normalized === 'offline') {
+    return 'default'
+  }
+  return 'warning'
+}
+
+const toSearchText = (...parts: Array<string | undefined>) => parts.filter(Boolean).join(' ').toLowerCase()
+
 const parseGeofenceArea = (geofence: bookcarsTypes.TraccarGeofence, fallbackIndex: number): ParsedGeofence | null => {
   if (geofence.geojson) {
     const name = geofence.name || geofence.description || `Geofence ${fallbackIndex + 1}`
     const id = geofence.id ?? `GEOJSON-${fallbackIndex}`
 
-    return {
-      id,
-      name,
-      shape: 'geojson',
-      geojson: {
-        type: 'Feature',
-        properties: { name },
-        geometry: geofence.geojson,
-      },
-    }
+    return { id, name, shape: 'geojson', geojson: { type: 'Feature', properties: { name }, geometry: geofence.geojson } }
   }
 
   if (!geofence.area) {
@@ -106,10 +154,7 @@ const parseGeofenceArea = (geofence: bookcarsTypes.TraccarGeofence, fallbackInde
   const name = geofence.name || geofence.description || `Geofence ${fallbackIndex + 1}`
   const id = geofence.id ?? `${shapeType}-${fallbackIndex}`
 
-  const parseCircle = (): ParsedGeofence | null => {
-    // Supported formats:
-    // - CIRCLE (lat lon, radius)
-    // - CIRCLE (lat, lon, radius)
+  if (shapeType === 'CIRCLE') {
     const full = geofence.area || ''
     const match = full.match(/CIRCLE\s*\(\s*([-\d.]+)(?:\s+|,\s*)([-\d.]+)\s*,\s*([-\d.]+)\s*\)\s*$/i)
     if (!match) {
@@ -119,194 +164,88 @@ const parseGeofenceArea = (geofence: bookcarsTypes.TraccarGeofence, fallbackInde
     const lat = Number.parseFloat(match[1])
     const lng = Number.parseFloat(match[2])
     const radius = Number.parseFloat(match[3])
-
-    if (![lat, lng, radius].every((value) => Number.isFinite(value))) {
-      return null
-    }
-
-    return { id, name, shape: 'circle', center: [lat, lng], radius }
-  }
-
-  const parseRectangle = (): ParsedGeofence | null => {
-    // Formats seen in the wild include:
-    // - RECTANGLE (lat1 lon1, lat2 lon2)
-    // - RECTANGLE (lat1,lng1,lat2,lng2)
-    const full = geofence.area || ''
-    const match = full.match(/RECTANGLE\s*\(\s*([-\d.]+)(?:\s+|,\s*)([-\d.]+)\s*,\s*([-\d.]+)(?:\s+|,\s*)([-\d.]+)\s*\)\s*$/i)
-    if (match) {
-      const lat1 = Number.parseFloat(match[1])
-      const lng1 = Number.parseFloat(match[2])
-      const lat2 = Number.parseFloat(match[3])
-      const lng2 = Number.parseFloat(match[4])
-      if ([lat1, lng1, lat2, lng2].every((value) => Number.isFinite(value))) {
-        return { id, name, shape: 'rectangle', bounds: [[lat1, lng1], [lat2, lng2]] }
-      }
-    }
-
-    // Fallback: pull 4 numbers (comma-style) from the inner part
-    const inner = rawCoords.replace(/\)\s*$/, '')
-    const nums = inner.split(',').map((item) => Number.parseFloat(item.trim())).filter((value) => Number.isFinite(value))
-    if (nums.length >= 4) {
-      const [lat1, lng1, lat2, lng2] = nums
-      return { id, name, shape: 'rectangle', bounds: [[lat1, lng1], [lat2, lng2]] }
-    }
-
-    return null
-  }
-
-  const parsePolygon = (): ParsedGeofence | null => {
-    const full = geofence.area || ''
-
-    try {
-      const geometry = wellknown.parse(full)
-      if (geometry?.type === 'Polygon' || geometry?.type === 'MultiPolygon') {
-        return {
-          id,
-          name,
-          shape: 'geojson',
-          geojson: {
-            type: 'Feature',
-            properties: { name },
-            geometry,
-          },
-        }
-      }
-    } catch {
-      // Fall back to permissive manual parsing below.
-    }
-
-    const wktMatch = full.match(/POLYGON\s*\(\(\s*([\s\S]+?)\s*\)\)\s*$/i)
-    const content = wktMatch ? wktMatch[1] : rawCoords.replace(/\)\s*$/, '')
-
-    const coordPairs: LatLngTuple[] = []
-    const pairRegex = /([+-]?\d+(?:\.\d+)?)\s+([+-]?\d+(?:\.\d+)?)/g
-    let match: RegExpExecArray | null
-
-    while ((match = pairRegex.exec(content)) !== null) {
-      const first = Number.parseFloat(match[1])
-      const second = Number.parseFloat(match[2])
-      if (Number.isFinite(first) && Number.isFinite(second)) {
-        coordPairs.push(normalizeLatLngOrder(first, second))
-      }
-    }
-
-    if (coordPairs.length < 3) {
-      const numericValues = (full.match(/[+-]?\d+(?:\.\d+)?/g) || [])
-        .map((value) => Number.parseFloat(value))
-        .filter((value) => Number.isFinite(value))
-
-      for (let i = 0; i + 1 < numericValues.length; i += 2) {
-        coordPairs.push(normalizeLatLngOrder(numericValues[i], numericValues[i + 1]))
-      }
-    }
-
-    if (coordPairs.length >= 3) {
-      return { id, name, shape: 'polygon', points: coordPairs }
-    }
-
-    // Last-resort fallback: treat any POLYGON string as a supported polygon shape
-    // if it contains at least 3 coordinate pairs after stripping punctuation.
-    const loosePairs = content
-      .replace(/[()]/g, ' ')
-      .split(',')
-      .map((segment) => segment.trim().split(/\s+/).map((value) => Number.parseFloat(value)).filter((value) => Number.isFinite(value)))
-      .filter((pair) => pair.length >= 2)
-      .map((pair) => normalizeLatLngOrder(pair[0], pair[1]))
-
-    return loosePairs.length >= 3 ? { id, name, shape: 'polygon', points: loosePairs } : null
-  }
-
-  const parseGeoJson = (): ParsedGeofence | null => {
-    try {
-      const geometry = wellknown.parse(geofence.area || '')
-      if (!geometry || typeof geometry !== 'object') {
-        return null
-      }
-
-      return {
-        id,
-        name,
-        shape: 'geojson',
-        geojson: {
-          type: 'Feature',
-          properties: { name },
-          geometry,
-        },
-      }
-    } catch {
-      return null
-    }
-  }
-
-  if (shapeType === 'CIRCLE') {
-    return parseCircle() || parseGeoJson()
+    return [lat, lng, radius].every((value) => Number.isFinite(value))
+      ? { id, name, shape: 'circle', center: [lat, lng], radius }
+      : null
   }
 
   if (shapeType === 'RECTANGLE') {
-    return parseRectangle() || parseGeoJson()
+    const values = (geofence.area.match(/[+-]?\d+(?:\.\d+)?/g) || [])
+      .map((value) => Number.parseFloat(value))
+      .filter((value) => Number.isFinite(value))
+
+    return values.length >= 4
+      ? { id, name, shape: 'rectangle', bounds: [[values[0], values[1]], [values[2], values[3]]] }
+      : null
   }
 
-  if (shapeType === 'POLYGON') {
-    return parsePolygon() || parseGeoJson()
+  try {
+    const geometry = wellknown.parse(geofence.area || '')
+    if (geometry?.type === 'Polygon' || geometry?.type === 'MultiPolygon') {
+      return { id, name, shape: 'geojson', geojson: { type: 'Feature', properties: { name }, geometry } }
+    }
+  } catch {
+    // Leave as unsupported.
   }
 
-  return parseGeoJson()
+  const values = (geofence.area.match(/[+-]?\d+(?:\.\d+)?/g) || [])
+    .map((value) => Number.parseFloat(value))
+    .filter((value) => Number.isFinite(value))
+
+  if (values.length >= 6) {
+    const points: LatLngTuple[] = []
+    for (let index = 0; index + 1 < values.length; index += 2) {
+      points.push(normalizeLatLngOrder(values[index], values[index + 1]))
+    }
+    return points.length >= 3 ? { id, name, shape: 'polygon', points } : null
+  }
+
+  return null
 }
-
-const formatTimestamp = (value?: Date | string) => {
-  if (!value) {
-    return '—'
-  }
-
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? `${value}` : date.toLocaleString()
-}
-
-const formatCoordinate = (value?: number) => (typeof value === 'number' && Number.isFinite(value) ? value.toFixed(6) : '—')
-const formatNumber = (value?: number, suffix = '') => (typeof value === 'number' && Number.isFinite(value) ? `${Math.round(value * 100) / 100}${suffix}` : '—')
-
-const toGoogleLatLng = (point: LatLngTuple): GoogleLatLng => ({ lat: point[0], lng: point[1] })
 
 const extractGeoJsonPaths = (geojson: any): LatLngTuple[][] => {
   const geometry = geojson?.type === 'Feature' ? geojson.geometry : geojson
   if (!geometry) {
     return []
   }
-
   if (geometry.type === 'Polygon') {
     return (geometry.coordinates || []).map((ring: [number, number][]) => ring.map(([lng, lat]) => [lat, lng]))
   }
-
   if (geometry.type === 'MultiPolygon') {
-    return (geometry.coordinates || []).flatMap((polygon: [number, number][][]) => (
-      polygon.map((ring: [number, number][]) => ring.map(([lng, lat]) => [lat, lng]))
-    ))
+    return (geometry.coordinates || []).flatMap((polygon: [number, number][][]) => polygon.map((ring: [number, number][]) => ring.map(([lng, lat]) => [lat, lng])))
   }
-
   return []
 }
 
 const GoogleTrackingMap = ({
+  mapMode,
+  fleetCars,
+  selectedFleetCar,
   currentPoint,
   currentPosition,
-  selectedCarName,
   routePoints,
   routeStartPoint,
   routeEndPoint,
   geofenceShapes,
+  onMarkerClick,
 }: {
+  mapMode: FleetMode
+  fleetCars: FleetCarView[]
+  selectedFleetCar: FleetCarView | null
   currentPoint: LatLngTuple | null
-  currentPosition?: bookcarsTypes.TraccarPosition | null
-  selectedCarName: string
+  currentPosition: bookcarsTypes.TraccarPosition | null
   routePoints: LatLngTuple[]
   routeStartPoint: LatLngTuple | null
   routeEndPoint: LatLngTuple | null
   geofenceShapes: ParsedGeofence[]
+  onMarkerClick: (carId: string) => void
 }) => {
   const { isLoaded } = useJsApiLoader({
     id: 'bookcars-google-maps',
     googleMapsApiKey: env.GOOGLE_MAPS_API_KEY,
   })
+
+  const fleetMarkers = useMemo(() => fleetCars.filter((item) => item.currentPoint), [fleetCars])
 
   const onLoad = React.useCallback((map: google.maps.Map) => {
     const bounds = new google.maps.LatLngBounds()
@@ -317,25 +256,27 @@ const GoogleTrackingMap = ({
       hasBounds = true
     }
 
-    if (currentPoint) {
-      extend(currentPoint)
+    if (mapMode === 'fleet') {
+      fleetMarkers.forEach((item) => item.currentPoint && extend(item.currentPoint))
+    } else {
+      if (currentPoint) {
+        extend(currentPoint)
+      }
+      routePoints.forEach(extend)
+      geofenceShapes.forEach((shape) => {
+        if (shape.center) {
+          extend(shape.center)
+        }
+        shape.points?.forEach(extend)
+        if (shape.bounds) {
+          extend(shape.bounds[0])
+          extend(shape.bounds[1])
+        }
+        if (shape.geojson) {
+          extractGeoJsonPaths(shape.geojson).forEach((ring) => ring.forEach(extend))
+        }
+      })
     }
-
-    routePoints.forEach(extend)
-
-    geofenceShapes.forEach((shape) => {
-      if (shape.center) {
-        extend(shape.center)
-      }
-      shape.points?.forEach(extend)
-      if (shape.bounds) {
-        extend(shape.bounds[0])
-        extend(shape.bounds[1])
-      }
-      if (shape.geojson) {
-        extractGeoJsonPaths(shape.geojson).forEach((ring) => ring.forEach(extend))
-      }
-    })
 
     if (hasBounds) {
       map.fitBounds(bounds, 40)
@@ -343,15 +284,27 @@ const GoogleTrackingMap = ({
       map.setCenter(toGoogleLatLng(DEFAULT_CENTER))
       map.setZoom(7)
     }
-  }, [currentPoint, routePoints, geofenceShapes])
+  }, [currentPoint, fleetMarkers, geofenceShapes, mapMode, routePoints])
 
   if (!env.GOOGLE_MAPS_API_KEY) {
     return <div className="tracking-map-empty"><Typography variant="body2">Google Maps API key is missing.</Typography></div>
   }
 
   if (!isLoaded) {
-    return <div className="tracking-map-empty"><Typography variant="body2">Loading Google Maps...</Typography></div>
+    return <div className="tracking-map-empty"><Typography variant="body2">{commonStrings.LOADING}</Typography></div>
   }
+
+  const buildMarkerIcon = (color: string, scale: number): google.maps.Symbol => ({
+    path: google.maps.SymbolPath.CIRCLE,
+    fillColor: color,
+    fillOpacity: 1,
+    strokeColor: '#ffffff',
+    strokeWeight: 2,
+    scale,
+  })
+
+  const infoPoint = mapMode === 'fleet' ? selectedFleetCar?.currentPoint || null : currentPoint
+  const infoPosition = mapMode === 'fleet' ? selectedFleetCar?.position || null : currentPosition
 
   return (
     <GoogleMap
@@ -361,11 +314,10 @@ const GoogleTrackingMap = ({
       onLoad={onLoad}
       options={{ streetViewControl: false, mapTypeControl: false, fullscreenControl: true }}
     >
-      {geofenceShapes.map((geofence) => {
+      {mapMode === 'single' && geofenceShapes.map((geofence) => {
         if (geofence.shape === 'circle' && geofence.center && geofence.radius) {
           return <CircleF key={`${geofence.id}`} center={toGoogleLatLng(geofence.center)} radius={geofence.radius} options={{ strokeColor: '#00897b', fillColor: '#4db6ac', fillOpacity: 0.18, strokeWeight: 2 }} />
         }
-
         if (geofence.shape === 'rectangle' && geofence.bounds) {
           const north = Math.max(geofence.bounds[0][0], geofence.bounds[1][0])
           const south = Math.min(geofence.bounds[0][0], geofence.bounds[1][0])
@@ -373,30 +325,40 @@ const GoogleTrackingMap = ({
           const west = Math.min(geofence.bounds[0][1], geofence.bounds[1][1])
           return <RectangleF key={`${geofence.id}`} bounds={{ north, south, east, west }} options={{ strokeColor: '#00897b', fillColor: '#4db6ac', fillOpacity: 0.18, strokeWeight: 2 }} />
         }
-
         if (geofence.shape === 'polygon' && geofence.points) {
           return <PolygonF key={`${geofence.id}`} paths={geofence.points.map(toGoogleLatLng)} options={{ strokeColor: '#00897b', fillColor: '#4db6ac', fillOpacity: 0.18, strokeWeight: 2 }} />
         }
-
         if (geofence.shape === 'geojson' && geofence.geojson) {
           return extractGeoJsonPaths(geofence.geojson).map((ring, index) => (
             <PolygonF key={`${geofence.id}-${index}`} paths={ring.map(toGoogleLatLng)} options={{ strokeColor: '#00897b', fillColor: '#4db6ac', fillOpacity: 0.18, strokeWeight: 2 }} />
           ))
         }
-
         return null
       })}
 
-      {routePoints.length > 1 && <PolylineF path={routePoints.map(toGoogleLatLng)} options={{ strokeColor: '#1976d2', strokeWeight: 4, strokeOpacity: 0.9 }} />}
-      {routeStartPoint && routePoints.length > 1 && <MarkerF position={toGoogleLatLng(routeStartPoint)} title={strings.ROUTE_START} />}
-      {routeEndPoint && routePoints.length > 1 && <MarkerF position={toGoogleLatLng(routeEndPoint)} title={strings.ROUTE_END} />}
-      {currentPoint && <MarkerF position={toGoogleLatLng(currentPoint)} title={selectedCarName} />}
-      {currentPoint && (
-        <InfoWindow position={toGoogleLatLng(currentPoint)}>
-          <div>
-            <strong>{selectedCarName}</strong>
-            <br />
-            {`${formatCoordinate(currentPosition?.latitude)}, ${formatCoordinate(currentPosition?.longitude)}`}
+      {mapMode === 'single' && routePoints.length > 1 && <PolylineF path={routePoints.map(toGoogleLatLng)} options={{ strokeColor: '#1976d2', strokeWeight: 4, strokeOpacity: 0.9 }} />}
+      {mapMode === 'single' && routeStartPoint && routePoints.length > 1 && <MarkerF position={toGoogleLatLng(routeStartPoint)} title={strings.ROUTE_START} icon={buildMarkerIcon('#2e7d32', 7)} />}
+      {mapMode === 'single' && routeEndPoint && routePoints.length > 1 && <MarkerF position={toGoogleLatLng(routeEndPoint)} title={strings.ROUTE_END} icon={buildMarkerIcon('#6a1b9a', 7)} />}
+      {mapMode === 'single' && currentPoint && <MarkerF position={toGoogleLatLng(currentPoint)} title={selectedFleetCar?.car.name || strings.SELECT_CAR} icon={buildMarkerIcon('#d32f2f', 8)} />}
+      {mapMode === 'fleet' && fleetMarkers.map((item) => (
+        <MarkerF
+          key={item.car._id}
+          position={toGoogleLatLng(item.currentPoint as LatLngTuple)}
+          title={item.car.name}
+          onClick={() => onMarkerClick(item.car._id)}
+          icon={buildMarkerIcon(item.car._id === selectedFleetCar?.car._id ? '#0f172a' : item.isOnline ? '#0284c7' : '#94a3b8', item.car._id === selectedFleetCar?.car._id ? 9 : 7)}
+        />
+      ))}
+      {infoPoint && (
+        <InfoWindow position={toGoogleLatLng(infoPoint)}>
+          <div className="tracking-map-info">
+            <strong>{selectedFleetCar?.car.name || strings.SELECT_CAR}</strong>
+            {selectedFleetCar?.car.licensePlate && <div>{selectedFleetCar.car.licensePlate}</div>}
+            <div>{`${formatCoordinate(infoPosition?.latitude)}, ${formatCoordinate(infoPosition?.longitude)}`}</div>
+            {selectedFleetCar?.deviceStatus && <div>{`${strings.DEVICE_STATUS}: ${selectedFleetCar.deviceStatus}`}</div>}
+            {infoPosition?.speed !== undefined && <div>{`${strings.SPEED}: ${formatNumber(infoPosition.speed, ' kn')}`}</div>}
+            <div>{`${strings.TIME}: ${formatTimestamp(getPositionTimestamp(infoPosition))}`}</div>
+            {infoPosition?.address && <div>{infoPosition.address}</div>}
           </div>
         </InfoWindow>
       )}
@@ -407,8 +369,11 @@ const GoogleTrackingMap = ({
 const Tracking = () => {
   const [user, setUser] = useState<bookcarsTypes.User>()
   const [cars, setCars] = useState<bookcarsTypes.Car[]>([])
+  const [devices, setDevices] = useState<bookcarsTypes.TraccarDevice[]>([])
+  const [fleetOverview, setFleetOverview] = useState<TraccarService.TraccarFleetItem[]>([])
   const [selectedCarId, setSelectedCarId] = useState('')
-  const [selectedCar, setSelectedCar] = useState<bookcarsTypes.Car | null>(null)
+  const [mapMode, setMapMode] = useState<FleetMode>('fleet')
+  const [fleetSearch, setFleetSearch] = useState('')
   const [trackingEnabled, setTrackingEnabled] = useState(false)
   const [deviceId, setDeviceId] = useState('')
   const [deviceName, setDeviceName] = useState('')
@@ -424,6 +389,15 @@ const Tracking = () => {
   const [from, setFrom] = useState(formatDateInput(new Date(now.getTime() - 24 * 60 * 60 * 1000)))
   const [to, setTo] = useState(formatDateInput(now))
 
+  const selectedCar = useMemo(() => cars.find((item) => item._id === selectedCarId) || null, [cars, selectedCarId])
+
+  useEffect(() => {
+    setTrackingEnabled(selectedCar?.tracking?.enabled ?? false)
+    setDeviceId(selectedCar?.tracking?.deviceId ? `${selectedCar.tracking.deviceId}` : '')
+    setDeviceName(selectedCar?.tracking?.deviceName || '')
+    setNotes(selectedCar?.tracking?.notes || '')
+  }, [selectedCar])
+
   const geofenceLookup = useMemo(() => {
     const lookup = new Map<number, string>()
     geofences.forEach((geofence) => {
@@ -434,7 +408,58 @@ const Tracking = () => {
     return lookup
   }, [geofences])
 
-  const currentPosition = positions.length > 0 ? positions[0] : null
+  const fleetOverviewByCarId = useMemo(() => {
+    const lookup = new Map<string, TraccarService.TraccarFleetItem>()
+    fleetOverview.forEach((item) => lookup.set(item.carId, item))
+    return lookup
+  }, [fleetOverview])
+
+  const fleetCars = useMemo<FleetCarView[]>(() => {
+    const result = cars.map((car) => {
+      const snapshot = fleetOverviewByCarId.get(car._id)
+      const position = car._id === selectedCarId && positions[0] ? positions[0] : snapshot?.position || null
+      const deviceStatus = snapshot?.deviceStatus || car.tracking?.status || ''
+      const isLinked = typeof car.tracking?.deviceId === 'number'
+
+      return {
+        car,
+        snapshot,
+        position,
+        currentPoint: toLatLng(position),
+        deviceName: snapshot?.deviceName || car.tracking?.deviceName || '',
+        deviceStatus,
+        isLinked,
+        isOnline: deviceStatus.trim().toLowerCase() === 'online',
+        lastSeen: formatTimestamp(getPositionTimestamp(position) || snapshot?.lastSyncedAt),
+      }
+    })
+
+    result.sort((left, right) => {
+      if (left.isOnline !== right.isOnline) {
+        return left.isOnline ? -1 : 1
+      }
+      if (left.isLinked !== right.isLinked) {
+        return left.isLinked ? -1 : 1
+      }
+      return left.car.name.localeCompare(right.car.name)
+    })
+
+    return result
+  }, [cars, fleetOverviewByCarId, positions, selectedCarId])
+
+  const filteredFleetCars = useMemo(() => {
+    const query = fleetSearch.trim().toLowerCase()
+    if (!query) {
+      return fleetCars
+    }
+
+    return fleetCars.filter((item) => (
+      toSearchText(item.car.name, item.car.licensePlate, item.deviceName, item.car.supplier?.fullName).includes(query)
+    ))
+  }, [fleetCars, fleetSearch])
+
+  const selectedFleetCar = useMemo(() => fleetCars.find((item) => item.car._id === selectedCarId) || null, [fleetCars, selectedCarId])
+  const currentPosition = positions[0] || selectedFleetCar?.position || null
   const currentPoint = useMemo(() => toLatLng(currentPosition), [currentPosition])
   const routePoints = useMemo(() => route.map((position) => toLatLng(position)).filter((point): point is LatLngTuple => point !== null), [route])
   const geofenceShapes = useMemo(() => geofences.map(parseGeofenceArea).filter((shape): shape is ParsedGeofence => shape !== null), [geofences])
@@ -444,6 +469,12 @@ const Tracking = () => {
   const routeEndPoint = useMemo(() => toLatLng(routeEnd), [routeEnd])
   const latestAlert = alerts[0]
 
+  const linkedCarsCount = fleetCars.filter((item) => item.isLinked).length
+  const liveCarsCount = fleetCars.filter((item) => item.currentPoint).length
+  const onlineCarsCount = fleetCars.filter((item) => item.isOnline).length
+  const canLoadTracking = !!selectedCar?.tracking?.deviceId && integrationEnabled
+  const hasMapData = mapMode === 'fleet' ? liveCarsCount > 0 : !!currentPoint || routePoints.length > 0 || geofenceShapes.length > 0
+
   const resetTrackingData = () => {
     setPositions([])
     setRoute([])
@@ -451,18 +482,12 @@ const Tracking = () => {
     setAlerts([])
   }
 
-  const handleCarChange = (carId: string) => {
+  const selectCar = (carId: string) => {
     setSelectedCarId(carId)
-    const car = cars.find((item) => item._id === carId) || null
-    setSelectedCar(car)
-    setTrackingEnabled(car?.tracking?.enabled ?? false)
-    setDeviceId(car?.tracking?.deviceId ? car.tracking.deviceId.toString() : '')
-    setDeviceName(car?.tracking?.deviceName || '')
-    setNotes(car?.tracking?.notes || '')
     resetTrackingData()
   }
 
-  const handleLoadCars = async () => {
+  const loadCars = async () => {
     const payload: bookcarsTypes.GetCarsPayload = {
       suppliers: [],
       carType: bookcarsHelper.getAllCarTypes(),
@@ -480,13 +505,47 @@ const Tracking = () => {
     const suppliers = await SupplierService.getAllSuppliers()
     payload.suppliers = bookcarsHelper.flattenSuppliers(suppliers)
 
-    const data = await CarService.getCars('', payload, 1, env.CARS_PAGE_SIZE)
-    const _data = data && data.length > 0 ? data[0] : { pageInfo: { totalRecord: 0 }, resultData: [] }
-    const result = _data?.resultData || []
-    setCars(result)
+    const firstPage = await CarService.getCars('', payload, 1, CARS_FETCH_SIZE)
+    const { rows: firstRows, totalRecords } = extractResultPage(firstPage)
+    const totalPages = Math.max(1, Math.ceil(totalRecords / CARS_FETCH_SIZE))
 
-    if (result.length > 0 && !selectedCarId) {
-      handleCarChange(result[0]._id)
+    if (totalPages === 1) {
+      return firstRows
+    }
+
+    const pageNumbers = Array.from({ length: totalPages - 1 }, (_, index) => index + 2)
+    const remainingPages = await Promise.all(pageNumbers.map((pageNumber) => CarService.getCars('', payload, pageNumber, CARS_FETCH_SIZE)))
+    return [...firstRows, ...remainingPages.flatMap((pageData) => extractResultPage(pageData).rows)]
+  }
+
+  const loadFleetOverview = async () => {
+    if (!integrationEnabled) {
+      setFleetOverview([])
+      return
+    }
+    setFleetOverview(await TraccarService.getFleetOverview())
+  }
+
+  const loadDevices = async () => {
+    if (!integrationEnabled) {
+      setDevices([])
+      return
+    }
+    setDevices(await TraccarService.getDevices())
+  }
+
+  const handleRefreshFleet = async () => {
+    if (!integrationEnabled) {
+      return
+    }
+
+    setLoading(true)
+    try {
+      await Promise.all([loadFleetOverview(), loadDevices()])
+    } catch (err) {
+      helper.error(err)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -494,7 +553,6 @@ const Tracking = () => {
     if (!selectedCar) {
       return
     }
-
     if (!deviceId) {
       helper.error(null, commonStrings.FIELD_NOT_VALID)
       return
@@ -508,9 +566,10 @@ const Tracking = () => {
         notes,
         enabled: trackingEnabled,
       })
+
       const updated = { ...selectedCar, tracking }
-      setSelectedCar(updated)
       setCars((prev) => prev.map((car) => (car._id === updated._id ? updated : car)))
+      await Promise.all([loadFleetOverview(), loadDevices()])
       helper.info(commonStrings.UPDATED)
     } catch (err) {
       helper.error(err)
@@ -528,13 +587,9 @@ const Tracking = () => {
     try {
       const tracking = await TraccarService.unlinkDevice(selectedCar._id)
       const updated = { ...selectedCar, tracking }
-      setSelectedCar(updated)
       setCars((prev) => prev.map((car) => (car._id === updated._id ? updated : car)))
-      setDeviceId('')
-      setDeviceName('')
-      setNotes('')
-      setTrackingEnabled(false)
       resetTrackingData()
+      await loadFleetOverview()
       helper.info(commonStrings.UPDATED)
     } catch (err) {
       helper.error(err)
@@ -550,8 +605,7 @@ const Tracking = () => {
 
     setLoading(true)
     try {
-      const data = await TraccarService.getPositions(selectedCar._id)
-      setPositions(data)
+      setPositions(await TraccarService.getPositions(selectedCar._id))
     } catch (err) {
       helper.error(err)
     } finally {
@@ -566,8 +620,7 @@ const Tracking = () => {
 
     setLoading(true)
     try {
-      const data = await TraccarService.getRoute(selectedCar._id, new Date(from).toISOString(), new Date(to).toISOString())
-      setRoute(data)
+      setRoute(await TraccarService.getRoute(selectedCar._id, new Date(from).toISOString(), new Date(to).toISOString()))
     } catch (err) {
       helper.error(err)
     } finally {
@@ -582,8 +635,7 @@ const Tracking = () => {
 
     setLoading(true)
     try {
-      const data = await TraccarService.getGeofences(selectedCar._id)
-      setGeofences(data)
+      setGeofences(await TraccarService.getGeofences(selectedCar._id))
     } catch (err) {
       helper.error(err)
     } finally {
@@ -598,8 +650,32 @@ const Tracking = () => {
 
     setLoading(true)
     try {
-      const data = await TraccarService.getGeofenceAlerts(selectedCar._id, new Date(from).toISOString(), new Date(to).toISOString())
-      setAlerts(data)
+      setAlerts(await TraccarService.getGeofenceAlerts(selectedCar._id, new Date(from).toISOString(), new Date(to).toISOString()))
+    } catch (err) {
+      helper.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleLoadSnapshot = async () => {
+    if (!selectedCar) {
+      return
+    }
+
+    setLoading(true)
+    try {
+      const [currentData, routeData, geofenceData, alertData] = await Promise.all([
+        TraccarService.getPositions(selectedCar._id),
+        TraccarService.getRoute(selectedCar._id, new Date(from).toISOString(), new Date(to).toISOString()),
+        TraccarService.getGeofences(selectedCar._id),
+        TraccarService.getGeofenceAlerts(selectedCar._id, new Date(from).toISOString(), new Date(to).toISOString()),
+      ])
+
+      setPositions(currentData)
+      setRoute(routeData)
+      setGeofences(geofenceData)
+      setAlerts(alertData)
     } catch (err) {
       helper.error(err)
     } finally {
@@ -618,7 +694,27 @@ const Tracking = () => {
     try {
       const status = await TraccarService.getStatus()
       setIntegrationEnabled(status.enabled)
-      await handleLoadCars()
+
+      const loadedCars = await loadCars()
+      setCars(loadedCars)
+      const defaultCar = loadedCars.find((car) => car.tracking?.deviceId) || loadedCars[0]
+      if (defaultCar) {
+        setSelectedCarId(defaultCar._id)
+      }
+
+      if (status.enabled) {
+        const [devicesResult, fleetResult] = await Promise.allSettled([
+          TraccarService.getDevices(),
+          TraccarService.getFleetOverview(),
+        ])
+
+        if (devicesResult.status === 'fulfilled') {
+          setDevices(devicesResult.value)
+        }
+        if (fleetResult.status === 'fulfilled') {
+          setFleetOverview(fleetResult.value)
+        }
+      }
     } catch (err) {
       helper.error(err)
       setIntegrationEnabled(false)
@@ -636,195 +732,372 @@ const Tracking = () => {
               <Typography variant="h4" className="tracking-title">{strings.TITLE}</Typography>
               <Typography className="tracking-subtitle">{strings.TRACKING_SUBTITLE}</Typography>
             </div>
-            {selectedCar && <Chip color={trackingEnabled ? 'success' : 'default'} label={trackingEnabled ? strings.TRACKING_ENABLED : strings.TRACKING_DISABLED} />}
+            <div className="tracking-header-chips">
+              <Chip color={integrationEnabled ? 'success' : 'error'} label={integrationEnabled ? strings.LIVE_FLEET : strings.INTEGRATION_DISABLED} />
+              {selectedCar && <Chip color={trackingEnabled ? 'success' : 'default'} label={trackingEnabled ? strings.TRACKING_ENABLED : strings.TRACKING_DISABLED} />}
+            </div>
           </div>
 
           {!integrationEnabled && (
-            <Paper className="tracking-card">
-              <Typography color="error">{strings.INTEGRATION_DISABLED}</Typography>
-            </Paper>
+            <Alert severity="error" className="tracking-info-alert">
+              {strings.INTEGRATION_DISABLED}
+            </Alert>
           )}
 
+          <div className="tracking-summary-grid tracking-summary-grid--hero">
+            <Paper className="tracking-card tracking-stat-card">
+              <Box className="tracking-stat-icon tracking-stat-icon--fleet"><DirectionsCarFilledIcon /></Box>
+              <div>
+                <Typography className="tracking-stat-label">{strings.LIVE_FLEET}</Typography>
+                <Typography variant="h6">{`${liveCarsCount}/${linkedCarsCount}`}</Typography>
+                <Typography className="tracking-stat-note">{strings.LIVE_FLEET_HINT}</Typography>
+              </div>
+            </Paper>
+
+            <Paper className="tracking-card tracking-stat-card">
+              <Box className="tracking-stat-icon tracking-stat-icon--linked"><LinkIcon /></Box>
+              <div>
+                <Typography className="tracking-stat-label">{strings.LINKED_DEVICES}</Typography>
+                <Typography variant="h6">{linkedCarsCount}</Typography>
+                <Typography className="tracking-stat-note">{`${cars.length} ${commonStrings.CARS}`}</Typography>
+              </div>
+            </Paper>
+
+            <Paper className="tracking-card tracking-stat-card">
+              <Box className="tracking-stat-icon tracking-stat-icon--online"><SensorsIcon /></Box>
+              <div>
+                <Typography className="tracking-stat-label">{strings.ONLINE_DEVICES}</Typography>
+                <Typography variant="h6">{onlineCarsCount}</Typography>
+                <Typography className="tracking-stat-note">{selectedFleetCar?.deviceStatus || strings.NO_DATA}</Typography>
+              </div>
+            </Paper>
+
+            <Paper className="tracking-card tracking-stat-card">
+              <Box className="tracking-stat-icon tracking-stat-icon--alerts"><WarningAmberIcon /></Box>
+              <div>
+                <Typography className="tracking-stat-label">{strings.SELECTED_VEHICLE}</Typography>
+                <Typography variant="h6">{selectedCar?.name || strings.NO_DATA}</Typography>
+                <Typography className="tracking-stat-note">{selectedCar?.licensePlate || strings.NO_DATA}</Typography>
+              </div>
+            </Paper>
+          </div>
+
           <Paper className="tracking-card tracking-controls-card">
-            <FormControl fullWidth>
-              <InputLabel>{strings.SELECT_CAR}</InputLabel>
-              <Select
-                value={selectedCarId}
-                label={strings.SELECT_CAR}
-                onChange={(event) => handleCarChange(event.target.value as string)}
-              >
-                {cars.map((car) => (
-                  <MenuItem key={car._id} value={car._id}>{car.name}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Paper>
+            <div className="tracking-toolbar">
+              <div className="tracking-toolbar-group">
+                <ToggleButtonGroup
+                  value={mapMode}
+                  exclusive
+                  onChange={(_event, value: FleetMode | null) => value && setMapMode(value)}
+                  size="small"
+                  className="tracking-mode-toggle"
+                >
+                  <ToggleButton value="fleet">{strings.FLEET_MODE}</ToggleButton>
+                  <ToggleButton value="single">{strings.SINGLE_MODE}</ToggleButton>
+                </ToggleButtonGroup>
 
-          {selectedCar && (
-            <div className="tracking-layout">
-              <div className="tracking-main-column">
-                <Paper className="tracking-card tracking-map-card">
-                  <div className="tracking-header">
-                    <div>
-                      <Typography variant="h6">{strings.MAP_OVERVIEW}</Typography>
-                      <Typography className="tracking-card-subtitle">{strings.MAP_HINT}</Typography>
-                    </div>
-                    <div className="tracking-map-legend">
-                      <span><i className="tracking-legend-dot tracking-legend-dot--current" /> {strings.CURRENT_POSITION}</span>
-                      <span><i className="tracking-legend-line" /> {strings.ROUTE_HISTORY}</span>
-                      <span><i className="tracking-legend-zone" /> {strings.GEOFENCES}</span>
-                    </div>
-                  </div>
-
-                  <div className="tracking-map-shell">
-                    {(!currentPoint && routePoints.length === 0 && geofenceShapes.length === 0)
-                      ? (
-                        <div className="tracking-map-empty">
-                          <Typography variant="body1">{strings.NO_MAP_DATA}</Typography>
-                          <Typography variant="body2">{strings.MAP_EMPTY_HELP}</Typography>
-                        </div>
-                        )
-                      : (
-                        <GoogleTrackingMap
-                          currentPoint={currentPoint}
-                          currentPosition={currentPosition}
-                          selectedCarName={selectedCar.name}
-                          routePoints={routePoints}
-                          routeStartPoint={routeStartPoint}
-                          routeEndPoint={routeEndPoint}
-                          geofenceShapes={geofenceShapes}
-                        />
-                        )}
-                  </div>
-                </Paper>
-
-                <div className="tracking-summary-grid">
-                  <Paper className="tracking-card tracking-stat-card">
-                    <Box className="tracking-stat-icon tracking-stat-icon--position"><RoomIcon /></Box>
-                    <div>
-                      <Typography className="tracking-stat-label">{strings.CURRENT_POSITION}</Typography>
-                      <Typography variant="h6">{currentPoint ? `${formatCoordinate(currentPosition?.latitude)}, ${formatCoordinate(currentPosition?.longitude)}` : '—'}</Typography>
-                      <Typography className="tracking-stat-note">{currentPosition?.address || strings.NO_DATA}</Typography>
-                    </div>
-                  </Paper>
-                  <Paper className="tracking-card tracking-stat-card">
-                    <Box className="tracking-stat-icon tracking-stat-icon--route"><RouteIcon /></Box>
-                    <div>
-                      <Typography className="tracking-stat-label">{strings.ROUTE_POINTS}</Typography>
-                      <Typography variant="h6">{routePoints.length}</Typography>
-                      <Typography className="tracking-stat-note">{routeStart ? formatTimestamp(routeStart.deviceTime || routeStart.serverTime || routeStart.fixTime) : strings.NO_DATA}</Typography>
-                    </div>
-                  </Paper>
-                  <Paper className="tracking-card tracking-stat-card">
-                    <Box className="tracking-stat-icon tracking-stat-icon--geofence"><RadarIcon /></Box>
-                    <div>
-                      <Typography className="tracking-stat-label">{strings.GEOFENCES}</Typography>
-                      <Typography variant="h6">{geofences.length}</Typography>
-                      <Typography className="tracking-stat-note">{geofenceShapes.length > 0 ? `${geofenceShapes.length} ${strings.MAP_READY}` : strings.NO_DATA}</Typography>
-                    </div>
-                  </Paper>
-                  <Paper className="tracking-card tracking-stat-card">
-                    <Box className="tracking-stat-icon tracking-stat-icon--alerts"><WarningAmberIcon /></Box>
-                    <div>
-                      <Typography className="tracking-stat-label">{strings.GEOFENCE_ALERTS}</Typography>
-                      <Typography variant="h6">{alerts.length}</Typography>
-                      <Typography className="tracking-stat-note">{latestAlert ? formatTimestamp(latestAlert.eventTime) : strings.NO_DATA}</Typography>
-                    </div>
-                  </Paper>
-                </div>
+                <FormControl className="tracking-car-select">
+                  <InputLabel>{strings.SELECT_CAR}</InputLabel>
+                  <Select
+                    value={selectedCarId}
+                    label={strings.SELECT_CAR}
+                    onChange={(event) => selectCar(event.target.value as string)}
+                  >
+                    {cars.map((car) => (
+                      <MenuItem key={car._id} value={car._id}>{car.name}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               </div>
 
-              <div className="tracking-side-column">
-                <Paper className="tracking-card">
-                  <Typography variant="h6" className="tracking-section-title">{strings.LINK_DEVICE}</Typography>
-                  <div className="tracking-grid">
-                    <FormControlLabel
-                      control={(
-                        <Switch
-                          checked={trackingEnabled}
-                          onChange={(event) => setTrackingEnabled(event.target.checked)}
-                        />
-                      )}
-                      label={strings.TRACKING_ENABLED}
-                    />
-                    <TextField
-                      label={strings.DEVICE_ID}
-                      value={deviceId}
-                      onChange={(event) => setDeviceId(event.target.value)}
-                    />
-                    <TextField
-                      label={strings.DEVICE_NAME}
-                      value={deviceName}
-                      onChange={(event) => setDeviceName(event.target.value)}
-                    />
-                    <TextField
-                      label={strings.NOTES}
-                      value={notes}
-                      onChange={(event) => setNotes(event.target.value)}
-                    />
+              <div className="tracking-toolbar-group tracking-toolbar-group--actions">
+                <Button variant="contained" className="btn-primary" onClick={handleRefreshFleet} disabled={!integrationEnabled}>
+                  {strings.REFRESH_FLEET}
+                </Button>
+                <Button variant="contained" className="btn-secondary" onClick={handleLoadSnapshot} disabled={!canLoadTracking}>
+                  {strings.LOAD_SNAPSHOT}
+                </Button>
+              </div>
+            </div>
+          </Paper>
+
+          <div className="tracking-layout">
+            <div className="tracking-main-column">
+              <Paper className="tracking-card tracking-map-card">
+                <div className="tracking-header">
+                  <div>
+                    <Typography variant="h6">{strings.MAP_OVERVIEW}</Typography>
+                    <Typography className="tracking-card-subtitle">
+                      {mapMode === 'fleet' ? strings.LIVE_FLEET_HINT : strings.MAP_HINT}
+                    </Typography>
                   </div>
-                  <div className="tracking-actions">
-                    <Button variant="contained" className="btn-primary" onClick={handleLink} disabled={!integrationEnabled}>{strings.LINK_DEVICE}</Button>
-                    <Button variant="contained" className="btn-secondary" onClick={handleUnlink}>{strings.UNLINK_DEVICE}</Button>
+                  <div className="tracking-map-legend">
+                    {mapMode === 'fleet'
+                      ? (
+                        <>
+                          <span><i className="tracking-legend-dot tracking-legend-dot--fleet" /> {strings.LIVE_FLEET}</span>
+                          <span><i className="tracking-legend-dot tracking-legend-dot--selected" /> {strings.SELECTED_VEHICLE}</span>
+                          <span><i className="tracking-legend-dot tracking-legend-dot--offline" /> {strings.TRACKING_DISABLED}</span>
+                        </>
+                        )
+                      : (
+                        <>
+                          <span><i className="tracking-legend-dot tracking-legend-dot--current" /> {strings.CURRENT_POSITION}</span>
+                          <span><i className="tracking-legend-line" /> {strings.ROUTE_HISTORY}</span>
+                          <span><i className="tracking-legend-zone" /> {strings.GEOFENCES}</span>
+                        </>
+                        )}
+                  </div>
+                </div>
+
+                <div className="tracking-map-shell">
+                  {!hasMapData
+                    ? (
+                      <div className="tracking-map-empty">
+                        <Typography variant="body1">{mapMode === 'fleet' ? strings.FLEET_EMPTY : strings.NO_MAP_DATA}</Typography>
+                        <Typography variant="body2">{mapMode === 'fleet' ? strings.LIVE_FLEET_HINT : strings.MAP_EMPTY_HELP}</Typography>
+                      </div>
+                      )
+                    : (
+                      <GoogleTrackingMap
+                        mapMode={mapMode}
+                        fleetCars={fleetCars}
+                        selectedFleetCar={selectedFleetCar}
+                        currentPoint={currentPoint}
+                        currentPosition={currentPosition}
+                        routePoints={routePoints}
+                        routeStartPoint={routeStartPoint}
+                        routeEndPoint={routeEndPoint}
+                        geofenceShapes={geofenceShapes}
+                        onMarkerClick={selectCar}
+                      />
+                      )}
+                </div>
+              </Paper>
+
+              <div className="tracking-summary-grid">
+                <Paper className="tracking-card tracking-stat-card">
+                  <Box className="tracking-stat-icon tracking-stat-icon--position"><MyLocationIcon /></Box>
+                  <div>
+                    <Typography className="tracking-stat-label">{strings.CURRENT_POSITION}</Typography>
+                    <Typography variant="h6">{currentPoint ? `${formatCoordinate(currentPosition?.latitude)}, ${formatCoordinate(currentPosition?.longitude)}` : '-'}</Typography>
+                    <Typography className="tracking-stat-note">{currentPosition?.address || strings.NO_DATA}</Typography>
                   </div>
                 </Paper>
 
-                <Paper className="tracking-card">
-                  <div className="tracking-header">
-                    <Typography variant="h6">{strings.CURRENT_POSITION}</Typography>
-                    <Button variant="contained" className="btn-primary" onClick={handleFetchPositions} disabled={!integrationEnabled}>{strings.FETCH}</Button>
+                <Paper className="tracking-card tracking-stat-card">
+                  <Box className="tracking-stat-icon tracking-stat-icon--route"><RouteIcon /></Box>
+                  <div>
+                    <Typography className="tracking-stat-label">{strings.ROUTE_POINTS}</Typography>
+                    <Typography variant="h6">{routePoints.length}</Typography>
+                    <Typography className="tracking-stat-note">{routeStart ? formatTimestamp(getPositionTimestamp(routeStart)) : strings.NO_DATA}</Typography>
                   </div>
-                  {currentPosition ? (
+                </Paper>
+
+                <Paper className="tracking-card tracking-stat-card">
+                  <Box className="tracking-stat-icon tracking-stat-icon--geofence"><RadarIcon /></Box>
+                  <div>
+                    <Typography className="tracking-stat-label">{strings.GEOFENCES}</Typography>
+                    <Typography variant="h6">{geofences.length}</Typography>
+                    <Typography className="tracking-stat-note">{geofenceShapes.length > 0 ? `${geofenceShapes.length} ${strings.MAP_READY}` : strings.NO_DATA}</Typography>
+                  </div>
+                </Paper>
+
+                <Paper className="tracking-card tracking-stat-card">
+                  <Box className="tracking-stat-icon tracking-stat-icon--alerts"><WarningAmberIcon /></Box>
+                  <div>
+                    <Typography className="tracking-stat-label">{strings.GEOFENCE_ALERTS}</Typography>
+                    <Typography variant="h6">{alerts.length}</Typography>
+                    <Typography className="tracking-stat-note">{latestAlert ? formatTimestamp(latestAlert.eventTime) : strings.NO_DATA}</Typography>
+                  </div>
+                </Paper>
+              </div>
+            </div>
+
+            <div className="tracking-side-column">
+              <Paper className="tracking-card tracking-fleet-roster-card">
+                <div className="tracking-header">
+                  <div>
+                    <Typography variant="h6">{strings.LIVE_FLEET}</Typography>
+                    <Typography className="tracking-card-subtitle">{`${filteredFleetCars.length}/${cars.length} ${commonStrings.CARS}`}</Typography>
+                  </div>
+                  <Chip size="small" label={`${liveCarsCount} ${strings.CURRENT_POSITION}`} />
+                </div>
+
+                <TextField
+                  value={fleetSearch}
+                  onChange={(event) => setFleetSearch(event.target.value)}
+                  placeholder={strings.SEARCH_CARS}
+                  fullWidth
+                  className="tracking-search"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon fontSize="small" />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+
+                <div className="tracking-fleet-list">
+                  {filteredFleetCars.map((item) => (
+                    <button
+                      type="button"
+                      key={item.car._id}
+                      className={`tracking-fleet-item${item.car._id === selectedCarId ? ' tracking-fleet-item--active' : ''}`}
+                      onClick={() => selectCar(item.car._id)}
+                    >
+                      <div className="tracking-fleet-avatar-shell">
+                        <div className="tracking-fleet-avatar">{item.car.name.slice(0, 1)}</div>
+                      </div>
+
+                      <div className="tracking-fleet-body">
+                        <div className="tracking-fleet-row">
+                          <Typography className="tracking-fleet-name">{item.car.name}</Typography>
+                          <Chip
+                            size="small"
+                            color={item.isLinked ? getStatusTone(item.deviceStatus) : 'default'}
+                            label={item.isLinked ? (item.deviceStatus || strings.TRACKING_ENABLED) : strings.TRACKING_NOT_LINKED}
+                          />
+                        </div>
+                        <Typography className="tracking-list-subtext">{item.car.licensePlate || strings.NO_DATA}</Typography>
+                        <div className="tracking-fleet-meta">
+                          <span>{item.deviceName || item.car.supplier?.fullName || strings.NO_DATA}</span>
+                          <span>{item.lastSeen}</span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </Paper>
+
+              <Paper className="tracking-card">
+                <div className="tracking-header">
+                  <div>
+                    <Typography variant="h6">{strings.LINK_DEVICE}</Typography>
+                    <Typography className="tracking-card-subtitle">{selectedCar?.name || strings.SELECT_CAR}</Typography>
+                  </div>
+                  {selectedFleetCar?.snapshot?.deviceStatus && (
+                    <Chip size="small" color={getStatusTone(selectedFleetCar.snapshot.deviceStatus)} label={selectedFleetCar.snapshot.deviceStatus} />
+                  )}
+                </div>
+
+                {selectedCar
+                  ? (
+                    <>
+                      {!selectedCar.tracking?.deviceId && (
+                        <Alert severity="info" className="tracking-inline-alert">
+                          {strings.TRACKING_NOT_LINKED}
+                        </Alert>
+                      )}
+
+                      <div className="tracking-grid">
+                        <FormControlLabel
+                          control={<Switch checked={trackingEnabled} onChange={(event) => setTrackingEnabled(event.target.checked)} />}
+                          label={strings.TRACKING_ENABLED}
+                        />
+                        <FormControl>
+                          <InputLabel>{strings.SELECT_DEVICE}</InputLabel>
+                          <Select
+                            value={deviceId}
+                            label={strings.SELECT_DEVICE}
+                            onChange={(event) => {
+                              const nextDeviceId = event.target.value as string
+                              setDeviceId(nextDeviceId)
+                              const nextDevice = devices.find((item) => `${item.id}` === nextDeviceId)
+                              if (nextDevice?.name) {
+                                setDeviceName(nextDevice.name)
+                              }
+                            }}
+                          >
+                            {devices.map((device) => (
+                              <MenuItem key={device.id} value={`${device.id}`}>
+                                {`${device.name || `Device ${device.id}`} ${device.status ? `(${device.status})` : ''}`}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        <TextField label={strings.DEVICE_ID} value={deviceId} onChange={(event) => setDeviceId(event.target.value)} />
+                        <TextField label={strings.DEVICE_NAME} value={deviceName} onChange={(event) => setDeviceName(event.target.value)} />
+                        <TextField label={strings.NOTES} value={notes} onChange={(event) => setNotes(event.target.value)} multiline minRows={2} />
+                      </div>
+
+                      <div className="tracking-actions">
+                        <Button variant="contained" className="btn-primary" onClick={handleLink} disabled={!integrationEnabled}>
+                          {strings.LINK_DEVICE}
+                        </Button>
+                        <Button variant="contained" className="btn-secondary" onClick={handleUnlink} disabled={!selectedCar.tracking?.deviceId}>
+                          {strings.UNLINK_DEVICE}
+                        </Button>
+                      </div>
+                    </>
+                    )
+                  : (
+                    <div className="tracking-empty">{strings.NO_DATA}</div>
+                    )}
+              </Paper>
+
+              <Paper className="tracking-card">
+                <div className="tracking-header">
+                  <Typography variant="h6">{strings.CURRENT_POSITION}</Typography>
+                  <Button variant="contained" className="btn-primary" onClick={handleFetchPositions} disabled={!canLoadTracking}>
+                    {strings.FETCH}
+                  </Button>
+                </div>
+
+                {currentPosition
+                  ? (
                     <div className="tracking-data tracking-detail-list">
-                      <div><RoomIcon fontSize="small" /> {`${formatCoordinate(currentPosition.latitude)}, ${formatCoordinate(currentPosition.longitude)}`}</div>
+                      <div><MyLocationIcon fontSize="small" /> {`${formatCoordinate(currentPosition.latitude)}, ${formatCoordinate(currentPosition.longitude)}`}</div>
                       <div><SpeedIcon fontSize="small" /> {`${strings.SPEED}: ${formatNumber(currentPosition.speed, ' kn')}`}</div>
-                      <div><AccessTimeIcon fontSize="small" /> {`${strings.TIME}: ${formatTimestamp(currentPosition.deviceTime || currentPosition.serverTime || currentPosition.fixTime)}`}</div>
+                      <div><AccessTimeIcon fontSize="small" /> {`${strings.TIME}: ${formatTimestamp(getPositionTimestamp(currentPosition))}`}</div>
                       {currentPosition.address && <div>{`${strings.ADDRESS}: ${currentPosition.address}`}</div>}
                     </div>
-                  ) : (
+                    )
+                  : (
                     <div className="tracking-empty">{strings.NO_DATA}</div>
-                  )}
-                </Paper>
+                    )}
+              </Paper>
 
-                <Paper className="tracking-card">
-                  <div className="tracking-header">
-                    <Typography variant="h6">{strings.ROUTE_HISTORY}</Typography>
-                    <Button variant="contained" className="btn-primary" onClick={handleFetchRoute} disabled={!integrationEnabled}>{strings.FETCH}</Button>
-                  </div>
-                  <div className="tracking-grid">
-                    <TextField
-                      label={strings.FROM}
-                      type="datetime-local"
-                      value={from}
-                      onChange={(event) => setFrom(event.target.value)}
-                    />
-                    <TextField
-                      label={strings.TO}
-                      type="datetime-local"
-                      value={to}
-                      onChange={(event) => setTo(event.target.value)}
-                    />
-                  </div>
-                  {route.length > 0 ? (
+              <Paper className="tracking-card">
+                <div className="tracking-header">
+                  <Typography variant="h6">{strings.ROUTE_HISTORY}</Typography>
+                  <Button variant="contained" className="btn-primary" onClick={handleFetchRoute} disabled={!canLoadTracking}>
+                    {strings.FETCH}
+                  </Button>
+                </div>
+
+                <div className="tracking-grid">
+                  <TextField label={strings.FROM} type="datetime-local" value={from} onChange={(event) => setFrom(event.target.value)} />
+                  <TextField label={strings.TO} type="datetime-local" value={to} onChange={(event) => setTo(event.target.value)} />
+                </div>
+
+                {route.length > 0
+                  ? (
                     <div className="tracking-list">
                       {route.slice(0, 10).map((position, index) => (
                         <div key={position.id || `${position.latitude}-${position.longitude}-${index}`} className="tracking-list-item">
-                          <div>{formatTimestamp(position.deviceTime || position.serverTime || position.fixTime)}</div>
-                          <div>{`${formatCoordinate(position.latitude)}, ${formatCoordinate(position.longitude)}`}</div>
+                          <div>{formatTimestamp(getPositionTimestamp(position))}</div>
+                          <div className="tracking-list-subtext">{`${formatCoordinate(position.latitude)}, ${formatCoordinate(position.longitude)}`}</div>
                         </div>
                       ))}
                     </div>
-                  ) : (
+                    )
+                  : (
                     <div className="tracking-empty">{strings.NO_DATA}</div>
-                  )}
-                </Paper>
+                    )}
+              </Paper>
 
-                <Paper className="tracking-card">
-                  <div className="tracking-header">
-                    <Typography variant="h6">{strings.GEOFENCES}</Typography>
-                    <Button variant="contained" className="btn-primary" onClick={handleFetchGeofences} disabled={!integrationEnabled}>{strings.FETCH}</Button>
-                  </div>
-                  {geofences.length > 0 ? (
+              <Paper className="tracking-card">
+                <div className="tracking-header">
+                  <Typography variant="h6">{strings.GEOFENCES}</Typography>
+                  <Button variant="contained" className="btn-primary" onClick={handleFetchGeofences} disabled={!canLoadTracking}>
+                    {strings.FETCH}
+                  </Button>
+                </div>
+
+                {geofences.length > 0
+                  ? (
                     <div className="tracking-list">
                       {geofences.map((geofence, index) => {
                         const parsed = parseGeofenceArea(geofence, index)
@@ -836,31 +1109,27 @@ const Tracking = () => {
                         )
                       })}
                     </div>
-                  ) : (
+                    )
+                  : (
                     <div className="tracking-empty">{strings.NO_DATA}</div>
-                  )}
-                </Paper>
+                    )}
+              </Paper>
 
-                <Paper className="tracking-card">
-                  <div className="tracking-header">
-                    <Typography variant="h6">{strings.GEOFENCE_ALERTS}</Typography>
-                    <Button variant="contained" className="btn-primary" onClick={handleFetchAlerts} disabled={!integrationEnabled}>{strings.FETCH}</Button>
-                  </div>
-                  <div className="tracking-grid">
-                    <TextField
-                      label={strings.FROM}
-                      type="datetime-local"
-                      value={from}
-                      onChange={(event) => setFrom(event.target.value)}
-                    />
-                    <TextField
-                      label={strings.TO}
-                      type="datetime-local"
-                      value={to}
-                      onChange={(event) => setTo(event.target.value)}
-                    />
-                  </div>
-                  {alerts.length > 0 ? (
+              <Paper className="tracking-card">
+                <div className="tracking-header">
+                  <Typography variant="h6">{strings.GEOFENCE_ALERTS}</Typography>
+                  <Button variant="contained" className="btn-primary" onClick={handleFetchAlerts} disabled={!canLoadTracking}>
+                    {strings.FETCH}
+                  </Button>
+                </div>
+
+                <div className="tracking-grid">
+                  <TextField label={strings.FROM} type="datetime-local" value={from} onChange={(event) => setFrom(event.target.value)} />
+                  <TextField label={strings.TO} type="datetime-local" value={to} onChange={(event) => setTo(event.target.value)} />
+                </div>
+
+                {alerts.length > 0
+                  ? (
                     <div className="tracking-list">
                       {alerts.map((alert, index) => (
                         <div key={alert.id || `${alert.geofenceId}-${index}`} className="tracking-list-item">
@@ -869,21 +1138,19 @@ const Tracking = () => {
                         </div>
                       ))}
                     </div>
-                  ) : (
+                    )
+                  : (
                     <div className="tracking-empty">{strings.NO_DATA}</div>
-                  )}
-                </Paper>
+                    )}
+              </Paper>
 
-                {geofences.length > 0 && geofenceShapes.length !== geofences.length && (
-                  <Alert severity="info" className="tracking-info-alert">
-                    {strings.GEOFENCE_PARSE_NOTICE}
-                  </Alert>
-                )}
-
-                <Divider />
-              </div>
+              {geofences.length > 0 && geofenceShapes.length !== geofences.length && (
+                <Alert severity="info" className="tracking-info-alert">
+                  {strings.GEOFENCE_PARSE_NOTICE}
+                </Alert>
+              )}
             </div>
-          )}
+          </div>
         </div>
       )}
       {loading && <Backdrop text={commonStrings.PLEASE_WAIT} />}

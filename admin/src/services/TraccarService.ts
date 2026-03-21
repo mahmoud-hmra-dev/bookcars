@@ -8,6 +8,17 @@ export interface TraccarLinkPayload {
   enabled?: boolean
 }
 
+export interface TraccarFleetItem {
+  carId: string
+  deviceId: number
+  trackingEnabled: boolean
+  deviceName?: string
+  deviceStatus?: string
+  lastEventType?: string
+  lastSyncedAt?: Date | string
+  position: bookcarsTypes.TraccarPosition | null
+}
+
 export const getStatus = (): Promise<{ enabled: boolean, baseUrl: string }> =>
   axiosInstance
     .get('/api/status', { withCredentials: true })
@@ -16,6 +27,11 @@ export const getStatus = (): Promise<{ enabled: boolean, baseUrl: string }> =>
 export const getDevices = (): Promise<bookcarsTypes.TraccarDevice[]> =>
   axiosInstance
     .get('/api/devices', { withCredentials: true })
+    .then((res) => res.data)
+
+export const getFleetOverview = (): Promise<TraccarFleetItem[]> =>
+  axiosInstance
+    .get('/api/fleet', { withCredentials: true })
     .then((res) => res.data)
 
 export const linkDevice = (carId: string, payload: TraccarLinkPayload): Promise<bookcarsTypes.TraccarCarTracking> =>

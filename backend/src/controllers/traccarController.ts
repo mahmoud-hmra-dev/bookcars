@@ -1,4 +1,5 @@
 import { Request, Response } from 'express'
+import * as bookcarsTypes from ':bookcars-types'
 import * as logger from '../utils/logger'
 import * as env from '../config/env.config'
 import Car from '../models/Car'
@@ -30,12 +31,81 @@ const getCarWithTracking = async (id: string) => {
   return car
 }
 
+const getPositionDate = (position?: bookcarsTypes.TraccarPosition | null) => {
+  if (!position) {
+    return 0
+  }
+
+  const value = position.fixTime || position.deviceTime || position.serverTime
+  const date = value ? new Date(value).getTime() : 0
+  return Number.isFinite(date) ? date : 0
+}
+
 export const getDevices = async (_req: Request, res: Response) => {
   try {
     const devices = await traccarService.getDevices()
     res.json(devices)
   } catch (err) {
     logger.error('[traccar.getDevices] Error', err)
+    res.status(400).send(String(err))
+  }
+}
+
+export const getFleetOverview = async (_req: Request, res: Response) => {
+  try {
+    const cars = await Car.find({
+      'tracking.enabled': true,
+      'tracking.deviceId': { $exists: true, $ne: null },
+    })
+
+    if (!cars.length) {
+      res.json([])
+      return
+    }
+
+    const [positions, devices] = await Promise.all([
+      traccarService.getPositions(),
+      traccarService.getDevices(),
+    ])
+
+    const latestPositionByDeviceId = new Map<number, bookcarsTypes.TraccarPosition>()
+    for (const position of positions) {
+      const positionWithDevice = position as bookcarsTypes.TraccarPosition & { deviceId?: number }
+      const deviceId = positionWithDevice.deviceId
+      if (typeof deviceId !== 'number') {
+        continue
+      }
+
+      const current = latestPositionByDeviceId.get(deviceId)
+      if (!current || getPositionDate(position) >= getPositionDate(current)) {
+        latestPositionByDeviceId.set(deviceId, position)
+      }
+    }
+
+    const deviceById = new Map<number, bookcarsTypes.TraccarDevice>()
+    for (const device of devices) {
+      if (typeof device.id === 'number') {
+        deviceById.set(device.id, device)
+      }
+    }
+
+    res.json(cars.map((car) => {
+      const linkedDeviceId = car.tracking?.deviceId as number
+      const device = deviceById.get(linkedDeviceId)
+
+      return {
+        carId: String(car._id),
+        deviceId: linkedDeviceId,
+        trackingEnabled: !!car.tracking?.enabled,
+        deviceName: device?.name || car.tracking?.deviceName,
+        deviceStatus: device?.status || car.tracking?.status,
+        lastEventType: car.tracking?.lastEventType,
+        lastSyncedAt: car.tracking?.lastSyncedAt,
+        position: latestPositionByDeviceId.get(linkedDeviceId) || null,
+      }
+    }))
+  } catch (err) {
+    logger.error('[traccar.getFleetOverview] Error', err)
     res.status(400).send(String(err))
   }
 }

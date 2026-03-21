@@ -1,6 +1,7 @@
 const routes = {
   status: '/api/status',
   devices: '/api/devices',
+  fleet: '/api/fleet',
   link: '/api/link/:carId',
   unlink: '/api/unlink/:carId',
   positions: '/api/positions/:carId',
