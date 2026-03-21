@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
   Alert,
-  Box,
   Button,
   Chip,
   FormControl,
@@ -19,14 +18,13 @@ import {
 } from '@mui/material'
 import AccessTimeIcon from '@mui/icons-material/AccessTime'
 import DirectionsCarFilledIcon from '@mui/icons-material/DirectionsCarFilled'
-import LinkIcon from '@mui/icons-material/Link'
 import MyLocationIcon from '@mui/icons-material/MyLocation'
 import PauseIcon from '@mui/icons-material/Pause'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import RadarIcon from '@mui/icons-material/Radar'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
+import RouteIcon from '@mui/icons-material/Route'
 import SearchIcon from '@mui/icons-material/Search'
-import SensorsIcon from '@mui/icons-material/Sensors'
 import SpeedIcon from '@mui/icons-material/Speed'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import { CircleF, DrawingManager, GoogleMap, HeatmapLayer, InfoWindow, MarkerF, PolygonF, PolylineF, RectangleF, type Libraries, useJsApiLoader } from '@react-google-maps/api'
@@ -51,6 +49,7 @@ const DEFAULT_CENTER: [number, number] = [33.8938, 35.5018]
 const CARS_FETCH_SIZE = 100
 
 type FleetMode = 'fleet' | 'single'
+type TrackingPanelSection = 'fleet' | 'vehicle' | 'route' | 'geofences' | 'alerts'
 type LatLngTuple = [number, number]
 type GoogleLatLng = google.maps.LatLngLiteral
 
@@ -886,6 +885,7 @@ const Tracking = () => {
   const [playbackSpeed, setPlaybackSpeed] = useState(4)
   const [showHeatmap, setShowHeatmap] = useState(true)
   const [showStops, setShowStops] = useState(true)
+  const [activePanelSection, setActivePanelSection] = useState<TrackingPanelSection>('fleet')
   const [allGeofences, setAllGeofences] = useState<bookcarsTypes.TraccarGeofence[]>([])
   const [geofences, setGeofences] = useState<bookcarsTypes.TraccarGeofence[]>([])
   const [alerts, setAlerts] = useState<bookcarsTypes.TraccarEvent[]>([])
@@ -974,6 +974,7 @@ const Tracking = () => {
       return
     }
 
+    setActivePanelSection('geofences')
     setEditingGeofenceId(typeof geofence.id === 'number' ? geofence.id : null)
     setGeofenceFormName(geofence.name || '')
     setGeofenceFormDescription(geofence.description || '')
@@ -1057,6 +1058,7 @@ const Tracking = () => {
   }
 
   const handleStartGeofenceDrawing = () => {
+    setActivePanelSection('geofences')
     setMapMode('single')
     setGeofenceDrawingMode((current) => (current === geofenceFormType ? null : geofenceFormType))
     setMapFitRequestToken((prev) => prev + 1)
@@ -1440,6 +1442,7 @@ const Tracking = () => {
   }
 
   const handleRefreshGeofenceLibrary = async () => {
+    setActivePanelSection('geofences')
     if (!integrationEnabled) {
       return
     }
@@ -1504,6 +1507,7 @@ const Tracking = () => {
   }
 
   const handleFetchPositions = async () => {
+    setActivePanelSection('vehicle')
     if (!selectedCar) {
       return
     }
@@ -1521,6 +1525,7 @@ const Tracking = () => {
   }
 
   const handleFetchRoute = async () => {
+    setActivePanelSection('route')
     if (!selectedCar) {
       return
     }
@@ -1538,6 +1543,7 @@ const Tracking = () => {
   }
 
   const handleFetchGeofences = async () => {
+    setActivePanelSection('geofences')
     if (!selectedCar) {
       return
     }
@@ -1636,6 +1642,7 @@ const Tracking = () => {
   }
 
   const handleFetchAlerts = async () => {
+    setActivePanelSection('alerts')
     if (!selectedCar) {
       return
     }
@@ -1651,6 +1658,7 @@ const Tracking = () => {
   }
 
   const handleLoadSnapshot = async () => {
+    setActivePanelSection('vehicle')
     if (!selectedCar) {
       return
     }
@@ -1724,115 +1732,77 @@ const Tracking = () => {
   return (
     <Layout onLoad={onLoad} strict>
       {user && (
-        <div className="tracking-page tracking-page--immersive">
+        <div className="tracking-page tracking-workspace">
           {!integrationEnabled && (
             <Alert severity="error" className="tracking-info-alert">
               {strings.INTEGRATION_DISABLED}
             </Alert>
           )}
 
-          <div className="tracking-map-shell tracking-map-shell--immersive">
-            {!hasMapData && mapMode === 'fleet'
-              ? (
-                <div className="tracking-map-empty">
-                  <Typography variant="body1">{mapMode === 'fleet' ? strings.FLEET_EMPTY : strings.NO_MAP_DATA}</Typography>
-                  <Typography variant="body2">{mapMode === 'fleet' ? strings.LIVE_FLEET_HINT : strings.MAP_EMPTY_HELP}</Typography>
-                </div>
-                )
-              : (
-                <GoogleTrackingMap
-                  mapMode={mapMode}
-                  fleetCars={fleetCars}
-                  selectedFleetCar={selectedFleetCar}
-                  currentPoint={currentPoint}
-                  currentPosition={currentPosition}
-                  routePathPoints={routePathPoints}
-                  routeStartPoint={routeStartPoint}
-                  routeEndPoint={routeEndPoint}
-                  playbackPoint={playbackPoint}
-                  playbackPosition={playbackFrame?.position || null}
-                  playbackHeading={playbackHeading}
-                  heatmapPoints={heatmapPoints}
-                  showHeatmap={showHeatmap}
-                  stopMarkers={detectedStops}
-                  showStops={showStops}
-                  geofenceShapes={visibleGeofenceShapes}
-                  draftGeofence={geofenceDraft}
-                  drawingMode={geofenceDrawingMode}
-                  fitRequestToken={mapFitRequestToken}
-                  onMarkerClick={selectCar}
-                  onDraftGeofenceChange={handleDraftGeofenceChange}
-                  onDraftGeofenceDrawn={handleDraftGeofenceDrawn}
-                />
-                )}
+          <div className="tracking-shell">
+            <div className="tracking-shell__map">
+              {!hasMapData && mapMode === 'fleet'
+                ? (
+                  <div className="tracking-map-empty">
+                    <Typography variant="body1">{mapMode === 'fleet' ? strings.FLEET_EMPTY : strings.NO_MAP_DATA}</Typography>
+                    <Typography variant="body2">{mapMode === 'fleet' ? strings.LIVE_FLEET_HINT : strings.MAP_EMPTY_HELP}</Typography>
+                  </div>
+                  )
+                : (
+                  <GoogleTrackingMap
+                    mapMode={mapMode}
+                    fleetCars={fleetCars}
+                    selectedFleetCar={selectedFleetCar}
+                    currentPoint={currentPoint}
+                    currentPosition={currentPosition}
+                    routePathPoints={routePathPoints}
+                    routeStartPoint={routeStartPoint}
+                    routeEndPoint={routeEndPoint}
+                    playbackPoint={playbackPoint}
+                    playbackPosition={playbackFrame?.position || null}
+                    playbackHeading={playbackHeading}
+                    heatmapPoints={heatmapPoints}
+                    showHeatmap={showHeatmap}
+                    stopMarkers={detectedStops}
+                    showStops={showStops}
+                    geofenceShapes={visibleGeofenceShapes}
+                    draftGeofence={geofenceDraft}
+                    drawingMode={geofenceDrawingMode}
+                    fitRequestToken={mapFitRequestToken}
+                    onMarkerClick={selectCar}
+                    onDraftGeofenceChange={handleDraftGeofenceChange}
+                    onDraftGeofenceDrawn={handleDraftGeofenceDrawn}
+                  />
+                  )}
 
-            <div className="tracking-map-topbar">
-              <div className="tracking-map-headline">
-                <Typography className="tracking-map-label">{strings.MAP_OVERVIEW}</Typography>
-                <Typography variant="h4" className="tracking-title">{strings.TITLE}</Typography>
-                <Typography className="tracking-subtitle">{strings.TRACKING_SUBTITLE}</Typography>
-                <div className="tracking-map-legend">
-                  {mapMode === 'fleet'
-                    ? (
-                      <>
-                        <span><i className="tracking-legend-dot tracking-legend-dot--fleet" /> {strings.LIVE_FLEET}</span>
-                        <span><i className="tracking-legend-dot tracking-legend-dot--selected" /> {strings.SELECTED_VEHICLE}</span>
-                        <span><i className="tracking-legend-dot tracking-legend-dot--offline" /> {strings.TRACKING_DISABLED}</span>
-                      </>
-                      )
-                    : (
-                      <>
-                        <span><i className="tracking-legend-dot tracking-legend-dot--current" /> {strings.CURRENT_POSITION}</span>
-                        <span><i className="tracking-legend-line" /> {strings.ROUTE_HISTORY}</span>
-                        <span><i className="tracking-legend-zone" /> {strings.GEOFENCES}</span>
-                      </>
-                      )}
+              <div className="tracking-map-overlay tracking-map-overlay--top">
+                <div className="tracking-map-badges">
+                  <Chip color={integrationEnabled ? 'success' : 'error'} label={integrationEnabled ? strings.LIVE_FLEET : strings.INTEGRATION_DISABLED} />
+                  <Chip label={`${linkedCarsCount} ${strings.LINKED_DEVICES}`} />
+                  <Chip label={`${onlineCarsCount} ${strings.ONLINE_DEVICES}`} />
+                  {selectedCar && <Chip color={trackingEnabled ? 'success' : 'default'} label={selectedCar.name} />}
+                </div>
+                <div className="tracking-map-legend-card">
+                  <Typography className="tracking-map-legend-title">{strings.MAP_OVERVIEW}</Typography>
+                  <div className="tracking-map-legend">
+                    {mapMode === 'fleet'
+                      ? (
+                        <>
+                          <span><i className="tracking-legend-dot tracking-legend-dot--fleet" /> {strings.LIVE_FLEET}</span>
+                          <span><i className="tracking-legend-dot tracking-legend-dot--selected" /> {strings.SELECTED_VEHICLE}</span>
+                          <span><i className="tracking-legend-dot tracking-legend-dot--offline" /> {strings.TRACKING_DISABLED}</span>
+                        </>
+                        )
+                      : (
+                        <>
+                          <span><i className="tracking-legend-dot tracking-legend-dot--current" /> {strings.CURRENT_POSITION}</span>
+                          <span><i className="tracking-legend-line" /> {strings.ROUTE_HISTORY}</span>
+                          <span><i className="tracking-legend-zone" /> {strings.GEOFENCES}</span>
+                        </>
+                        )}
+                  </div>
                 </div>
               </div>
-
-              <div className="tracking-map-status">
-                <Chip color={integrationEnabled ? 'success' : 'error'} label={integrationEnabled ? strings.LIVE_FLEET : strings.INTEGRATION_DISABLED} />
-                {selectedCar && <Chip color={trackingEnabled ? 'success' : 'default'} label={trackingEnabled ? strings.TRACKING_ENABLED : strings.TRACKING_DISABLED} />}
-              </div>
-            </div>
-
-            <div className="tracking-map-kpis">
-              <Paper className="tracking-card tracking-stat-card tracking-overlay-stat-card">
-                <Box className="tracking-stat-icon tracking-stat-icon--fleet"><DirectionsCarFilledIcon /></Box>
-                <div>
-                  <Typography className="tracking-stat-label">{strings.LIVE_FLEET}</Typography>
-                  <Typography variant="h6">{`${liveCarsCount}/${linkedCarsCount}`}</Typography>
-                  <Typography className="tracking-stat-note">{strings.LIVE_FLEET_HINT}</Typography>
-                </div>
-              </Paper>
-
-              <Paper className="tracking-card tracking-stat-card tracking-overlay-stat-card">
-                <Box className="tracking-stat-icon tracking-stat-icon--linked"><LinkIcon /></Box>
-                <div>
-                  <Typography className="tracking-stat-label">{strings.LINKED_DEVICES}</Typography>
-                  <Typography variant="h6">{linkedCarsCount}</Typography>
-                  <Typography className="tracking-stat-note">{`${cars.length} ${commonStrings.CARS}`}</Typography>
-                </div>
-              </Paper>
-
-              <Paper className="tracking-card tracking-stat-card tracking-overlay-stat-card">
-                <Box className="tracking-stat-icon tracking-stat-icon--online"><SensorsIcon /></Box>
-                <div>
-                  <Typography className="tracking-stat-label">{strings.ONLINE_DEVICES}</Typography>
-                  <Typography variant="h6">{onlineCarsCount}</Typography>
-                  <Typography className="tracking-stat-note">{selectedFleetCar?.deviceStatus || strings.NO_DATA}</Typography>
-                </div>
-              </Paper>
-
-              <Paper className="tracking-card tracking-stat-card tracking-overlay-stat-card">
-                <Box className="tracking-stat-icon tracking-stat-icon--alerts"><WarningAmberIcon /></Box>
-                <div>
-                  <Typography className="tracking-stat-label">{strings.SELECTED_VEHICLE}</Typography>
-                  <Typography variant="h6">{selectedCar?.name || strings.NO_DATA}</Typography>
-                  <Typography className="tracking-stat-note">{selectedCar?.licensePlate || strings.NO_DATA}</Typography>
-                </div>
-              </Paper>
-            </div>
 
             {mapMode === 'single' && routeFrames.length > 0 && (
               <div className="tracking-map-playback-panel">
@@ -1878,182 +1848,217 @@ const Tracking = () => {
               </div>
             )}
 
-            <div className="tracking-overlay-sidebar">
-              <Paper className="tracking-card tracking-controls-card tracking-overlay-card">
-                <div className="tracking-header">
-                  <div>
-                    <Typography variant="h6">{strings.MAP_OVERVIEW}</Typography>
-                    <Typography className="tracking-card-subtitle">
-                      {mapMode === 'fleet' ? strings.LIVE_FLEET_HINT : strings.MAP_HINT}
-                    </Typography>
-                  </div>
-                  <Chip size="small" label={selectedCar?.name || strings.SELECT_CAR} />
+            </div>
+
+            <aside className="tracking-panel">
+              <div className="tracking-panel__handle" />
+              <div className="tracking-panel__header">
+                <div>
+                  <Typography variant="h4" className="tracking-title">{strings.TITLE}</Typography>
+                  <Typography className="tracking-subtitle">{strings.TRACKING_SUBTITLE}</Typography>
                 </div>
-
-                <div className="tracking-toolbar tracking-toolbar--overlay">
-                  <div className="tracking-toolbar-group">
-                    <ToggleButtonGroup
-                      value={mapMode}
-                      exclusive
-                      onChange={(_event, value: FleetMode | null) => value && setMapMode(value)}
-                      size="small"
-                      className="tracking-mode-toggle"
-                    >
-                      <ToggleButton value="fleet">{strings.FLEET_MODE}</ToggleButton>
-                      <ToggleButton value="single">{strings.SINGLE_MODE}</ToggleButton>
-                    </ToggleButtonGroup>
-                  </div>
-
-                  <div className="tracking-toolbar-group">
-                    <FormControl className="tracking-car-select">
-                      <InputLabel>{strings.SELECT_CAR}</InputLabel>
-                      <Select
-                        value={selectedCarId}
-                        label={strings.SELECT_CAR}
-                        onChange={(event) => selectCar(event.target.value as string)}
-                      >
-                        {cars.map((car) => (
-                          <MenuItem key={car._id} value={car._id}>{car.name}</MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </div>
-
-                  <div className="tracking-toolbar-group tracking-toolbar-group--actions">
-                    <Button variant="contained" className="btn-primary" onClick={handleRefreshFleet} disabled={!integrationEnabled}>
-                      {strings.REFRESH_FLEET}
-                    </Button>
-                    <Button variant="contained" className="btn-secondary" onClick={handleLoadSnapshot} disabled={!canLoadTracking}>
-                      {strings.LOAD_SNAPSHOT}
-                    </Button>
-                  </div>
+                <div className="tracking-header-chips">
+                  <Chip size="small" color={integrationEnabled ? 'success' : 'error'} label={integrationEnabled ? strings.LIVE_FLEET : strings.INTEGRATION_DISABLED} />
+                  {selectedCar && <Chip size="small" color={trackingEnabled ? 'success' : 'default'} label={selectedCar.licensePlate || strings.SELECTED_VEHICLE} />}
                 </div>
-              </Paper>
+              </div>
 
-            <div className="tracking-side-column">
-              <Paper className="tracking-card tracking-fleet-roster-card">
-                <div className="tracking-header">
-                  <div>
-                    <Typography variant="h6">{strings.LIVE_FLEET}</Typography>
-                    <Typography className="tracking-card-subtitle">{`${filteredFleetCars.length}/${cars.length} ${commonStrings.CARS}`}</Typography>
-                  </div>
-                  <Chip size="small" label={`${liveCarsCount} ${strings.CURRENT_POSITION}`} />
+              <div className="tracking-panel__toolbar">
+                <ToggleButtonGroup
+                  value={mapMode}
+                  exclusive
+                  onChange={(_event, value: FleetMode | null) => value && setMapMode(value)}
+                  size="small"
+                  className="tracking-mode-toggle"
+                >
+                  <ToggleButton value="fleet">{strings.FLEET_MODE}</ToggleButton>
+                  <ToggleButton value="single">{strings.SINGLE_MODE}</ToggleButton>
+                </ToggleButtonGroup>
+
+                <FormControl className="tracking-car-select">
+                  <InputLabel>{strings.SELECT_CAR}</InputLabel>
+                  <Select
+                    value={selectedCarId}
+                    label={strings.SELECT_CAR}
+                    onChange={(event) => selectCar(event.target.value as string)}
+                  >
+                    {cars.map((car) => (
+                      <MenuItem key={car._id} value={car._id}>{car.name}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <div className="tracking-panel__actions">
+                  <Button variant="contained" className="btn-primary" onClick={handleRefreshFleet} disabled={!integrationEnabled}>
+                    {strings.REFRESH_FLEET}
+                  </Button>
+                  <Button variant="contained" className="btn-secondary" onClick={handleLoadSnapshot} disabled={!canLoadTracking}>
+                    {strings.LOAD_SNAPSHOT}
+                  </Button>
                 </div>
+              </div>
 
-                <TextField
-                  value={fleetSearch}
-                  onChange={(event) => setFleetSearch(event.target.value)}
-                  placeholder={strings.SEARCH_CARS}
-                  fullWidth
-                  className="tracking-search"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon fontSize="small" />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
+              <div className="tracking-panel__summary">
+                <div className="tracking-panel__summary-item">
+                  <span>{strings.SELECTED_VEHICLE}</span>
+                  <strong>{selectedCar?.name || strings.NO_DATA}</strong>
+                </div>
+                <div className="tracking-panel__summary-item">
+                  <span>{strings.CURRENT_POSITION}</span>
+                  <strong>{currentPoint ? `${formatCoordinate(currentPosition?.latitude)}, ${formatCoordinate(currentPosition?.longitude)}` : '-'}</strong>
+                </div>
+                <div className="tracking-panel__summary-item">
+                  <span>{strings.DEVICE_STATUS}</span>
+                  <strong>{selectedFleetCar?.deviceStatus || strings.NO_DATA}</strong>
+                </div>
+              </div>
 
-                <div className="tracking-fleet-list">
-                  {filteredFleetCars.map((item) => (
-                    <button
-                      type="button"
-                      key={item.car._id}
-                      className={`tracking-fleet-item${item.car._id === selectedCarId ? ' tracking-fleet-item--active' : ''}`}
-                      onClick={() => selectCar(item.car._id)}
-                    >
-                      <div className="tracking-fleet-avatar-shell">
-                        <div className="tracking-fleet-avatar">{item.car.name.slice(0, 1)}</div>
+              <div className="tracking-panel__tabs">
+                <ToggleButtonGroup
+                  value={activePanelSection}
+                  exclusive
+                  onChange={(_event, value: TrackingPanelSection | null) => value && setActivePanelSection(value)}
+                  size="small"
+                  className="tracking-section-tabs"
+                >
+                  <ToggleButton value="fleet"><DirectionsCarFilledIcon fontSize="small" /> {strings.LIVE_FLEET}</ToggleButton>
+                  <ToggleButton value="vehicle"><MyLocationIcon fontSize="small" /> {strings.SELECTED_VEHICLE}</ToggleButton>
+                  <ToggleButton value="route"><RouteIcon fontSize="small" /> {strings.ROUTE_HISTORY}</ToggleButton>
+                  <ToggleButton value="geofences"><RadarIcon fontSize="small" /> {strings.GEOFENCES}</ToggleButton>
+                  <ToggleButton value="alerts"><WarningAmberIcon fontSize="small" /> {strings.GEOFENCE_ALERTS}</ToggleButton>
+                </ToggleButtonGroup>
+              </div>
+
+              <div className="tracking-panel__content">
+                {activePanelSection === 'fleet' && (
+                  <Paper className="tracking-card tracking-fleet-roster-card">
+                    <div className="tracking-header">
+                      <div>
+                        <Typography variant="h6">{strings.LIVE_FLEET}</Typography>
+                        <Typography className="tracking-card-subtitle">{`${filteredFleetCars.length}/${cars.length} ${commonStrings.CARS}`}</Typography>
                       </div>
+                      <Chip size="small" label={`${liveCarsCount} ${strings.CURRENT_POSITION}`} />
+                    </div>
 
-                      <div className="tracking-fleet-body">
-                        <div className="tracking-fleet-row">
-                          <Typography className="tracking-fleet-name">{item.car.name}</Typography>
-                          <Chip
-                            size="small"
-                            color={item.isLinked ? getStatusTone(item.deviceStatus) : 'default'}
-                            label={item.isLinked ? (item.deviceStatus || strings.TRACKING_ENABLED) : strings.TRACKING_NOT_LINKED}
-                          />
-                        </div>
-                        <Typography className="tracking-list-subtext">{item.car.licensePlate || strings.NO_DATA}</Typography>
-                        <div className="tracking-fleet-meta">
-                          <span>{item.deviceName || item.car.supplier?.fullName || strings.NO_DATA}</span>
-                          <span>{item.lastSeen}</span>
-                        </div>
+                    <TextField
+                      value={fleetSearch}
+                      onChange={(event) => setFleetSearch(event.target.value)}
+                      placeholder={strings.SEARCH_CARS}
+                      fullWidth
+                      className="tracking-search"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <SearchIcon fontSize="small" />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+
+                    <div className="tracking-fleet-list">
+                      {filteredFleetCars.map((item) => (
+                        <button
+                          type="button"
+                          key={item.car._id}
+                          className={`tracking-fleet-item${item.car._id === selectedCarId ? ' tracking-fleet-item--active' : ''}`}
+                          onClick={() => selectCar(item.car._id)}
+                        >
+                          <div className="tracking-fleet-avatar-shell">
+                            <div className="tracking-fleet-avatar">{item.car.name.slice(0, 1)}</div>
+                          </div>
+
+                          <div className="tracking-fleet-body">
+                            <div className="tracking-fleet-row">
+                              <Typography className="tracking-fleet-name">{item.car.name}</Typography>
+                              <Chip
+                                size="small"
+                                color={item.isLinked ? getStatusTone(item.deviceStatus) : 'default'}
+                                label={item.isLinked ? (item.deviceStatus || strings.TRACKING_ENABLED) : strings.TRACKING_NOT_LINKED}
+                              />
+                            </div>
+                            <Typography className="tracking-list-subtext">{item.car.licensePlate || strings.NO_DATA}</Typography>
+                            <div className="tracking-fleet-meta">
+                              <span>{item.deviceName || item.car.supplier?.fullName || strings.NO_DATA}</span>
+                              <span>{item.lastSeen}</span>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </Paper>
+                )}
+
+                {activePanelSection === 'vehicle' && (
+                  <Paper className="tracking-card">
+                    <div className="tracking-header">
+                      <div>
+                        <Typography variant="h6">{strings.LINK_DEVICE}</Typography>
+                        <Typography className="tracking-card-subtitle">{selectedCar?.name || strings.SELECT_CAR}</Typography>
                       </div>
-                    </button>
-                  ))}
-                </div>
-              </Paper>
-
-              <Paper className="tracking-card">
-                <div className="tracking-header">
-                  <div>
-                    <Typography variant="h6">{strings.LINK_DEVICE}</Typography>
-                    <Typography className="tracking-card-subtitle">{selectedCar?.name || strings.SELECT_CAR}</Typography>
-                  </div>
-                  {selectedFleetCar?.snapshot?.deviceStatus && (
-                    <Chip size="small" color={getStatusTone(selectedFleetCar.snapshot.deviceStatus)} label={selectedFleetCar.snapshot.deviceStatus} />
-                  )}
-                </div>
-
-                {selectedCar
-                  ? (
-                    <>
-                      {!selectedCar.tracking?.deviceId && (
-                        <Alert severity="info" className="tracking-inline-alert">
-                          {strings.TRACKING_NOT_LINKED}
-                        </Alert>
+                      {selectedFleetCar?.snapshot?.deviceStatus && (
+                        <Chip size="small" color={getStatusTone(selectedFleetCar.snapshot.deviceStatus)} label={selectedFleetCar.snapshot.deviceStatus} />
                       )}
+                    </div>
 
-                      <div className="tracking-grid">
-                        <FormControlLabel
-                          control={<Switch checked={trackingEnabled} onChange={(event) => setTrackingEnabled(event.target.checked)} />}
-                          label={strings.TRACKING_ENABLED}
-                        />
-                        <FormControl>
-                          <InputLabel>{strings.SELECT_DEVICE}</InputLabel>
-                          <Select
-                            value={deviceId}
-                            label={strings.SELECT_DEVICE}
-                            onChange={(event) => {
-                              const nextDeviceId = event.target.value as string
-                              setDeviceId(nextDeviceId)
-                              const nextDevice = devices.find((item) => `${item.id}` === nextDeviceId)
-                              if (nextDevice?.name) {
-                                setDeviceName(nextDevice.name)
-                              }
-                            }}
-                          >
-                            {devices.map((device) => (
-                              <MenuItem key={device.id} value={`${device.id}`}>
-                                {`${device.name || `Device ${device.id}`} ${device.status ? `(${device.status})` : ''}`}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                        <TextField label={strings.DEVICE_ID} value={deviceId} onChange={(event) => setDeviceId(event.target.value)} />
-                        <TextField label={strings.DEVICE_NAME} value={deviceName} onChange={(event) => setDeviceName(event.target.value)} />
-                        <TextField label={strings.NOTES} value={notes} onChange={(event) => setNotes(event.target.value)} multiline minRows={2} />
-                      </div>
+                    {selectedCar
+                      ? (
+                        <>
+                          {!selectedCar.tracking?.deviceId && (
+                            <Alert severity="info" className="tracking-inline-alert">
+                              {strings.TRACKING_NOT_LINKED}
+                            </Alert>
+                          )}
 
-                      <div className="tracking-actions">
-                        <Button variant="contained" className="btn-primary" onClick={handleLink} disabled={!integrationEnabled}>
-                          {strings.LINK_DEVICE}
-                        </Button>
-                        <Button variant="contained" className="btn-secondary" onClick={handleUnlink} disabled={!selectedCar.tracking?.deviceId}>
-                          {strings.UNLINK_DEVICE}
-                        </Button>
-                      </div>
-                    </>
-                    )
-                  : (
-                    <div className="tracking-empty">{strings.NO_DATA}</div>
-                    )}
-              </Paper>
+                          <div className="tracking-grid">
+                            <FormControlLabel
+                              control={<Switch checked={trackingEnabled} onChange={(event) => setTrackingEnabled(event.target.checked)} />}
+                              label={strings.TRACKING_ENABLED}
+                            />
+                            <FormControl>
+                              <InputLabel>{strings.SELECT_DEVICE}</InputLabel>
+                              <Select
+                                value={deviceId}
+                                label={strings.SELECT_DEVICE}
+                                onChange={(event) => {
+                                  const nextDeviceId = event.target.value as string
+                                  setDeviceId(nextDeviceId)
+                                  const nextDevice = devices.find((item) => `${item.id}` === nextDeviceId)
+                                  if (nextDevice?.name) {
+                                    setDeviceName(nextDevice.name)
+                                  }
+                                }}
+                              >
+                                {devices.map((device) => (
+                                  <MenuItem key={device.id} value={`${device.id}`}>
+                                    {`${device.name || `Device ${device.id}`} ${device.status ? `(${device.status})` : ''}`}
+                                  </MenuItem>
+                                ))}
+                              </Select>
+                            </FormControl>
+                            <TextField label={strings.DEVICE_ID} value={deviceId} onChange={(event) => setDeviceId(event.target.value)} />
+                            <TextField label={strings.DEVICE_NAME} value={deviceName} onChange={(event) => setDeviceName(event.target.value)} />
+                            <TextField label={strings.NOTES} value={notes} onChange={(event) => setNotes(event.target.value)} multiline minRows={2} />
+                          </div>
 
-              <Paper className="tracking-card">
+                          <div className="tracking-actions">
+                            <Button variant="contained" className="btn-primary" onClick={handleLink} disabled={!integrationEnabled}>
+                              {strings.LINK_DEVICE}
+                            </Button>
+                            <Button variant="contained" className="btn-secondary" onClick={handleUnlink} disabled={!selectedCar.tracking?.deviceId}>
+                              {strings.UNLINK_DEVICE}
+                            </Button>
+                          </div>
+                        </>
+                        )
+                      : (
+                        <div className="tracking-empty">{strings.NO_DATA}</div>
+                        )}
+                  </Paper>
+                )}
+
+                {activePanelSection === 'geofences' && (
+                  <>
+                    <Paper className="tracking-card">
                 <div className="tracking-header">
                   <div>
                     <Typography variant="h6">{strings.GEOFENCE_MANAGER}</Typography>
@@ -2173,9 +2178,9 @@ const Tracking = () => {
                     {editingGeofenceId ? strings.UPDATE_GEOFENCE : strings.CREATE_GEOFENCE}
                   </Button>
                 </div>
-              </Paper>
+                    </Paper>
 
-              <Paper className="tracking-card">
+                    <Paper className="tracking-card">
                 <div className="tracking-header">
                   <div>
                     <Typography variant="h6">{strings.GEOFENCE_LIBRARY}</Typography>
@@ -2253,31 +2258,36 @@ const Tracking = () => {
                   : (
                     <div className="tracking-empty">{strings.NO_GEOFENCES}</div>
                     )}
-              </Paper>
+                    </Paper>
+                  </>
+                )}
 
-              <Paper className="tracking-card">
-                <div className="tracking-header">
-                  <Typography variant="h6">{strings.CURRENT_POSITION}</Typography>
-                  <Button variant="contained" className="btn-primary" onClick={handleFetchPositions} disabled={!canLoadTracking}>
-                    {strings.FETCH}
-                  </Button>
-                </div>
-
-                {currentPosition
-                  ? (
-                    <div className="tracking-data tracking-detail-list">
-                      <div><MyLocationIcon fontSize="small" /> {`${formatCoordinate(currentPosition.latitude)}, ${formatCoordinate(currentPosition.longitude)}`}</div>
-                      <div><SpeedIcon fontSize="small" /> {`${strings.SPEED}: ${formatNumber(currentPosition.speed, ' kn')}`}</div>
-                      <div><AccessTimeIcon fontSize="small" /> {`${strings.TIME}: ${formatTimestamp(getPositionTimestamp(currentPosition))}`}</div>
-                      {currentPosition.address && <div>{`${strings.ADDRESS}: ${currentPosition.address}`}</div>}
+                {activePanelSection === 'vehicle' && (
+                  <Paper className="tracking-card">
+                    <div className="tracking-header">
+                      <Typography variant="h6">{strings.CURRENT_POSITION}</Typography>
+                      <Button variant="contained" className="btn-primary" onClick={handleFetchPositions} disabled={!canLoadTracking}>
+                        {strings.FETCH}
+                      </Button>
                     </div>
-                    )
-                  : (
-                    <div className="tracking-empty">{strings.NO_DATA}</div>
-                    )}
-              </Paper>
 
-              <Paper className="tracking-card">
+                    {currentPosition
+                      ? (
+                        <div className="tracking-data tracking-detail-list">
+                          <div><MyLocationIcon fontSize="small" /> {`${formatCoordinate(currentPosition.latitude)}, ${formatCoordinate(currentPosition.longitude)}`}</div>
+                          <div><SpeedIcon fontSize="small" /> {`${strings.SPEED}: ${formatNumber(currentPosition.speed, ' kn')}`}</div>
+                          <div><AccessTimeIcon fontSize="small" /> {`${strings.TIME}: ${formatTimestamp(getPositionTimestamp(currentPosition))}`}</div>
+                          {currentPosition.address && <div>{`${strings.ADDRESS}: ${currentPosition.address}`}</div>}
+                        </div>
+                        )
+                      : (
+                        <div className="tracking-empty">{strings.NO_DATA}</div>
+                        )}
+                  </Paper>
+                )}
+
+                {activePanelSection === 'route' && (
+                  <Paper className="tracking-card">
                 <div className="tracking-header">
                   <Typography variant="h6">{strings.ROUTE_HISTORY}</Typography>
                   <Button variant="contained" className="btn-primary" onClick={handleFetchRoute} disabled={!canLoadTracking}>
@@ -2423,9 +2433,11 @@ const Tracking = () => {
                   : (
                     <div className="tracking-empty">{strings.NO_DATA}</div>
                     )}
-              </Paper>
+                  </Paper>
+                )}
 
-              <Paper className="tracking-card">
+                {activePanelSection === 'geofences' && (
+                  <Paper className="tracking-card">
                 <div className="tracking-header">
                   <Typography variant="h6">{strings.GEOFENCES}</Typography>
                   <Button variant="contained" className="btn-primary" onClick={handleFetchGeofences} disabled={!canLoadTracking}>
@@ -2450,44 +2462,47 @@ const Tracking = () => {
                   : (
                     <div className="tracking-empty">{strings.NO_DATA}</div>
                     )}
-              </Paper>
+                  </Paper>
+                )}
 
-              <Paper className="tracking-card">
-                <div className="tracking-header">
-                  <Typography variant="h6">{strings.GEOFENCE_ALERTS}</Typography>
-                  <Button variant="contained" className="btn-primary" onClick={handleFetchAlerts} disabled={!canLoadTracking}>
-                    {strings.FETCH}
-                  </Button>
-                </div>
-
-                <div className="tracking-grid">
-                  <TextField label={strings.FROM} type="datetime-local" value={from} onChange={(event) => setFrom(event.target.value)} />
-                  <TextField label={strings.TO} type="datetime-local" value={to} onChange={(event) => setTo(event.target.value)} />
-                </div>
-
-                {alerts.length > 0
-                  ? (
-                    <div className="tracking-list">
-                      {alerts.map((alert, index) => (
-                        <div key={alert.id || `${alert.geofenceId}-${index}`} className="tracking-list-item">
-                          <div>{formatTimestamp(alert.eventTime || '')}</div>
-                          <div className="tracking-list-subtext">{geofenceLookup.get(alert.geofenceId || -1) || alert.geofenceId || alert.type}</div>
-                        </div>
-                      ))}
+                {activePanelSection === 'alerts' && (
+                  <Paper className="tracking-card">
+                    <div className="tracking-header">
+                      <Typography variant="h6">{strings.GEOFENCE_ALERTS}</Typography>
+                      <Button variant="contained" className="btn-primary" onClick={handleFetchAlerts} disabled={!canLoadTracking}>
+                        {strings.FETCH}
+                      </Button>
                     </div>
-                    )
-                  : (
-                    <div className="tracking-empty">{strings.NO_DATA}</div>
-                    )}
-              </Paper>
 
-              {geofences.length > 0 && geofenceShapes.length !== geofences.length && (
-                <Alert severity="info" className="tracking-info-alert tracking-overlay-alert">
-                  {strings.GEOFENCE_PARSE_NOTICE}
-                </Alert>
-              )}
+                    <div className="tracking-grid">
+                      <TextField label={strings.FROM} type="datetime-local" value={from} onChange={(event) => setFrom(event.target.value)} />
+                      <TextField label={strings.TO} type="datetime-local" value={to} onChange={(event) => setTo(event.target.value)} />
+                    </div>
+
+                    {alerts.length > 0
+                      ? (
+                        <div className="tracking-list">
+                          {alerts.map((alert, index) => (
+                            <div key={alert.id || `${alert.geofenceId}-${index}`} className="tracking-list-item">
+                              <div>{formatTimestamp(alert.eventTime || '')}</div>
+                              <div className="tracking-list-subtext">{geofenceLookup.get(alert.geofenceId || -1) || alert.geofenceId || alert.type}</div>
+                            </div>
+                          ))}
+                        </div>
+                        )
+                      : (
+                        <div className="tracking-empty">{strings.NO_DATA}</div>
+                        )}
+                  </Paper>
+                )}
+
+                {activePanelSection === 'geofences' && geofences.length > 0 && geofenceShapes.length !== geofences.length && (
+                  <Alert severity="info" className="tracking-info-alert tracking-overlay-alert">
+                    {strings.GEOFENCE_PARSE_NOTICE}
+                  </Alert>
+                )}
             </div>
-          </div>
+          </aside>
         </div>
         </div>
       )}
