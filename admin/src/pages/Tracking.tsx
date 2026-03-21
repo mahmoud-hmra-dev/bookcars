@@ -1130,6 +1130,8 @@ const Tracking = () => {
     setLoading(true)
     try {
       setPositions(await TraccarService.getPositions(selectedCar._id))
+      setMapMode('single')
+      setMapFitRequestToken((prev) => prev + 1)
     } catch (err) {
       helper.error(err)
     } finally {
@@ -1145,6 +1147,8 @@ const Tracking = () => {
     setLoading(true)
     try {
       setRoute(await TraccarService.getRoute(selectedCar._id, new Date(from).toISOString(), new Date(to).toISOString()))
+      setMapMode('single')
+      setMapFitRequestToken((prev) => prev + 1)
     } catch (err) {
       helper.error(err)
     } finally {
@@ -1160,6 +1164,8 @@ const Tracking = () => {
     setLoading(true)
     try {
       setGeofences(await TraccarService.getGeofences(selectedCar._id))
+      setMapMode('single')
+      setMapFitRequestToken((prev) => prev + 1)
     } catch (err) {
       helper.error(err)
     } finally {
@@ -1256,6 +1262,8 @@ const Tracking = () => {
       setRoute(routeData)
       setGeofences(geofenceData)
       setAlerts(alertData)
+      setMapMode('single')
+      setMapFitRequestToken((prev) => prev + 1)
     } catch (err) {
       helper.error(err)
     } finally {
