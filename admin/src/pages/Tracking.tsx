@@ -27,7 +27,7 @@ import SearchIcon from '@mui/icons-material/Search'
 import SensorsIcon from '@mui/icons-material/Sensors'
 import SpeedIcon from '@mui/icons-material/Speed'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
-import { CircleF, GoogleMap, InfoWindow, MarkerF, PolygonF, PolylineF, RectangleF, useJsApiLoader } from '@react-google-maps/api'
+import { CircleF, DrawingManager, GoogleMap, InfoWindow, MarkerF, PolygonF, PolylineF, RectangleF, type Libraries, useJsApiLoader } from '@react-google-maps/api'
 import * as bookcarsTypes from ':bookcars-types'
 import * as bookcarsHelper from ':bookcars-helper'
 import wellknown from 'wellknown'
@@ -75,12 +75,22 @@ type FleetCarView = {
 }
 
 type GeofenceEditorType = 'circle' | 'polygon' | 'polyline'
+type DraftGeofenceShape =
+  | { type: 'circle', center: LatLngTuple, radius: number }
+  | { type: 'polygon', points: LatLngTuple[] }
+  | { type: 'polyline', points: LatLngTuple[] }
+
+const GOOGLE_MAP_LIBRARIES: Libraries = ['drawing']
 
 const formatDateInput = (date: Date) => date.toISOString().slice(0, 16)
 const isFiniteCoordinate = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
 const formatCoordinate = (value?: number) => (typeof value === 'number' && Number.isFinite(value) ? value.toFixed(6) : '-')
 const formatNumber = (value?: number, suffix = '') => (typeof value === 'number' && Number.isFinite(value) ? `${Math.round(value * 100) / 100}${suffix}` : '-')
 const toGoogleLatLng = (point: LatLngTuple): GoogleLatLng => ({ lat: point[0], lng: point[1] })
+const fromGoogleLatLng = (point: google.maps.LatLng | google.maps.LatLngLiteral): LatLngTuple => (
+  [typeof point.lat === 'function' ? point.lat() : point.lat, typeof point.lng === 'function' ? point.lng() : point.lng]
+)
+const fromGooglePath = (path: google.maps.MVCArray<google.maps.LatLng>) => path.getArray().map(fromGoogleLatLng)
 
 const formatTimestamp = (value?: Date | string | null) => {
   if (!value) {
@@ -136,22 +146,6 @@ const getStatusTone = (status?: string): 'default' | 'success' | 'warning' => {
 
 const toSearchText = (...parts: Array<string | undefined>) => parts.filter(Boolean).join(' ').toLowerCase()
 
-const formatPointList = (points: LatLngTuple[]) => points.map(([lat, lng]) => `${lat}, ${lng}`).join('\n')
-
-const parsePointList = (value: string) => value
-  .split('\n')
-  .map((line) => line.trim())
-  .filter(Boolean)
-  .map((line) => {
-    const [latText, lngText] = line.split(',').map((part) => part.trim())
-    const lat = Number.parseFloat(latText)
-    const lng = Number.parseFloat(lngText)
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      throw new Error(commonStrings.FIELD_NOT_VALID)
-    }
-    return [lat, lng] as LatLngTuple
-  })
-
 const closePolygon = (points: LatLngTuple[]) => {
   if (points.length < 2) {
     return points
@@ -164,6 +158,77 @@ const closePolygon = (points: LatLngTuple[]) => {
   }
 
   return [...points, first]
+}
+
+const openPolygon = (points: LatLngTuple[]) => {
+  if (points.length < 2) {
+    return points
+  }
+
+  const first = points[0]
+  const last = points[points.length - 1]
+  if (first[0] === last[0] && first[1] === last[1]) {
+    return points.slice(0, -1)
+  }
+
+  return points
+}
+
+const hasDraftGeofenceGeometry = (draft: DraftGeofenceShape | null) => {
+  if (!draft) {
+    return false
+  }
+
+  if (draft.type === 'circle') {
+    return isFiniteCoordinate(draft.center[0]) && isFiniteCoordinate(draft.center[1]) && draft.radius > 0
+  }
+
+  return draft.points.length >= (draft.type === 'polygon' ? 3 : 2)
+}
+
+const parseEditableGeofence = (geofence: bookcarsTypes.TraccarGeofence): DraftGeofenceShape | null => {
+  const area = geofence.area || ''
+  const circleMatch = area.match(/CIRCLE\s*\(\s*([-\d.]+)(?:\s+|,\s*)([-\d.]+)\s*,\s*([-\d.]+)\s*\)\s*$/i)
+  if (circleMatch) {
+    const lat = Number.parseFloat(circleMatch[1])
+    const lng = Number.parseFloat(circleMatch[2])
+    const radius = Number.parseFloat(circleMatch[3])
+    return [lat, lng, radius].every((value) => Number.isFinite(value))
+      ? { type: 'circle', center: [lat, lng], radius }
+      : null
+  }
+
+  try {
+    const geometry = wellknown.parse(area)
+    if (geometry?.type === 'LineString') {
+      const points = (geometry.coordinates || []).map((coordinate) => [coordinate[1], coordinate[0]] as LatLngTuple)
+      return points.length >= 2 ? { type: 'polyline', points } : null
+    }
+
+    if (geometry?.type === 'Polygon') {
+      const ring = (geometry.coordinates?.[0] || []).map((coordinate) => [coordinate[1], coordinate[0]] as LatLngTuple)
+      const points = openPolygon(ring)
+      return points.length >= 3 ? { type: 'polygon', points } : null
+    }
+  } catch {
+    // Fall back to numeric parsing below.
+  }
+
+  const values = (area.match(/[+-]?\d+(?:\.\d+)?/g) || [])
+    .map((value) => Number.parseFloat(value))
+    .filter((value) => Number.isFinite(value))
+  const points: LatLngTuple[] = []
+
+  for (let index = 0; index + 1 < values.length; index += 2) {
+    points.push(normalizeLatLngOrder(values[index], values[index + 1]))
+  }
+
+  if (area.toUpperCase().startsWith('LINESTRING')) {
+    return points.length >= 2 ? { type: 'polyline', points } : null
+  }
+
+  const polygonPoints = openPolygon(points)
+  return polygonPoints.length >= 3 ? { type: 'polygon', points: polygonPoints } : null
 }
 
 const parseGeofenceArea = (geofence: bookcarsTypes.TraccarGeofence, fallbackIndex: number): ParsedGeofence | null => {
@@ -275,7 +340,12 @@ const GoogleTrackingMap = ({
   routeStartPoint,
   routeEndPoint,
   geofenceShapes,
+  draftGeofence,
+  drawingMode,
+  fitRequestToken,
   onMarkerClick,
+  onDraftGeofenceChange,
+  onDraftGeofenceDrawn,
 }: {
   mapMode: FleetMode
   fleetCars: FleetCarView[]
@@ -286,16 +356,37 @@ const GoogleTrackingMap = ({
   routeStartPoint: LatLngTuple | null
   routeEndPoint: LatLngTuple | null
   geofenceShapes: ParsedGeofence[]
+  draftGeofence: DraftGeofenceShape | null
+  drawingMode: GeofenceEditorType | null
+  fitRequestToken: number
   onMarkerClick: (carId: string) => void
+  onDraftGeofenceChange: (draft: DraftGeofenceShape) => void
+  onDraftGeofenceDrawn: (draft: DraftGeofenceShape) => void
 }) => {
   const { isLoaded } = useJsApiLoader({
     id: 'bookcars-google-maps',
     googleMapsApiKey: env.GOOGLE_MAPS_API_KEY,
+    libraries: GOOGLE_MAP_LIBRARIES,
   })
 
   const fleetMarkers = useMemo(() => fleetCars.filter((item) => item.currentPoint), [fleetCars])
+  const mapRef = React.useRef<google.maps.Map | null>(null)
+  const draftCircleRef = React.useRef<google.maps.Circle | null>(null)
+  const draftPolygonRef = React.useRef<google.maps.Polygon | null>(null)
+  const draftPolylineRef = React.useRef<google.maps.Polyline | null>(null)
+  const draftPolylineListenersRef = React.useRef<google.maps.MapsEventListener[]>([])
 
-  const onLoad = React.useCallback((map: google.maps.Map) => {
+  const clearDraftPolylineListeners = () => {
+    draftPolylineListenersRef.current.forEach((listener) => listener.remove())
+    draftPolylineListenersRef.current = []
+  }
+
+  React.useEffect(() => {
+    const map = mapRef.current
+    if (!map) {
+      return
+    }
+
     const bounds = new google.maps.LatLngBounds()
     let hasBounds = false
 
@@ -324,15 +415,23 @@ const GoogleTrackingMap = ({
           extractGeoJsonPaths(shape.geojson).forEach((ring) => ring.forEach(extend))
         }
       })
+
+      if (draftGeofence?.type === 'circle') {
+        extend(draftGeofence.center)
+      } else {
+        draftGeofence?.points.forEach(extend)
+      }
     }
 
     if (hasBounds) {
       map.fitBounds(bounds, 40)
     } else {
-      map.setCenter(toGoogleLatLng(DEFAULT_CENTER))
-      map.setZoom(7)
+      map.setCenter(toGoogleLatLng(currentPoint || DEFAULT_CENTER))
+      map.setZoom(currentPoint ? 12 : 7)
     }
-  }, [currentPoint, fleetMarkers, geofenceShapes, mapMode, routePoints])
+  }, [currentPoint, fleetMarkers, fitRequestToken, geofenceShapes, mapMode, routePoints])
+
+  React.useEffect(() => () => clearDraftPolylineListeners(), [])
 
   if (!env.GOOGLE_MAPS_API_KEY) {
     return <div className="tracking-map-empty"><Typography variant="body2">Google Maps API key is missing.</Typography></div>
@@ -353,15 +452,121 @@ const GoogleTrackingMap = ({
 
   const infoPoint = mapMode === 'fleet' ? selectedFleetCar?.currentPoint || null : currentPoint
   const infoPosition = mapMode === 'fleet' ? selectedFleetCar?.position || null : currentPosition
+  const activeDrawingMode = drawingMode
+    ? (
+      drawingMode === 'circle'
+        ? google.maps.drawing.OverlayType.CIRCLE
+        : drawingMode === 'polygon'
+          ? google.maps.drawing.OverlayType.POLYGON
+          : google.maps.drawing.OverlayType.POLYLINE
+    )
+    : null
+
+  const syncDraftCircle = () => {
+    const circle = draftCircleRef.current
+    const center = circle?.getCenter()
+    const radius = circle?.getRadius()
+    if (!circle || !center || typeof radius !== 'number' || !Number.isFinite(radius)) {
+      return
+    }
+
+    onDraftGeofenceChange({ type: 'circle', center: fromGoogleLatLng(center), radius })
+  }
+
+  const syncDraftPolygon = (polygon?: google.maps.Polygon | null) => {
+    const instance = polygon || draftPolygonRef.current
+    if (!instance) {
+      return
+    }
+
+    onDraftGeofenceChange({ type: 'polygon', points: fromGooglePath(instance.getPath()) })
+  }
+
+  const syncDraftPolyline = () => {
+    const polyline = draftPolylineRef.current
+    if (!polyline) {
+      return
+    }
+
+    onDraftGeofenceChange({ type: 'polyline', points: fromGooglePath(polyline.getPath()) })
+  }
+
+  const attachDraftPolylineListeners = (polyline: google.maps.Polyline) => {
+    clearDraftPolylineListeners()
+    const path = polyline.getPath()
+    draftPolylineListenersRef.current = [
+      google.maps.event.addListener(path, 'insert_at', syncDraftPolyline),
+      google.maps.event.addListener(path, 'remove_at', syncDraftPolyline),
+      google.maps.event.addListener(path, 'set_at', syncDraftPolyline),
+    ]
+  }
+
+  const drawingOptions = {
+    circleOptions: {
+      clickable: false,
+      editable: false,
+      fillColor: '#fb923c',
+      fillOpacity: 0.16,
+      strokeColor: '#f97316',
+      strokeWeight: 3,
+    },
+    polygonOptions: {
+      clickable: false,
+      editable: false,
+      fillColor: '#fb923c',
+      fillOpacity: 0.16,
+      strokeColor: '#f97316',
+      strokeWeight: 3,
+    },
+    polylineOptions: {
+      clickable: false,
+      editable: false,
+      strokeColor: '#f97316',
+      strokeWeight: 4,
+      strokeOpacity: 0.95,
+    },
+    drawingControl: false,
+  } satisfies google.maps.drawing.DrawingManagerOptions
 
   return (
     <GoogleMap
       mapContainerClassName="tracking-map"
       center={toGoogleLatLng(DEFAULT_CENTER)}
       zoom={7}
-      onLoad={onLoad}
+      onLoad={(map) => {
+        mapRef.current = map
+      }}
       options={{ streetViewControl: false, mapTypeControl: false, fullscreenControl: true }}
     >
+      {mapMode === 'single' && activeDrawingMode && (
+        <DrawingManager
+          drawingMode={activeDrawingMode}
+          options={drawingOptions}
+          onCircleComplete={(circle) => {
+            const center = circle.getCenter()
+            const radius = circle.getRadius()
+            circle.setMap(null)
+            if (center && Number.isFinite(radius)) {
+              onDraftGeofenceDrawn({ type: 'circle', center: fromGoogleLatLng(center), radius })
+            }
+          }}
+          onPolygonComplete={(polygon) => {
+            const points = fromGooglePath(polygon.getPath())
+            polygon.setMap(null)
+            if (points.length >= 3) {
+              onDraftGeofenceDrawn({ type: 'polygon', points })
+            }
+          }}
+          onPolylineComplete={(polyline) => {
+            const points = fromGooglePath(polyline.getPath())
+            polyline.setMap(null)
+            if (points.length >= 2) {
+              onDraftGeofenceDrawn({ type: 'polyline', points })
+            }
+          }}
+        />
+      )}
+
       {mapMode === 'single' && geofenceShapes.map((geofence) => {
         if (geofence.shape === 'circle' && geofence.center && geofence.radius) {
           return <CircleF key={`${geofence.id}`} center={toGoogleLatLng(geofence.center)} radius={geofence.radius} options={{ strokeColor: '#00897b', fillColor: '#4db6ac', fillOpacity: 0.18, strokeWeight: 2 }} />
@@ -386,6 +591,63 @@ const GoogleTrackingMap = ({
         }
         return null
       })}
+
+      {mapMode === 'single' && draftGeofence?.type === 'circle' && (
+        <CircleF
+          center={toGoogleLatLng(draftGeofence.center)}
+          radius={draftGeofence.radius}
+          options={{ strokeColor: '#f97316', fillColor: '#fb923c', fillOpacity: 0.16, strokeWeight: 3, zIndex: 90 }}
+          editable
+          draggable
+          onLoad={(circle) => {
+            draftCircleRef.current = circle
+          }}
+          onUnmount={() => {
+            draftCircleRef.current = null
+          }}
+          onCenterChanged={syncDraftCircle}
+          onRadiusChanged={syncDraftCircle}
+          onDragEnd={syncDraftCircle}
+          onMouseUp={syncDraftCircle}
+        />
+      )}
+
+      {mapMode === 'single' && draftGeofence?.type === 'polygon' && (
+        <PolygonF
+          paths={draftGeofence.points.map(toGoogleLatLng)}
+          options={{ strokeColor: '#f97316', fillColor: '#fb923c', fillOpacity: 0.16, strokeWeight: 3, zIndex: 90 }}
+          editable
+          draggable
+          onLoad={(polygon) => {
+            draftPolygonRef.current = polygon
+          }}
+          onUnmount={() => {
+            draftPolygonRef.current = null
+          }}
+          onEdit={syncDraftPolygon}
+          onDragEnd={() => syncDraftPolygon()}
+          onMouseUp={() => syncDraftPolygon()}
+        />
+      )}
+
+      {mapMode === 'single' && draftGeofence?.type === 'polyline' && (
+        <PolylineF
+          path={draftGeofence.points.map(toGoogleLatLng)}
+          options={{ strokeColor: '#f97316', strokeWeight: 4, strokeOpacity: 0.95, zIndex: 90 }}
+          editable
+          draggable
+          onLoad={(polyline) => {
+            draftPolylineRef.current = polyline
+            attachDraftPolylineListeners(polyline)
+          }}
+          onUnmount={() => {
+            clearDraftPolylineListeners()
+            draftPolylineRef.current = null
+          }}
+          onDragEnd={syncDraftPolyline}
+          onMouseUp={syncDraftPolyline}
+        />
+      )}
 
       {mapMode === 'single' && routePoints.length > 1 && <PolylineF path={routePoints.map(toGoogleLatLng)} options={{ strokeColor: '#1976d2', strokeWeight: 4, strokeOpacity: 0.9 }} />}
       {mapMode === 'single' && routeStartPoint && routePoints.length > 1 && <MarkerF position={toGoogleLatLng(routeStartPoint)} title={strings.ROUTE_START} icon={buildMarkerIcon('#2e7d32', 7)} />}
@@ -440,11 +702,11 @@ const Tracking = () => {
   const [geofenceFormName, setGeofenceFormName] = useState('')
   const [geofenceFormDescription, setGeofenceFormDescription] = useState('')
   const [geofenceFormType, setGeofenceFormType] = useState<GeofenceEditorType>('circle')
-  const [geofenceFormCenterLat, setGeofenceFormCenterLat] = useState('')
-  const [geofenceFormCenterLng, setGeofenceFormCenterLng] = useState('')
   const [geofenceFormRadius, setGeofenceFormRadius] = useState('200')
-  const [geofenceFormPoints, setGeofenceFormPoints] = useState('')
   const [geofenceFormPolylineDistance, setGeofenceFormPolylineDistance] = useState('25')
+  const [geofenceDraft, setGeofenceDraft] = useState<DraftGeofenceShape | null>(null)
+  const [geofenceDrawingMode, setGeofenceDrawingMode] = useState<GeofenceEditorType | null>(null)
+  const [mapFitRequestToken, setMapFitRequestToken] = useState(0)
 
   const now = useMemo(() => new Date(), [])
   const [from, setFrom] = useState(formatDateInput(new Date(now.getTime() - 24 * 60 * 60 * 1000)))
@@ -506,73 +768,29 @@ const Tracking = () => {
     setGeofenceFormName('')
     setGeofenceFormDescription('')
     setGeofenceFormType('circle')
-    setGeofenceFormCenterLat('')
-    setGeofenceFormCenterLng('')
     setGeofenceFormRadius('200')
-    setGeofenceFormPoints('')
     setGeofenceFormPolylineDistance('25')
+    setGeofenceDraft(null)
+    setGeofenceDrawingMode(null)
   }
 
   const populateGeofenceForm = (geofence: bookcarsTypes.TraccarGeofence) => {
+    const draft = parseEditableGeofence(geofence)
+    if (!draft) {
+      helper.error(null, strings.UNSUPPORTED_GEOFENCE)
+      return
+    }
+
     setEditingGeofenceId(typeof geofence.id === 'number' ? geofence.id : null)
     setGeofenceFormName(geofence.name || '')
     setGeofenceFormDescription(geofence.description || '')
-    setGeofenceFormCenterLat('')
-    setGeofenceFormCenterLng('')
-    setGeofenceFormRadius('200')
-    setGeofenceFormPoints('')
     setGeofenceFormPolylineDistance(`${typeof geofence.attributes?.polylineDistance === 'number' ? geofence.attributes.polylineDistance : 25}`)
-
-    const area = geofence.area || ''
-    const circleMatch = area.match(/CIRCLE\s*\(\s*([-\d.]+)(?:\s+|,\s*)([-\d.]+)\s*,\s*([-\d.]+)\s*\)\s*$/i)
-    if (circleMatch) {
-      setGeofenceFormType('circle')
-      setGeofenceFormCenterLat(circleMatch[1])
-      setGeofenceFormCenterLng(circleMatch[2])
-      setGeofenceFormRadius(circleMatch[3])
-      return
-    }
-
-    try {
-      const geometry = wellknown.parse(area)
-      if (geometry?.type === 'LineString') {
-        setGeofenceFormType('polyline')
-        setGeofenceFormPoints(formatPointList((geometry.coordinates || []).map((coordinate) => [coordinate[1], coordinate[0]] as LatLngTuple)))
-        return
-      }
-
-      if (geometry?.type === 'Polygon') {
-        const ring = (geometry.coordinates?.[0] || []).map((coordinate) => [coordinate[1], coordinate[0]] as LatLngTuple)
-        setGeofenceFormType('polygon')
-        setGeofenceFormPoints(formatPointList(ring.length > 1 ? ring.slice(0, -1) : ring))
-        return
-      }
-    } catch {
-      // Fall back to free-form numeric parsing below.
-    }
-
-    const points = (area.match(/[+-]?\d+(?:\.\d+)?/g) || [])
-      .map((value) => Number.parseFloat(value))
-      .filter((value) => Number.isFinite(value))
-
-    if (area.toUpperCase().startsWith('LINESTRING') && points.length >= 4) {
-      const linePoints: LatLngTuple[] = []
-      for (let index = 0; index + 1 < points.length; index += 2) {
-        linePoints.push(normalizeLatLngOrder(points[index], points[index + 1]))
-      }
-      setGeofenceFormType('polyline')
-      setGeofenceFormPoints(formatPointList(linePoints))
-      return
-    }
-
-    if (points.length >= 6) {
-      const polygonPoints: LatLngTuple[] = []
-      for (let index = 0; index + 1 < points.length; index += 2) {
-        polygonPoints.push(normalizeLatLngOrder(points[index], points[index + 1]))
-      }
-      setGeofenceFormType('polygon')
-      setGeofenceFormPoints(formatPointList(polygonPoints.length > 1 ? polygonPoints.slice(0, -1) : polygonPoints))
-    }
+    setGeofenceFormType(draft.type)
+    setGeofenceFormRadius(draft.type === 'circle' ? `${Math.round(draft.radius * 100) / 100}` : '200')
+    setGeofenceDraft(draft)
+    setGeofenceDrawingMode(null)
+    setMapMode('single')
+    setMapFitRequestToken((prev) => prev + 1)
   }
 
   const buildGeofencePayload = (): TraccarService.TraccarGeofenceEditorPayload => {
@@ -581,25 +799,27 @@ const Tracking = () => {
       throw new Error(commonStrings.FIELD_NOT_VALID)
     }
 
-    if (geofenceFormType === 'circle') {
-      const lat = Number.parseFloat(geofenceFormCenterLat)
-      const lng = Number.parseFloat(geofenceFormCenterLng)
+    if (!geofenceDraft || geofenceDraft.type !== geofenceFormType) {
+      throw new Error(commonStrings.FIELD_NOT_VALID)
+    }
+
+    if (geofenceDraft.type === 'circle') {
       const radius = Number.parseFloat(geofenceFormRadius)
-      if (![lat, lng, radius].every((value) => Number.isFinite(value))) {
+      if (![geofenceDraft.center[0], geofenceDraft.center[1], radius].every((value) => Number.isFinite(value)) || radius <= 0) {
         throw new Error(commonStrings.FIELD_NOT_VALID)
       }
 
       return {
         name,
         description: geofenceFormDescription.trim() || undefined,
-        area: `CIRCLE (${lat} ${lng}, ${radius})`,
+        area: `CIRCLE (${geofenceDraft.center[0]} ${geofenceDraft.center[1]}, ${radius})`,
         attributes: {},
       }
     }
 
-    const points = parsePointList(geofenceFormPoints)
+    const points = geofenceDraft.points
 
-    if (geofenceFormType === 'polyline') {
+    if (geofenceDraft.type === 'polyline') {
       if (points.length < 2) {
         throw new Error(commonStrings.FIELD_NOT_VALID)
       }
@@ -627,6 +847,53 @@ const Tracking = () => {
       description: geofenceFormDescription.trim() || undefined,
       area: `POLYGON ((${closedPoints.map(([lat, lng]) => `${lat} ${lng}`).join(', ')}))`,
       attributes: {},
+    }
+  }
+
+  const handleGeofenceTypeChange = (nextType: GeofenceEditorType) => {
+    setGeofenceFormType(nextType)
+    setGeofenceDrawingMode(null)
+
+    if (geofenceDraft && geofenceDraft.type !== nextType) {
+      setGeofenceDraft(null)
+    }
+
+    if (nextType === 'circle' && (!geofenceDraft || geofenceDraft.type !== 'circle')) {
+      setGeofenceFormRadius('200')
+    }
+  }
+
+  const handleStartGeofenceDrawing = () => {
+    setMapMode('single')
+    setGeofenceDrawingMode((current) => (current === geofenceFormType ? null : geofenceFormType))
+    setMapFitRequestToken((prev) => prev + 1)
+  }
+
+  const handleClearGeofenceDrawing = () => {
+    setGeofenceDraft(null)
+    setGeofenceDrawingMode(null)
+  }
+
+  const handleDraftGeofenceChange = (draft: DraftGeofenceShape) => {
+    setGeofenceDraft(draft)
+    setGeofenceFormType(draft.type)
+    if (draft.type === 'circle') {
+      setGeofenceFormRadius(`${Math.round(draft.radius * 100) / 100}`)
+    }
+  }
+
+  const handleDraftGeofenceDrawn = (draft: DraftGeofenceShape) => {
+    handleDraftGeofenceChange(draft)
+    setGeofenceDrawingMode(null)
+    setMapFitRequestToken((prev) => prev + 1)
+  }
+
+  const handleGeofenceRadiusChange = (value: string) => {
+    setGeofenceFormRadius(value)
+
+    const radius = Number.parseFloat(value)
+    if (geofenceDraft?.type === 'circle' && Number.isFinite(radius) && radius > 0) {
+      setGeofenceDraft({ ...geofenceDraft, radius })
     }
   }
 
@@ -688,17 +955,26 @@ const Tracking = () => {
   const currentPoint = useMemo(() => toLatLng(currentPosition), [currentPosition])
   const routePoints = useMemo(() => route.map((position) => toLatLng(position)).filter((point): point is LatLngTuple => point !== null), [route])
   const geofenceShapes = useMemo(() => geofences.map(parseGeofenceArea).filter((shape): shape is ParsedGeofence => shape !== null), [geofences])
+  const visibleGeofenceShapes = useMemo(() => (
+    editingGeofenceId === null
+      ? geofenceShapes
+      : geofenceShapes.filter((shape) => `${shape.id}` !== `${editingGeofenceId}`)
+  ), [editingGeofenceId, geofenceShapes])
   const routeStart = route.length > 0 ? route[0] : null
   const routeEnd = route.length > 1 ? route[route.length - 1] : route[0] || null
   const routeStartPoint = useMemo(() => toLatLng(routeStart), [routeStart])
   const routeEndPoint = useMemo(() => toLatLng(routeEnd), [routeEnd])
   const latestAlert = alerts[0]
+  const geofenceDraftReady = hasDraftGeofenceGeometry(geofenceDraft)
+  const geofenceDraftPointCount = geofenceDraft?.type === 'circle' ? 0 : geofenceDraft?.points.length || 0
 
   const linkedCarsCount = fleetCars.filter((item) => item.isLinked).length
   const liveCarsCount = fleetCars.filter((item) => item.currentPoint).length
   const onlineCarsCount = fleetCars.filter((item) => item.isOnline).length
   const canLoadTracking = !!selectedCar?.tracking?.deviceId && integrationEnabled
-  const hasMapData = mapMode === 'fleet' ? liveCarsCount > 0 : !!currentPoint || routePoints.length > 0 || geofenceShapes.length > 0
+  const hasMapData = mapMode === 'fleet'
+    ? liveCarsCount > 0
+    : !!currentPoint || routePoints.length > 0 || visibleGeofenceShapes.length > 0 || geofenceDraftReady || geofenceDrawingMode !== null
 
   const resetTrackingData = () => {
     setPositions([])
@@ -1159,7 +1435,7 @@ const Tracking = () => {
                 </div>
 
                 <div className="tracking-map-shell">
-                  {!hasMapData
+                  {!hasMapData && mapMode === 'fleet'
                     ? (
                       <div className="tracking-map-empty">
                         <Typography variant="body1">{mapMode === 'fleet' ? strings.FLEET_EMPTY : strings.NO_MAP_DATA}</Typography>
@@ -1176,8 +1452,13 @@ const Tracking = () => {
                         routePoints={routePoints}
                         routeStartPoint={routeStartPoint}
                         routeEndPoint={routeEndPoint}
-                        geofenceShapes={geofenceShapes}
+                        geofenceShapes={visibleGeofenceShapes}
+                        draftGeofence={geofenceDraft}
+                        drawingMode={geofenceDrawingMode}
+                        fitRequestToken={mapFitRequestToken}
                         onMarkerClick={selectCar}
+                        onDraftGeofenceChange={handleDraftGeofenceChange}
+                        onDraftGeofenceDrawn={handleDraftGeofenceDrawn}
                       />
                       )}
                 </div>
@@ -1207,7 +1488,7 @@ const Tracking = () => {
                   <div>
                     <Typography className="tracking-stat-label">{strings.GEOFENCES}</Typography>
                     <Typography variant="h6">{geofences.length}</Typography>
-                    <Typography className="tracking-stat-note">{geofenceShapes.length > 0 ? `${geofenceShapes.length} ${strings.MAP_READY}` : strings.NO_DATA}</Typography>
+                    <Typography className="tracking-stat-note">{visibleGeofenceShapes.length > 0 ? `${visibleGeofenceShapes.length} ${strings.MAP_READY}` : strings.NO_DATA}</Typography>
                   </div>
                 </Paper>
 
@@ -1371,7 +1652,7 @@ const Tracking = () => {
                     <Select
                       value={geofenceFormType}
                       label={strings.GEOFENCE_TYPE}
-                      onChange={(event) => setGeofenceFormType(event.target.value as GeofenceEditorType)}
+                      onChange={(event) => handleGeofenceTypeChange(event.target.value as GeofenceEditorType)}
                     >
                       <MenuItem value="circle">{strings.GEOFENCE_TYPE_CIRCLE}</MenuItem>
                       <MenuItem value="polygon">{strings.GEOFENCE_TYPE_POLYGON}</MenuItem>
@@ -1385,40 +1666,83 @@ const Tracking = () => {
                   />
                 </div>
 
-                {geofenceFormType === 'circle'
-                  ? (
-                    <div className="tracking-grid">
-                      <TextField label={strings.CENTER_LATITUDE} value={geofenceFormCenterLat} onChange={(event) => setGeofenceFormCenterLat(event.target.value)} />
-                      <TextField label={strings.CENTER_LONGITUDE} value={geofenceFormCenterLng} onChange={(event) => setGeofenceFormCenterLng(event.target.value)} />
-                      <TextField label={strings.RADIUS_METERS} value={geofenceFormRadius} onChange={(event) => setGeofenceFormRadius(event.target.value)} />
-                    </div>
-                    )
-                  : (
+                <Alert
+                  severity={geofenceDrawingMode ? 'warning' : geofenceDraftReady ? 'success' : 'info'}
+                  className="tracking-inline-alert tracking-geofence-editor-alert"
+                >
+                  {geofenceDrawingMode
+                    ? strings.GEOFENCE_DRAWING_ACTIVE
+                    : geofenceDraftReady
+                      ? strings.GEOFENCE_READY
+                      : strings.DRAW_ON_MAP_HELP}
+                </Alert>
+
+                <div className="tracking-actions tracking-actions--compact">
+                  <Button
+                    variant={geofenceDrawingMode === geofenceFormType ? 'contained' : 'outlined'}
+                    className={geofenceDrawingMode === geofenceFormType ? 'btn-primary' : undefined}
+                    onClick={handleStartGeofenceDrawing}
+                    disabled={!integrationEnabled}
+                  >
+                    {geofenceDrawingMode === geofenceFormType ? commonStrings.CANCEL : strings.DRAW_ON_MAP}
+                  </Button>
+                  <Button
+                    variant="text"
+                    onClick={handleClearGeofenceDrawing}
+                    disabled={!geofenceDraft && !geofenceDrawingMode}
+                  >
+                    {strings.CLEAR_SHAPE}
+                  </Button>
+                </div>
+
+                <div className="tracking-geofence-summary">
+                  <div className="tracking-geofence-summary-item">
+                    <span>{strings.SHAPE}</span>
+                    <strong>
+                      {geofenceFormType === 'circle'
+                        ? strings.GEOFENCE_TYPE_CIRCLE
+                        : geofenceFormType === 'polygon'
+                          ? strings.GEOFENCE_TYPE_POLYGON
+                          : strings.GEOFENCE_TYPE_POLYLINE}
+                    </strong>
+                  </div>
+                  <div className="tracking-geofence-summary-item">
+                    <span>{strings.GEOFENCE_POINTS}</span>
+                    <strong>{geofenceDraft?.type === 'circle' ? '-' : `${geofenceDraftPointCount}`}</strong>
+                  </div>
+                  {geofenceDraft?.type === 'circle' && (
                     <>
-                      <TextField
-                        label={strings.GEOFENCE_POINTS}
-                        value={geofenceFormPoints}
-                        onChange={(event) => setGeofenceFormPoints(event.target.value)}
-                        placeholder={strings.GEOFENCE_POINTS_HINT}
-                        fullWidth
-                        multiline
-                        minRows={4}
-                        className="tracking-geofence-points"
-                      />
-                      {geofenceFormType === 'polyline' && (
-                        <div className="tracking-grid">
-                          <TextField
-                            label={strings.POLYLINE_DISTANCE}
-                            value={geofenceFormPolylineDistance}
-                            onChange={(event) => setGeofenceFormPolylineDistance(event.target.value)}
-                          />
-                        </div>
-                      )}
+                      <div className="tracking-geofence-summary-item">
+                        <span>{strings.CENTER_LATITUDE}</span>
+                        <strong>{formatCoordinate(geofenceDraft.center[0])}</strong>
+                      </div>
+                      <div className="tracking-geofence-summary-item">
+                        <span>{strings.CENTER_LONGITUDE}</span>
+                        <strong>{formatCoordinate(geofenceDraft.center[1])}</strong>
+                      </div>
                     </>
-                    )}
+                  )}
+                </div>
+
+                <div className="tracking-grid">
+                  {geofenceFormType === 'circle' && (
+                    <TextField
+                      label={strings.RADIUS_METERS}
+                      value={geofenceFormRadius}
+                      onChange={(event) => handleGeofenceRadiusChange(event.target.value)}
+                    />
+                  )}
+                  {geofenceFormType === 'polyline' && (
+                    <TextField
+                      label={strings.POLYLINE_DISTANCE}
+                      value={geofenceFormPolylineDistance}
+                      onChange={(event) => setGeofenceFormPolylineDistance(event.target.value)}
+                    />
+                  )}
+                </div>
 
                 <div className="tracking-actions">
-                  <Button variant="contained" className="btn-primary" onClick={handleSaveGeofence} disabled={!integrationEnabled}>
+                  <Button variant="contained" className="btn-primary" onClick={handleSaveGeofence} disabled={!integrationEnabled || !geofenceDraftReady}>
                     {editingGeofenceId ? strings.UPDATE_GEOFENCE : strings.CREATE_GEOFENCE}
                   </Button>
                 </div>
@@ -1440,6 +1764,7 @@ const Tracking = () => {
                     <div className="tracking-list">
                       {managedGeofences.map((geofence, index) => {
                         const parsed = parseGeofenceArea(geofence, index)
+                        const editable = !!parseEditableGeofence(geofence)
                         const linked = typeof geofence.id === 'number' && linkedGeofenceIds.has(geofence.id)
 
                         return (
@@ -1459,7 +1784,7 @@ const Tracking = () => {
                               <Button
                                 variant="text"
                                 onClick={() => populateGeofenceForm(geofence)}
-                                disabled={!integrationEnabled}
+                                disabled={!integrationEnabled || !editable}
                               >
                                 {strings.EDIT_GEOFENCE}
                               </Button>
