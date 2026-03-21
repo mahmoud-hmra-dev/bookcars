@@ -555,14 +555,6 @@ const GoogleTrackingMap = ({
 
   React.useEffect(() => () => clearDraftPolylineListeners(), [])
 
-  if (!env.GOOGLE_MAPS_API_KEY) {
-    return <div className="tracking-map-empty"><Typography variant="body2">Google Maps API key is missing.</Typography></div>
-  }
-
-  if (!isLoaded) {
-    return <div className="tracking-map-empty"><Typography variant="body2">{commonStrings.LOADING}</Typography></div>
-  }
-
   const buildMarkerIcon = (color: string, scale: number): google.maps.Symbol => ({
     path: google.maps.SymbolPath.CIRCLE,
     fillColor: color,
@@ -674,16 +666,20 @@ const GoogleTrackingMap = ({
     drawingControl: false,
   } satisfies google.maps.drawing.DrawingManagerOptions
 
-  const heatmapData = useMemo(() => {
-    if (!isLoaded || !globalThis.google?.maps?.visualization) {
-      return []
-    }
-
-    return heatmapPoints.map((item) => ({
+  const heatmapData = !isLoaded || !globalThis.google?.maps?.visualization
+    ? []
+    : heatmapPoints.map((item) => ({
       location: new google.maps.LatLng(item.point[0], item.point[1]),
       weight: item.weight,
     }))
-  }, [heatmapPoints, isLoaded])
+
+  if (!env.GOOGLE_MAPS_API_KEY) {
+    return <div className="tracking-map-empty"><Typography variant="body2">Google Maps API key is missing.</Typography></div>
+  }
+
+  if (!isLoaded) {
+    return <div className="tracking-map-empty"><Typography variant="body2">{commonStrings.LOADING}</Typography></div>
+  }
 
   return (
     <GoogleMap
