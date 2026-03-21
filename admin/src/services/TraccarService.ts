@@ -24,6 +24,12 @@ export interface TraccarEventCenterParams {
   limit?: number
 }
 
+export interface TraccarCommandPayload {
+  type: string
+  textChannel?: boolean
+  attributes?: Record<string, any>
+}
+
 export const getStatus = (): Promise<{ enabled: boolean, baseUrl: string }> =>
   axiosInstance
     .get('/api/status', { withCredentials: true })
@@ -82,6 +88,16 @@ export const unlinkDevice = (carId: string): Promise<bookcarsTypes.TraccarCarTra
 export const getPositions = (carId: string): Promise<bookcarsTypes.TraccarPosition[]> =>
   axiosInstance
     .get(`/api/positions/${encodeURIComponent(carId)}`, { withCredentials: true })
+    .then((res) => res.data)
+
+export const getCommandTypes = (carId: string): Promise<bookcarsTypes.TraccarCommandType[]> =>
+  axiosInstance
+    .get(`/api/commands/${encodeURIComponent(carId)}/types`, { withCredentials: true })
+    .then((res) => res.data)
+
+export const sendCommand = (carId: string, payload: TraccarCommandPayload): Promise<bookcarsTypes.TraccarCommand> =>
+  axiosInstance
+    .post(`/api/commands/${encodeURIComponent(carId)}/send`, payload, { withCredentials: true })
     .then((res) => res.data)
 
 export const getRoute = (carId: string, from: string, to: string): Promise<bookcarsTypes.TraccarPosition[]> =>

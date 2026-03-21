@@ -1,10 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
   Alert,
+  BottomNavigation,
+  BottomNavigationAction,
   Button,
   Chip,
   FormControl,
   FormControlLabel,
+  IconButton,
   InputAdornment,
   InputLabel,
   MenuItem,
@@ -15,15 +18,21 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Typography,
+  useMediaQuery,
 } from '@mui/material'
+import CenterFocusStrongIcon from '@mui/icons-material/CenterFocusStrong'
 import DirectionsCarFilledIcon from '@mui/icons-material/DirectionsCarFilled'
+import LayersIcon from '@mui/icons-material/Layers'
+import MapIcon from '@mui/icons-material/Map'
 import MyLocationIcon from '@mui/icons-material/MyLocation'
 import PauseIcon from '@mui/icons-material/Pause'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import RadarIcon from '@mui/icons-material/Radar'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import RouteIcon from '@mui/icons-material/Route'
+import SatelliteAltIcon from '@mui/icons-material/SatelliteAlt'
 import SearchIcon from '@mui/icons-material/Search'
+import TerminalIcon from '@mui/icons-material/Terminal'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import { CircleF, DrawingManager, GoogleMap, HeatmapLayer, InfoWindow, MarkerClustererF, MarkerF, PolygonF, PolylineF, RectangleF, type Libraries, useJsApiLoader } from '@react-google-maps/api'
 import * as bookcarsTypes from ':bookcars-types'
@@ -48,6 +57,7 @@ const CARS_FETCH_SIZE = 100
 
 type FleetMode = 'fleet' | 'single'
 type TrackingPanelSection = 'fleet' | 'vehicle' | 'route' | 'geofences' | 'events'
+type TrackingMapType = 'roadmap' | 'hybrid'
 type LatLngTuple = [number, number]
 type GoogleLatLng = google.maps.LatLngLiteral
 
@@ -130,6 +140,7 @@ const EVENT_TYPE_OPTIONS = [
   'deviceMoving',
   'deviceStopped',
 ] as const
+const DEFAULT_COMMAND_ATTRIBUTES = '{\n  "data": ""\n}'
 
 const formatDateInput = (date: Date) => date.toISOString().slice(0, 16)
 const isFiniteCoordinate = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
@@ -673,6 +684,7 @@ const extractGeoJsonPaths = (geojson: any): LatLngTuple[][] => {
 
 const GoogleTrackingMap = ({
   mapMode,
+  mapType,
   fleetCars,
   selectedFleetCar,
   currentPoint,
@@ -696,6 +708,7 @@ const GoogleTrackingMap = ({
   onDraftGeofenceDrawn,
 }: {
   mapMode: FleetMode
+  mapType: TrackingMapType
   fleetCars: FleetCarView[]
   selectedFleetCar: FleetCarView | null
   currentPoint: LatLngTuple | null
@@ -946,7 +959,7 @@ const GoogleTrackingMap = ({
       onLoad={(map) => {
         mapRef.current = map
       }}
-      options={{ streetViewControl: false, mapTypeControl: false, fullscreenControl: true }}
+      options={{ streetViewControl: false, mapTypeControl: false, fullscreenControl: true, mapTypeId: mapType, zoomControlOptions: { position: googleMaps.ControlPosition.LEFT_CENTER } }}
     >
       {mapMode === 'single' && showHeatmap && heatmapData.length > 0 && (
         <HeatmapLayer
@@ -1149,6 +1162,7 @@ const GoogleTrackingMap = ({
 }
 
 const Tracking = () => {
+  const isMobileLayout = useMediaQuery('(max-width:960px)')
   const [user, setUser] = useState<bookcarsTypes.User>()
   const [cars, setCars] = useState<bookcarsTypes.Car[]>([])
   const [devices, setDevices] = useState<bookcarsTypes.TraccarDevice[]>([])
@@ -1156,6 +1170,8 @@ const Tracking = () => {
   const [fleetHealth, setFleetHealth] = useState<bookcarsTypes.TraccarFleetHealth | null>(null)
   const [selectedCarId, setSelectedCarId] = useState('')
   const [mapMode, setMapMode] = useState<FleetMode>('fleet')
+  const [mapType, setMapType] = useState<TrackingMapType>('roadmap')
+  const [showMapLegend, setShowMapLegend] = useState(true)
   const [fleetSearch, setFleetSearch] = useState('')
   const [fleetStatusFilter, setFleetStatusFilter] = useState<'all' | bookcarsTypes.TraccarFleetStatus>('all')
   const [fleetLinkFilter, setFleetLinkFilter] = useState<'all' | 'linked' | 'unlinked'>('all')
@@ -1181,6 +1197,10 @@ const Tracking = () => {
   const [eventScope, setEventScope] = useState<'fleet' | 'vehicle'>('fleet')
   const [eventTypeFilter, setEventTypeFilter] = useState<(typeof EVENT_TYPE_OPTIONS)[number]>('all')
   const [eventCenterItems, setEventCenterItems] = useState<bookcarsTypes.TraccarEventCenterEntry[]>([])
+  const [commandTypes, setCommandTypes] = useState<bookcarsTypes.TraccarCommandType[]>([])
+  const [selectedCommandType, setSelectedCommandType] = useState('')
+  const [commandTextChannel, setCommandTextChannel] = useState(false)
+  const [commandAttributes, setCommandAttributes] = useState(DEFAULT_COMMAND_ATTRIBUTES)
   const [loading, setLoading] = useState(false)
   const [integrationEnabled, setIntegrationEnabled] = useState(true)
   const [editingGeofenceId, setEditingGeofenceId] = useState<number | null>(null)
@@ -1209,6 +1229,49 @@ const Tracking = () => {
     setDeviceName(selectedCar?.tracking?.deviceName || '')
     setNotes(selectedCar?.tracking?.notes || '')
   }, [selectedCar])
+
+  useEffect(() => {
+    let active = true
+
+    const loadVehicleCommandTypes = async () => {
+      if (!selectedCar?.tracking?.deviceId || !integrationEnabled) {
+        setCommandTypes([])
+        setSelectedCommandType('')
+        return
+      }
+
+      try {
+        const types = await TraccarService.getCommandTypes(selectedCar._id)
+        if (!active) {
+          return
+        }
+
+        setCommandTypes(types)
+        const defaultType = types[0]?.type || ''
+        setSelectedCommandType((current) => (
+          current && types.some((type) => type.type === current) ? current : defaultType
+        ))
+      } catch {
+        if (active) {
+          setCommandTypes([])
+          setSelectedCommandType('')
+        }
+      }
+    }
+
+    void loadVehicleCommandTypes()
+
+    return () => {
+      active = false
+    }
+  }, [integrationEnabled, selectedCar])
+
+  useEffect(() => {
+    const match = commandTypes.find((type) => type.type === selectedCommandType)
+    if (match && typeof match.textChannel === 'boolean') {
+      setCommandTextChannel(match.textChannel)
+    }
+  }, [commandTypes, selectedCommandType])
 
   useEffect(() => {
     let active = true
@@ -1720,6 +1783,20 @@ const Tracking = () => {
     resetTrackingData()
   }
 
+  const focusSelectedVehicleOnMap = () => {
+    if (!selectedCarId) {
+      return
+    }
+
+    setMapMode('single')
+    setMapFitRequestToken((prev) => prev + 1)
+  }
+
+  const focusFleetOnMap = () => {
+    setMapMode('fleet')
+    setMapFitRequestToken((prev) => prev + 1)
+  }
+
   const loadCars = async () => {
     const payload: bookcarsTypes.GetCarsPayload = {
       suppliers: [],
@@ -2153,6 +2230,35 @@ const Tracking = () => {
     }
   }
 
+  const handleSendCommand = async () => {
+    if (!selectedCar || !selectedCommandType) {
+      return
+    }
+
+    let parsedAttributes: Record<string, any> = {}
+
+    try {
+      parsedAttributes = commandAttributes.trim() ? JSON.parse(commandAttributes) : {}
+    } catch {
+      helper.error(null, commonStrings.FIELD_NOT_VALID)
+      return
+    }
+
+    setLoading(true)
+    try {
+      await TraccarService.sendCommand(selectedCar._id, {
+        type: selectedCommandType,
+        textChannel: commandTextChannel,
+        attributes: parsedAttributes,
+      })
+      helper.info(commonStrings.UPDATED)
+    } catch (err) {
+      helper.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (!user || !integrationEnabled || !liveRefreshEnabled) {
       return
@@ -2493,6 +2599,64 @@ const Tracking = () => {
                   )
                 : (
                   <div className="tracking-empty">{strings.NO_DATA}</div>
+                  )}
+            </Paper>
+
+            <Paper className="tracking-card tracking-card--embedded">
+              <div className="tracking-header">
+                <div>
+                  <Typography variant="h6">{strings.COMMAND_CENTER}</Typography>
+                  <Typography className="tracking-card-subtitle">{strings.COMMAND_CENTER_SUBTITLE}</Typography>
+                </div>
+                <TerminalIcon fontSize="small" />
+              </div>
+
+              {canLoadTracking
+                ? (
+                  <>
+                    <div className="tracking-grid">
+                      <FormControl>
+                        <InputLabel>{strings.COMMAND_TYPE}</InputLabel>
+                        <Select
+                          value={selectedCommandType}
+                          label={strings.COMMAND_TYPE}
+                          onChange={(event) => setSelectedCommandType(event.target.value as string)}
+                        >
+                          {commandTypes.map((commandType, index) => (
+                            <MenuItem key={`${commandType.type || index}-${index}`} value={commandType.type || ''}>
+                              {commandType.type || strings.NO_DATA}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      <FormControlLabel
+                        control={<Switch checked={commandTextChannel} onChange={(event) => setCommandTextChannel(event.target.checked)} />}
+                        label={strings.TEXT_CHANNEL}
+                      />
+                    </div>
+                    <TextField
+                      label={strings.COMMAND_ATTRIBUTES}
+                      value={commandAttributes}
+                      onChange={(event) => setCommandAttributes(event.target.value)}
+                      multiline
+                      minRows={5}
+                      className="tracking-command-editor"
+                    />
+                    <div className="tracking-actions">
+                      <Button
+                        variant="contained"
+                        className="btn-primary"
+                        onClick={handleSendCommand}
+                        disabled={!selectedCommandType}
+                        startIcon={<TerminalIcon />}
+                      >
+                        {strings.SEND_COMMAND}
+                      </Button>
+                    </div>
+                  </>
+                  )
+                : (
+                  <div className="tracking-empty">{strings.TRACKING_NOT_LINKED}</div>
                   )}
             </Paper>
           </>
@@ -3003,6 +3167,99 @@ const Tracking = () => {
     }
   }
 
+  const renderPanelNavigation = () => (
+    <div className={`tracking-sidebar__nav${isMobileLayout ? ' tracking-sidebar__nav--mobile' : ''}`}>
+      {sectionItems.map((section) => {
+        const isActive = activePanelSection === section.id
+
+        return (
+          <button
+            key={section.id}
+            type="button"
+            className={`tracking-sidebar__nav-item${isActive ? ' is-active' : ''}`}
+            onClick={() => focusPanelSection(section.id)}
+          >
+            <span className="tracking-sidebar__nav-icon">{section.icon}</span>
+            <span className="tracking-sidebar__nav-copy">
+              <strong>{section.title}</strong>
+              <em>{section.summary}</em>
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+
+  const renderOperationsHeader = () => (
+    <>
+      <div className="tracking-pane__hero">
+        <div className="tracking-pane__hero-copy">
+          <span>{strings.TITLE}</span>
+          <strong>{strings.TRACKING_WORKSPACE}</strong>
+          <p>{strings.TRACKING_WORKSPACE_SUBTITLE}</p>
+        </div>
+        <div className="tracking-pane__hero-chips">
+          <Chip size="small" color={integrationEnabled ? 'success' : 'default'} label={integrationEnabled ? strings.SYSTEM_ONLINE : strings.SYSTEM_OFFLINE} />
+          <Chip size="small" label={`${fleetHealth?.staleCars ?? fleetStatusCounts.stale} ${strings.STATUS_STALE}`} />
+        </div>
+      </div>
+
+      <div className="tracking-pane__toolbar">
+        <ToggleButtonGroup
+          value={mapMode}
+          exclusive
+          onChange={(_event, value: FleetMode | null) => value && setMapMode(value)}
+          size="small"
+          className="tracking-mode-toggle"
+        >
+          <ToggleButton value="fleet">{strings.FLEET_MODE}</ToggleButton>
+          <ToggleButton value="single">{strings.SINGLE_MODE}</ToggleButton>
+        </ToggleButtonGroup>
+
+        <FormControl className="tracking-car-select">
+          <InputLabel>{strings.SELECT_CAR}</InputLabel>
+          <Select
+            value={selectedCarId}
+            label={strings.SELECT_CAR}
+            onChange={(event) => selectCar(event.target.value as string)}
+          >
+            {cars.map((car) => (
+              <MenuItem key={car._id} value={car._id}>{car.name}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <div className="tracking-pane__actions">
+          <Button variant="contained" className="btn-primary" onClick={handleRefreshFleet} disabled={!integrationEnabled}>
+            {strings.REFRESH_FLEET}
+          </Button>
+          <Button variant="contained" className="btn-secondary" onClick={handleLoadSnapshot} disabled={!canLoadTracking}>
+            {strings.LOAD_SNAPSHOT}
+          </Button>
+        </div>
+
+        <div className="tracking-pane__summary">
+          <div className="tracking-panel__summary-item">
+            <span>{strings.SELECTED_VEHICLE}</span>
+            <strong>{selectedCar?.name || strings.NO_DATA}</strong>
+          </div>
+          <div className="tracking-panel__summary-item">
+            <span>{strings.DEVICE_STATUS}</span>
+            <strong>{selectedStatusLabel}</strong>
+          </div>
+          <div className="tracking-panel__summary-item">
+            <span>{strings.CURRENT_POSITION}</span>
+            <strong>{currentPoint ? `${formatCoordinate(currentPosition?.latitude)}, ${formatCoordinate(currentPosition?.longitude)}` : '-'}</strong>
+          </div>
+          <div className="tracking-panel__summary-item">
+            <span>{strings.LAST_UPDATE}</span>
+            <strong>{lastOperationalRefreshAt ? formatTimestamp(lastOperationalRefreshAt) : strings.NO_DATA}</strong>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+
   return (
     <Layout onLoad={onLoad} strict>
       {user && (
@@ -3013,7 +3270,7 @@ const Tracking = () => {
             </Alert>
           )}
 
-          <div className="tracking-shell">
+          <div className={`tracking-shell${isMobileLayout ? ' tracking-shell--mobile' : ''}`}>
             <div className="tracking-shell__map">
               {!hasMapData && mapMode === 'fleet'
                 ? (
@@ -3025,6 +3282,7 @@ const Tracking = () => {
                 : (
                   <GoogleTrackingMap
                     mapMode={mapMode}
+                    mapType={mapType}
                     fleetCars={fleetCars}
                     selectedFleetCar={selectedFleetCar}
                     currentPoint={currentPoint}
@@ -3043,7 +3301,13 @@ const Tracking = () => {
                     draftGeofence={geofenceDraft}
                     drawingMode={geofenceDrawingMode}
                     fitRequestToken={mapFitRequestToken}
-                    onMarkerClick={selectCar}
+                    onMarkerClick={(carId) => {
+                      selectCar(carId)
+                      setMapMode('single')
+                      if (isMobileLayout) {
+                        setActivePanelSection('vehicle')
+                      }
+                    }}
                     onDraftGeofenceChange={handleDraftGeofenceChange}
                     onDraftGeofenceDrawn={handleDraftGeofenceDrawn}
                   />
@@ -3078,7 +3342,8 @@ const Tracking = () => {
                     {selectedCar && <Chip color={selectedStatusTone} label={`${selectedCar.name} • ${selectedStatusLabel}`} />}
                   </div>
                 </div>
-                <div className="tracking-map-legend-card">
+                {showMapLegend && (
+                  <div className="tracking-map-legend-card">
                   <Typography className="tracking-map-legend-title">{mapMode === 'fleet' ? strings.FLEET_LEGEND : strings.SELECTED_VEHICLE}</Typography>
                   <div className="tracking-map-legend">
                     {mapMode === 'fleet'
@@ -3098,7 +3363,23 @@ const Tracking = () => {
                         </>
                         )}
                   </div>
-                </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="tracking-map-toolbar">
+                <IconButton className="tracking-map-toolbar__button" onClick={handleRefreshFleet} disabled={!integrationEnabled}>
+                  <RestartAltIcon fontSize="small" />
+                </IconButton>
+                <IconButton className="tracking-map-toolbar__button" onClick={() => setMapType((current) => (current === 'roadmap' ? 'hybrid' : 'roadmap'))}>
+                  {mapType === 'roadmap' ? <SatelliteAltIcon fontSize="small" /> : <MapIcon fontSize="small" />}
+                </IconButton>
+                <IconButton className="tracking-map-toolbar__button" onClick={() => setShowMapLegend((current) => !current)}>
+                  <LayersIcon fontSize="small" />
+                </IconButton>
+                <IconButton className="tracking-map-toolbar__button" onClick={() => (mapMode === 'fleet' ? focusFleetOnMap() : focusSelectedVehicleOnMap())}>
+                  <CenterFocusStrongIcon fontSize="small" />
+                </IconButton>
               </div>
 
               {mapMode === 'single' && routeFrames.length > 0 && (
@@ -3146,98 +3427,29 @@ const Tracking = () => {
               )}
             </div>
 
-            <aside className="tracking-panel tracking-panel--product">
-              <div className="tracking-panel__hero">
-                <div className="tracking-panel__hero-copy">
-                  <span>{strings.TITLE}</span>
-                  <strong>{strings.TRACKING_WORKSPACE}</strong>
-                  <p>{strings.TRACKING_WORKSPACE_SUBTITLE}</p>
-                </div>
-                <div className="tracking-panel__hero-chips">
-                  <Chip size="small" color={integrationEnabled ? 'success' : 'default'} label={integrationEnabled ? strings.SYSTEM_ONLINE : strings.SYSTEM_OFFLINE} />
-                  <Chip size="small" label={`${fleetHealth?.staleCars ?? fleetStatusCounts.stale} ${strings.STATUS_STALE}`} />
-                </div>
-              </div>
+            {isMobileLayout && (
+              <BottomNavigation
+                showLabels
+                value={activePanelSection}
+                onChange={(_event, value: TrackingPanelSection) => setActivePanelSection(value)}
+                className="tracking-mobile-nav"
+              >
+                {sectionItems.map((section) => (
+                  <BottomNavigationAction
+                    key={section.id}
+                    value={section.id}
+                    icon={section.icon}
+                    label={section.title}
+                  />
+                ))}
+              </BottomNavigation>
+            )}
 
-              <div className="tracking-panel__primary">
-                <ToggleButtonGroup
-                  value={mapMode}
-                  exclusive
-                  onChange={(_event, value: FleetMode | null) => value && setMapMode(value)}
-                  size="small"
-                  className="tracking-mode-toggle"
-                >
-                  <ToggleButton value="fleet">{strings.FLEET_MODE}</ToggleButton>
-                  <ToggleButton value="single">{strings.SINGLE_MODE}</ToggleButton>
-                </ToggleButtonGroup>
-
-                <FormControl className="tracking-car-select">
-                  <InputLabel>{strings.SELECT_CAR}</InputLabel>
-                  <Select
-                    value={selectedCarId}
-                    label={strings.SELECT_CAR}
-                    onChange={(event) => selectCar(event.target.value as string)}
-                  >
-                    {cars.map((car) => (
-                      <MenuItem key={car._id} value={car._id}>{car.name}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <div className="tracking-panel__actions tracking-panel__actions--dock">
-                  <Button variant="contained" className="btn-primary" onClick={handleRefreshFleet} disabled={!integrationEnabled}>
-                    {strings.REFRESH_FLEET}
-                  </Button>
-                  <Button variant="contained" className="btn-secondary" onClick={handleLoadSnapshot} disabled={!canLoadTracking}>
-                    {strings.LOAD_SNAPSHOT}
-                  </Button>
-                </div>
-
-                <div className="tracking-ops-metrics">
-                  <div className="tracking-panel__summary-item">
-                    <span>{strings.SELECTED_VEHICLE}</span>
-                    <strong>{selectedCar?.name || strings.NO_DATA}</strong>
-                  </div>
-                  <div className="tracking-panel__summary-item">
-                    <span>{strings.DEVICE_STATUS}</span>
-                    <strong>{selectedStatusLabel}</strong>
-                  </div>
-                  <div className="tracking-panel__summary-item">
-                    <span>{strings.CURRENT_POSITION}</span>
-                    <strong>{currentPoint ? `${formatCoordinate(currentPosition?.latitude)}, ${formatCoordinate(currentPosition?.longitude)}` : '-'}</strong>
-                  </div>
-                  <div className="tracking-panel__summary-item">
-                    <span>{strings.LAST_UPDATE}</span>
-                    <strong>{lastOperationalRefreshAt ? formatTimestamp(lastOperationalRefreshAt) : strings.NO_DATA}</strong>
-                  </div>
-                </div>
-              </div>
-
-              <div className="tracking-sidebar">
-                <div className="tracking-sidebar__nav">
-                  {sectionItems.map((section) => {
-                    const isActive = activePanelSection === section.id
-
-                    return (
-                      <button
-                        key={section.id}
-                        type="button"
-                        className={`tracking-sidebar__nav-item${isActive ? ' is-active' : ''}`}
-                        onClick={() => focusPanelSection(section.id)}
-                      >
-                        <span className="tracking-sidebar__nav-icon">{section.icon}</span>
-                        <span className="tracking-sidebar__nav-copy">
-                          <strong>{section.title}</strong>
-                          <em>{section.summary}</em>
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-
-                <div className="tracking-sidebar__content tracking-sidebar__content--product">
-                  {renderSectionBody(activePanelSection)}
-                </div>
+            <aside className="tracking-pane">
+              {renderOperationsHeader()}
+              {renderPanelNavigation()}
+              <div className="tracking-pane__content">
+                {renderSectionBody(activePanelSection)}
               </div>
             </aside>
           </div>

@@ -417,6 +417,18 @@ export const getFleetEvents = async (
   }
 }
 
+export const getCommandTypes = async (deviceId: number): Promise<bookcarsTypes.TraccarCommandType[]> => {
+  ensureEnabled()
+  const response = await getClient().get('/api/commands/types', { params: { deviceId } })
+  return response.data
+}
+
+export const sendCommand = async (payload: bookcarsTypes.TraccarCommand): Promise<bookcarsTypes.TraccarCommand> => {
+  ensureEnabled()
+  const response = await getClient().post('/api/commands/send', payload)
+  return response.data
+}
+
 export const getStops = async (deviceId: number, from: string, to: string): Promise<bookcarsTypes.TraccarStopReport[]> => {
   ensureEnabled()
   return mapListReport<bookcarsTypes.TraccarStopReport>('/api/reports/stops', deviceId, from, to)

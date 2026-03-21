@@ -61,6 +61,20 @@ const sanitizeGeofencePayload = (payload: Partial<bookcarsTypes.UpsertTraccarGeo
   }
 }
 
+const sanitizeCommandPayload = (payload: Partial<bookcarsTypes.TraccarCommand>, deviceId: number): bookcarsTypes.TraccarCommand => {
+  const type = payload.type?.trim()
+  if (!type) {
+    throw new Error('Command type is required')
+  }
+
+  return {
+    deviceId,
+    type,
+    textChannel: !!payload.textChannel,
+    attributes: payload.attributes || {},
+  }
+}
+
 const getPositionDate = (position?: bookcarsTypes.TraccarPosition | null) => {
   if (!position) {
     return 0
@@ -438,6 +452,36 @@ export const getCurrentPositions = async (req: Request, res: Response) => {
     res.json(positions)
   } catch (err) {
     logger.error('[traccar.getCurrentPositions] Error', err)
+    res.status(400).send(String(err))
+  }
+}
+
+export const getCommandTypes = async (req: Request, res: Response) => {
+  try {
+    const car = await getCarWithTracking(req.params.carId)
+    const commandTypes = await traccarService.getCommandTypes(car.tracking?.deviceId as number)
+    res.json(commandTypes)
+  } catch (err) {
+    logger.error('[traccar.getCommandTypes] Error', err)
+    res.status(400).send(String(err))
+  }
+}
+
+export const sendDeviceCommand = async (req: Request, res: Response) => {
+  try {
+    const car = await getCarWithTracking(req.params.carId)
+    const command = await traccarService.sendCommand(sanitizeCommandPayload(req.body, car.tracking?.deviceId as number))
+
+    car.tracking = {
+      ...car.tracking,
+      lastSyncedAt: new Date(),
+      lastEventType: 'commandSent',
+    }
+
+    await car.save()
+    res.json(command)
+  } catch (err) {
+    logger.error('[traccar.sendDeviceCommand] Error', err)
     res.status(400).send(String(err))
   }
 }

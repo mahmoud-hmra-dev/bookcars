@@ -9,6 +9,8 @@ const routes = {
   link: '/api/link/:carId',
   unlink: '/api/unlink/:carId',
   positions: '/api/positions/:carId',
+  commandTypes: '/api/commands/:carId/types',
+  commandSend: '/api/commands/:carId/send',
   route: '/api/route/:carId',
   reports: '/api/reports/:carId',
   geofences: '/api/geofences/:carId',

@@ -19,6 +19,8 @@ routes.route(routeNames.geofenceUnlink).post(authJwt.verifyToken, authJwt.authAd
 routes.route(routeNames.link).post(authJwt.verifyToken, authJwt.authAdmin, traccarController.linkDevice)
 routes.route(routeNames.unlink).post(authJwt.verifyToken, authJwt.authAdmin, traccarController.unlinkDevice)
 routes.route(routeNames.positions).get(authJwt.verifyToken, authJwt.authAdmin, traccarController.getCurrentPositions)
+routes.route(routeNames.commandTypes).get(authJwt.verifyToken, authJwt.authAdmin, traccarController.getCommandTypes)
+routes.route(routeNames.commandSend).post(authJwt.verifyToken, authJwt.authAdmin, traccarController.sendDeviceCommand)
 routes.route(routeNames.route).get(authJwt.verifyToken, authJwt.authAdmin, traccarController.getRouteHistory)
 routes.route(routeNames.reports).get(authJwt.verifyToken, authJwt.authAdmin, traccarController.getVehicleReports)
 routes.route(routeNames.geofences).get(authJwt.verifyToken, authJwt.authAdmin, traccarController.getGeofences)

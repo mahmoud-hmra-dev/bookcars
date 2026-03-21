@@ -241,6 +241,20 @@ export interface TraccarGeofence {
   attributes?: Record<string, any>
 }
 
+export interface TraccarCommandType {
+  type?: string
+  textChannel?: boolean
+}
+
+export interface TraccarCommand {
+  id?: number
+  deviceId?: number
+  description?: string
+  type?: string
+  textChannel?: boolean
+  attributes?: Record<string, any>
+}
+
 export type TraccarFleetStatus =
   | 'moving'
   | 'idle'
