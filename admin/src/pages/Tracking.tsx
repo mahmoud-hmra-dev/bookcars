@@ -1081,8 +1081,8 @@ const Tracking = () => {
 
   const focusPanelSection = (section: TrackingPanelSection) => {
     setActivePanelSection(section)
-    if (isCompactViewport && mobileSheetState === 'collapsed') {
-      setMobileSheetState('mid')
+    if (isCompactViewport) {
+      setMobileSheetState('full')
     }
   }
 
