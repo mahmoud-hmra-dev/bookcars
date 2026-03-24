@@ -5,6 +5,7 @@ import Car from '../../models/Car'
 import Location from '../../models/Location'
 import LocationValue from '../../models/LocationValue'
 import User from '../../models/User'
+import Notification from '../../models/Notification'
 import * as logger from '../../utils/logger'
 import { normalizeAssistantText, parseAssistantMessage } from './assistantParser'
 import { localizeAssistantResponse, resolveAssistantIntentWithLlm } from './assistantLlmResolver'
@@ -668,6 +669,236 @@ const handleRevenueSummary = async (parsed: ParsedAssistantIntent, history: Assi
   })
 }
 
+const handleSupplierPerformance = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
+  const paidMatch: Record<string, unknown> = { expireAt: null, status: { $in: PAID_STATUSES } }
+  const unpaidMatch: Record<string, unknown> = { expireAt: null, status: { $nin: PAID_STATUSES } }
+
+  if (parsed.dateRange) {
+    paidMatch.from = { $gte: parsed.dateRange.from, $lte: parsed.dateRange.to }
+    unpaidMatch.from = { $gte: parsed.dateRange.from, $lte: parsed.dateRange.to }
+  }
+
+  const [paidBookings, unpaidBookings, suppliers] = await Promise.all([
+    Booking.find(paidMatch).populate<{ supplier: { fullName?: string } }>('supplier').lean(),
+    Booking.find(unpaidMatch).populate<{ supplier: { fullName?: string } }>('supplier').lean(),
+    User.find({ type: bookcarsTypes.UserType.Supplier, expireAt: null }).select('_id fullName active verified').lean(),
+  ])
+
+  const scoreMap = new Map<string, { supplierId: string, supplierName: string, paidRevenue: number, paidBookings: number, unpaidBookings: number, active: boolean, verified: boolean, score: number }>()
+
+  for (const supplier of suppliers) {
+    scoreMap.set(supplier._id.toString(), {
+      supplierId: supplier._id.toString(),
+      supplierName: supplier.fullName,
+      paidRevenue: 0,
+      paidBookings: 0,
+      unpaidBookings: 0,
+      active: !!supplier.active,
+      verified: !!supplier.verified,
+      score: 0,
+    })
+  }
+
+  for (const booking of paidBookings) {
+    const supplierId = booking.supplier?._id?.toString()
+    if (!supplierId || !scoreMap.has(supplierId)) continue
+    const row = scoreMap.get(supplierId)!
+    row.paidRevenue += booking.price || 0
+    row.paidBookings += 1
+  }
+
+  for (const booking of unpaidBookings) {
+    const supplierId = booking.supplier?._id?.toString()
+    if (!supplierId || !scoreMap.has(supplierId)) continue
+    const row = scoreMap.get(supplierId)!
+    row.unpaidBookings += 1
+  }
+
+  const rows = Array.from(scoreMap.values()).map((row) => ({
+    ...row,
+    score: (row.paidRevenue / 100) + (row.paidBookings * 8) - (row.unpaidBookings * 10) + (row.active ? 10 : -15) + (row.verified ? 5 : -10),
+  }))
+
+  const topSuppliers = [...rows].sort((a, b) => b.score - a.score).slice(0, 5)
+  const weakestSuppliers = [...rows].sort((a, b) => a.score - b.score).slice(0, 5)
+
+  return withLanguageMetadata(parsed, history, {
+    intent: 'supplier_performance',
+    status: 'success',
+    reply: `Supplier performance analyzed across ${rows.length} suppliers. ${topSuppliers[0] ? `Top supplier right now is ${topSuppliers[0].supplierName}.` : ''}`.trim(),
+    data: withResolutionSource(parsed, {
+      topSuppliers,
+      weakestSuppliers,
+      totalSuppliers: rows.length,
+    }),
+    suggestedActions: ['find supplier Youssef', 'show unpaid bookings today', 'what do you recommend now?'],
+  })
+}
+
+const handleCustomerHealth = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
+  const customers = await User.find({ type: bookcarsTypes.UserType.User, expireAt: null })
+    .select('_id fullName email active verified blacklisted createdAt')
+    .lean()
+
+  const bookings = await Booking.find({ expireAt: null })
+    .select('driver price status')
+    .lean()
+
+  const stats = new Map<string, { customerId: string, fullName: string, email: string, active: boolean, verified: boolean, blacklisted: boolean, bookings: number, paidBookings: number, unpaidBookings: number, revenue: number, healthScore: number }>()
+
+  for (const customer of customers) {
+    stats.set(customer._id.toString(), {
+      customerId: customer._id.toString(),
+      fullName: customer.fullName,
+      email: customer.email,
+      active: !!customer.active,
+      verified: !!customer.verified,
+      blacklisted: !!customer.blacklisted,
+      bookings: 0,
+      paidBookings: 0,
+      unpaidBookings: 0,
+      revenue: 0,
+      healthScore: 0,
+    })
+  }
+
+  for (const booking of bookings) {
+    const driverId = booking.driver?.toString()
+    if (!driverId || !stats.has(driverId)) continue
+    const row = stats.get(driverId)!
+    row.bookings += 1
+    row.revenue += booking.price || 0
+    if (PAID_STATUSES.includes(booking.status as bookcarsTypes.BookingStatus)) {
+      row.paidBookings += 1
+    } else {
+      row.unpaidBookings += 1
+    }
+  }
+
+  const rows = Array.from(stats.values()).map((row) => ({
+    ...row,
+    healthScore: (row.paidBookings * 10) + (row.revenue / 100) - (row.unpaidBookings * 12) + (row.active ? 5 : -10) + (row.verified ? 5 : -10) + (row.blacklisted ? -50 : 0),
+  }))
+
+  const riskyCustomers = rows.filter((row) => row.blacklisted || row.unpaidBookings > 1 || !row.verified).sort((a, b) => a.healthScore - b.healthScore).slice(0, 8)
+  const bestCustomers = [...rows].sort((a, b) => b.healthScore - a.healthScore).slice(0, 8)
+
+  return withLanguageMetadata(parsed, history, {
+    intent: 'customer_health',
+    status: 'success',
+    reply: `Customer health reviewed across ${rows.length} customers. ${riskyCustomers.length > 0 ? `${riskyCustomers.length} customer records need closer attention.` : 'No obvious customer risk clusters found.'}`,
+    data: withResolutionSource(parsed, {
+      riskyCustomers,
+      bestCustomers,
+      metrics: {
+        totalCustomers: rows.length,
+        blacklistedCustomers: rows.filter((row) => row.blacklisted).length,
+        unverifiedCustomers: rows.filter((row) => !row.verified).length,
+      },
+    }),
+    suggestedActions: ['find customer Mahmoud', 'show risk alerts', 'what needs attention today?'],
+  })
+}
+
+const handleRiskAlerts = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
+  const now = new Date()
+  const dayStart = new Date(now)
+  dayStart.setHours(0, 0, 0, 0)
+  const dayEnd = new Date(now)
+  dayEnd.setHours(23, 59, 59, 999)
+
+  const [unpaidBookings, cancelledBookings, fullyBookedCars, inactiveSuppliers, staleNotifications] = await Promise.all([
+    Booking.countDocuments({ expireAt: null, status: { $nin: PAID_STATUSES } }),
+    Booking.countDocuments({ expireAt: null, status: bookcarsTypes.BookingStatus.Cancelled, from: { $gte: dayStart, $lte: dayEnd } }),
+    Car.countDocuments({ fullyBooked: true }),
+    User.countDocuments({ type: bookcarsTypes.UserType.Supplier, expireAt: null, $or: [{ active: { $ne: true } }, { verified: { $ne: true } }] }),
+    Notification.countDocuments({ isRead: false }),
+  ])
+
+  const alerts = []
+  if (unpaidBookings > 3) alerts.push({ severity: 'high', label: 'Unpaid bookings pressure', value: unpaidBookings, note: 'Too many unpaid bookings are still open.' })
+  if (cancelledBookings > 2) alerts.push({ severity: 'medium', label: 'Cancellation spike', value: cancelledBookings, note: 'There is a noticeable cancellation count today.' })
+  if (fullyBookedCars > 0) alerts.push({ severity: 'medium', label: 'Fleet saturation', value: fullyBookedCars, note: 'Some cars are fully booked and may block demand.' })
+  if (inactiveSuppliers > 0) alerts.push({ severity: 'medium', label: 'Inactive or unverified suppliers', value: inactiveSuppliers, note: 'Supplier accounts need review.' })
+  if (staleNotifications > 10) alerts.push({ severity: 'low', label: 'Unread ops notifications', value: staleNotifications, note: 'Unread notifications are piling up.' })
+
+  return withLanguageMetadata(parsed, history, {
+    intent: 'risk_alerts',
+    status: 'success',
+    reply: alerts.length > 0
+      ? `Detected ${alerts.length} operational risk alert${alerts.length > 1 ? 's' : ''}.`
+      : 'No strong operational risk alerts were detected in the current quick scan.',
+    data: withResolutionSource(parsed, {
+      alerts,
+      metrics: {
+        unpaidBookings,
+        cancelledBookings,
+        fullyBookedCars,
+        inactiveSuppliers,
+        unreadNotifications: staleNotifications,
+      },
+    }),
+    suggestedActions: ['show unpaid bookings today', 'show supplier performance', 'what do you recommend now?'],
+  })
+}
+
+const handleSmartRecommendations = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
+  const [unpaidBookings, fullyBookedCars, inactiveSuppliers, blacklistedCustomers, availableCars, paidBookings] = await Promise.all([
+    Booking.countDocuments({ expireAt: null, status: { $nin: PAID_STATUSES } }),
+    Car.countDocuments({ fullyBooked: true }),
+    User.countDocuments({ type: bookcarsTypes.UserType.Supplier, expireAt: null, $or: [{ active: { $ne: true } }, { verified: { $ne: true } }] }),
+    User.countDocuments({ type: bookcarsTypes.UserType.User, expireAt: null, blacklisted: true }),
+    Car.countDocuments({ available: true, comingSoon: { $ne: true }, fullyBooked: { $ne: true } }),
+    Booking.countDocuments({ expireAt: null, status: { $in: PAID_STATUSES } }),
+  ])
+
+  const recommendations: string[] = []
+
+  if (unpaidBookings > 0) {
+    recommendations.push(`Prioritize unpaid bookings follow-up first (${unpaidBookings} open).`)
+  }
+
+  if (fullyBookedCars > 0 && availableCars < fullyBookedCars) {
+    recommendations.push('Rebalance fleet exposure or promote currently available cars because fully booked cars are constraining supply.')
+  }
+
+  if (inactiveSuppliers > 0) {
+    recommendations.push(`Review ${inactiveSuppliers} inactive or unverified supplier accounts and unblock the good ones quickly.`)
+  }
+
+  if (blacklistedCustomers > 0) {
+    recommendations.push(`Audit blacklisted customer records (${blacklistedCustomers}) before approving sensitive new bookings.`)
+  }
+
+  if (paidBookings === 0) {
+    recommendations.push('Investigate checkout/payment flow because there are no paid bookings in the current snapshot.')
+  }
+
+  if (recommendations.length === 0) {
+    recommendations.push('Focus on conversion: push available cars, monitor new bookings, and keep supplier response times tight.')
+  }
+
+  return withLanguageMetadata(parsed, history, {
+    intent: 'smart_recommendations',
+    status: 'success',
+    reply: `Top recommendations right now:
+- ${recommendations.join('
+- ')}`,
+    data: withResolutionSource(parsed, {
+      recommendations,
+      metrics: {
+        unpaidBookings,
+        fullyBookedCars,
+        inactiveSuppliers,
+        blacklistedCustomers,
+        availableCars,
+        paidBookings,
+      },
+    }),
+    suggestedActions: ['show risk alerts', 'show supplier performance', 'show customer health'],
+  })
+}
+
 const handleOpsSummary = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
   const now = new Date()
   const activeRange = parsed.dateRange ?? {
@@ -914,6 +1145,42 @@ const fallbackResolveAssistantIntent = (message: string): ParsedAssistantIntent 
     }
   }
 
+  if (normalizedMessage.includes('top suppliers') || normalizedMessage.includes('supplier performance') || normalizedMessage.includes('best supplier') || normalizedMessage.includes('الموردين الافضل') || normalizedMessage.includes('اداء المورد')) {
+    return {
+      ...extracted,
+      intent: 'supplier_performance',
+      source: 'system_fallback',
+      confidence: 0.78,
+    }
+  }
+
+  if (normalizedMessage.includes('customer health') || normalizedMessage.includes('risky customers') || normalizedMessage.includes('blacklisted') || normalizedMessage.includes('العملاء الخطرين') || normalizedMessage.includes('العملاء المحظورين') || normalizedMessage.includes('صحه العملاء')) {
+    return {
+      ...extracted,
+      intent: 'customer_health',
+      source: 'system_fallback',
+      confidence: 0.77,
+    }
+  }
+
+  if (normalizedMessage.includes('risk') || normalizedMessage.includes('risks') || normalizedMessage.includes('alerts') || normalizedMessage.includes('urgent issues') || normalizedMessage.includes('المخاطر') || normalizedMessage.includes('تنبيهات') || normalizedMessage.includes('عاجل')) {
+    return {
+      ...extracted,
+      intent: 'risk_alerts',
+      source: 'system_fallback',
+      confidence: 0.8,
+    }
+  }
+
+  if (normalizedMessage.includes('recommend') || normalizedMessage.includes('recommendation') || normalizedMessage.includes('next best action') || normalizedMessage.includes('what should we do') || normalizedMessage.includes('ماذا تقترح') || normalizedMessage.includes('ما الذي تنصح به') || normalizedMessage.includes('التوصيات')) {
+    return {
+      ...extracted,
+      intent: 'smart_recommendations',
+      source: 'system_fallback',
+      confidence: 0.82,
+    }
+  }
+
   if (normalizedMessage.includes('revenue') || normalizedMessage.includes('income') || normalizedMessage.includes('الايراد') || normalizedMessage.includes('الايرادات') || normalizedMessage.includes('الدخل')) {
     return {
       ...extracted,
@@ -1004,6 +1271,18 @@ export const processAssistantMessage = async (
       break
     case 'revenue_summary':
       response = await handleRevenueSummary(parsed, safeHistory)
+      break
+    case 'supplier_performance':
+      response = await handleSupplierPerformance(parsed, safeHistory)
+      break
+    case 'customer_health':
+      response = await handleCustomerHealth(parsed, safeHistory)
+      break
+    case 'risk_alerts':
+      response = await handleRiskAlerts(parsed, safeHistory)
+      break
+    case 'smart_recommendations':
+      response = await handleSmartRecommendations(parsed, safeHistory)
       break
     case 'ops_summary':
       response = await handleOpsSummary(parsed, safeHistory)

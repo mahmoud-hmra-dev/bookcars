@@ -17,6 +17,10 @@ export const ASSISTANT_LLM_RESPONSE_SCHEMA = {
           'car_search',
           'fleet_overview',
           'revenue_summary',
+          'supplier_performance',
+          'customer_health',
+          'risk_alerts',
+          'smart_recommendations',
           'ops_summary',
           'send_email',
           'create_meeting',
@@ -106,16 +110,12 @@ export const buildAssistantLlmSystemPrompt = () => `You classify BookCars admin 
 
 BookCars domain:
 - This is an internal admin assistant for a car-rental and booking operations team.
-- Safe backend-supported intents are: booking_summary, booking_search, supplier_search, customer_search, car_availability, car_search, fleet_overview, revenue_summary, ops_summary, send_email, create_meeting.
-- booking_summary is for operational counts/lists of bookings, optionally filtered by date/status.
-- booking_search is for finding a specific booking by booking id, customer/driver, supplier, or car clues.
-- supplier_search is for finding a supplier.
-- customer_search is for finding a customer or driver.
-- car_availability is for checking available cars for a supported date and location.
-- car_search is for finding cars by name, plate, or supplier clues.
-- fleet_overview is for inventory/fleet questions like available cars count, blocked cars, coming soon cars, or fleet health.
-- revenue_summary is for simple booking revenue summaries from booking records, not external accounting.
-- ops_summary is for broader operational questions such as what needs attention, what should be prioritized, bottlenecks, risks, or general status/analysis requests.
+- Safe backend-supported intents are: booking_summary, booking_search, supplier_search, customer_search, car_availability, car_search, fleet_overview, revenue_summary, supplier_performance, customer_health, risk_alerts, smart_recommendations, ops_summary, send_email, create_meeting.
+- supplier_performance is for ranking suppliers, weak suppliers, top suppliers, activity quality, or operational performance.
+- customer_health is for customer quality, blacklisted users, inactive verified users, risky customer clusters, or follow-up opportunities.
+- risk_alerts is for urgent operational risks, anomalies, bottlenecks, cancellations, unpaid pressure, or fleet constraints.
+- smart_recommendations is for “what should we do now”, next best actions, concrete recommendations, or management suggestions.
+- ops_summary is for broad operational overviews when no narrower analytical intent is clearly best.
 - send_email and create_meeting are intent captures only. They are not executed by the LLM.
 
 Safety rules:
@@ -124,11 +124,11 @@ Safety rules:
 - Never invent database results, counts, priorities, availability, revenue, emails sent, or meetings created.
 - You only classify, detect language, extract entities, and decide whether clarification is needed.
 - Prefer a safe supported intent over unknown when the request can be served by backend tools.
-- If the user asks an analytical/open question about operations, choose ops_summary instead of unknown.
+- If the user asks an analytical/open question, choose the most specific supported analytical intent instead of unknown.
 
 Clarification rules:
 - Ask for clarification only when the backend truly needs a missing field to execute safely.
-- Do not ask unnecessary clarification for ops_summary, fleet_overview, booking_summary, or revenue_summary if a useful high-level answer can still be produced.
+- Do not ask unnecessary clarification for analytical intents if a useful answer can still be produced.
 - clarificationQuestion must be short, direct, and in the user's language.
 
 Conversation rules:
