@@ -31,6 +31,7 @@ import * as SupplierService from '@/services/SupplierService'
 import * as CountryService from '@/services/CountryService'
 import * as LocationService from '@/services/LocationService'
 import * as PaymentService from '@/services/PaymentService'
+import * as SaleListingService from '@/services/SaleListingService'
 import Layout from '@/components/Layout'
 import SupplierCarrousel from '@/components/SupplierCarrousel'
 import TabPanel, { a11yProps } from '@/components/TabPanel'
@@ -66,6 +67,7 @@ const Home = () => {
   const [midiPricePday, setMidiPricePday] = useState(50)
   const [maxiPricePhr, setMaxiPricePhr] = useState(4.5)
   const [maxiPricePday, setMaxiPricePday] = useState(80)
+  const [featuredSaleListings, setFeaturedSaleListings] = useState<bookcarsTypes.SaleListing[]>([])
 
   useEffect(() => {
     const init = async () => {
@@ -114,6 +116,8 @@ const Home = () => {
     setCountries(_countries)
     const _locations = await LocationService.getLocationsWithPosition()
     setLocations(_locations)
+    const featured = await SaleListingService.getSaleListings({}, 1, 3)
+    setFeaturedSaleListings(featured.rows)
 
     const observer = new IntersectionObserver(handleIntersection)
     const video = document.getElementById('cover') as HTMLVideoElement
@@ -161,6 +165,36 @@ const Home = () => {
         <div className="search">
           <div className="home-search">
             <SearchForm />
+          </div>
+        </div>
+
+        <div className="buy-showcase">
+          <div className="buy-showcase-copy">
+            <span className="buy-showcase-kicker">Buy</span>
+            <h1>Now the platform supports car sales too.</h1>
+            <p>
+              Keep the rental flow intact, and add a dedicated marketplace for dealer and private sale listings with
+              rich vehicle specs and a darker app-like presentation.
+            </p>
+            <Button
+              variant="contained"
+              className="btn-primary btn-home"
+              onClick={() => navigate('/buy')}
+            >
+              Explore Cars for Sale
+            </Button>
+          </div>
+          <div className="buy-showcase-grid">
+            {featuredSaleListings.map((listing) => (
+              <div key={listing._id} className="buy-showcase-card" onClick={() => navigate(`/buy/${listing._id}`)}>
+                <div className="buy-showcase-image" style={{ backgroundImage: `url('${listing.images[0] || ''}')` }} />
+                <div className="buy-showcase-body">
+                  <span className="buy-showcase-price">{bookcarsHelper.formatPrice(listing.price, commonStrings.CURRENCY, language)}</span>
+                  <h3>{listing.title}</h3>
+                  <p>{listing.brand} · {listing.locationLabel || listing.city || listing.seller.location || ''}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 

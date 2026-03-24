@@ -308,9 +308,14 @@ const checks = {
     logger.logProject(project, 'Running TypeScript check...')
 
     try {
+      const localTypeScriptBinary = path.posix.join('.', 'node_modules', 'typescript', 'bin', 'tsc')
+      const typeCheckCommand = !runInDocker && await fs.pathExists(path.join(project.folder, 'node_modules', 'typescript', 'bin', 'tsc'))
+        ? `node ${localTypeScriptBinary} --noEmit --incremental --pretty`
+        : 'npx tsc --noEmit --incremental --pretty'
+
       await cmd.runInContext(
         project,
-        'npx tsc --noEmit --incremental --pretty',
+        typeCheckCommand,
         runInDocker,
       )
       logger.logProject(project, `${chalk.green('TypeScript check passed.')}`)

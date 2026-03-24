@@ -125,6 +125,82 @@ div.home div.search div.home-search {
   width: fit-content;
 }
 
+div.home div.buy-showcase {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 390px 1fr;
+  gap: 24px;
+  padding: 36px 60px 20px;
+  background:
+    radial-gradient(circle at top left, rgb(197 102 34 / 15%), transparent 25%),
+    linear-gradient(180deg, #0b0b0b 0%, #111 100%);
+}
+
+div.home div.buy-showcase div.buy-showcase-copy {
+  color: #f5f5f5;
+}
+
+div.home div.buy-showcase span.buy-showcase-kicker {
+  color: #d68a4d;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+div.home div.buy-showcase div.buy-showcase-copy h1 {
+  font-size: 42px;
+  line-height: 1.05;
+  margin: 10px 0 16px;
+}
+
+div.home div.buy-showcase div.buy-showcase-copy p {
+  color: #b9b9b9;
+  line-height: 1.8;
+  margin-bottom: 24px;
+}
+
+div.home div.buy-showcase div.buy-showcase-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+div.home div.buy-showcase div.buy-showcase-card {
+  background-color: #171717;
+  border: 1px solid #252525;
+  border-radius: 24px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+div.home div.buy-showcase div.buy-showcase-image {
+  height: 210px;
+  background-size: cover;
+  background-position: center;
+}
+
+div.home div.buy-showcase div.buy-showcase-body {
+  padding: 18px;
+  color: #f5f5f5;
+}
+
+div.home div.buy-showcase div.buy-showcase-body h3 {
+  margin: 12px 0 8px;
+  font-size: 24px;
+}
+
+div.home div.buy-showcase div.buy-showcase-body p {
+  color: #a9a9a9;
+  margin: 0;
+}
+
+div.home div.buy-showcase span.buy-showcase-price {
+  color: #d97833;
+  font-size: 20px;
+  font-weight: 700;
+}
+
 div.home div.why {
   background-color: #fff;
   width: 100%;
@@ -420,9 +496,15 @@ div.home div.customer-care div.customer-care-img img {
   }
 
   div.home div.why div.why-boxes,
-  div.home div.services div.services-boxes {
+  div.home div.services div.services-boxes,
+  div.home div.buy-showcase,
+  div.home div.buy-showcase div.buy-showcase-grid {
     display: flex;
     flex-direction: column;
+  }
+
+  div.home div.buy-showcase {
+    padding: 32px 20px;
   }
 
   div.home div.car-size div.boxes {
