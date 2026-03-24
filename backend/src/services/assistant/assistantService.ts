@@ -574,7 +574,7 @@ const handleFleetOverview = async (parsed: ParsedAssistantIntent, history: Assis
     Car.countDocuments({ fullyBooked: true }),
     Car.countDocuments({ comingSoon: true }),
     Car.find({})
-      .populate<{ supplier: { fullName?: string } }>('supplier')
+      .populate<{ supplier: { _id?: string, fullName?: string } }>('supplier')
       .sort({ trips: -1, updatedAt: -1, _id: 1 })
       .limit(5)
       .lean(),
@@ -617,7 +617,7 @@ const handleRevenueSummary = async (parsed: ParsedAssistantIntent, history: Assi
   }
 
   const paidBookings = await Booking.find(match)
-    .populate<{ supplier: { fullName?: string } }>('supplier')
+    .populate<{ supplier: { _id?: string, fullName?: string } }>('supplier')
     .sort({ from: 1, _id: 1 })
     .lean()
 
@@ -679,8 +679,8 @@ const handleSupplierPerformance = async (parsed: ParsedAssistantIntent, history:
   }
 
   const [paidBookings, unpaidBookings, suppliers] = await Promise.all([
-    Booking.find(paidMatch).populate<{ supplier: { fullName?: string } }>('supplier').lean(),
-    Booking.find(unpaidMatch).populate<{ supplier: { fullName?: string } }>('supplier').lean(),
+    Booking.find(paidMatch).populate<{ supplier: { _id?: string, fullName?: string } }>('supplier').lean(),
+    Booking.find(unpaidMatch).populate<{ supplier: { _id?: string, fullName?: string } }>('supplier').lean(),
     User.find({ type: bookcarsTypes.UserType.Supplier, expireAt: null }).select('_id fullName active verified').lean(),
   ])
 
@@ -881,9 +881,7 @@ const handleSmartRecommendations = async (parsed: ParsedAssistantIntent, history
   return withLanguageMetadata(parsed, history, {
     intent: 'smart_recommendations',
     status: 'success',
-    reply: `Top recommendations right now:
-- ${recommendations.join('
-- ')}`,
+    reply: `Top recommendations right now:\n- ${recommendations.join('\\n- ')}`,
     data: withResolutionSource(parsed, {
       recommendations,
       metrics: {
@@ -934,12 +932,12 @@ const handleOpsSummary = async (parsed: ParsedAssistantIntent, history: Assistan
     Car.countDocuments({ available: true, comingSoon: { $ne: true }, fullyBooked: { $ne: true } }),
     Car.countDocuments({ fullyBooked: true }),
     Booking.find({ ...baseMatch, status: { $nin: PAID_STATUSES } })
-      .populate<{ driver: { fullName?: string }, supplier: { fullName?: string }, car: { name?: string } }>('driver supplier car')
+      .populate<{ driver: { _id?: string, fullName?: string }, supplier: { _id?: string, fullName?: string }, car: { _id?: string, name?: string } }>('driver supplier car')
       .sort({ from: 1, _id: 1 })
       .limit(3)
       .lean(),
     Booking.find({ ...dateMatch, to: { $gte: now } })
-      .populate<{ driver: { fullName?: string }, supplier: { fullName?: string }, car: { name?: string } }>('driver supplier car')
+      .populate<{ driver: { _id?: string, fullName?: string }, supplier: { _id?: string, fullName?: string }, car: { _id?: string, name?: string } }>('driver supplier car')
       .sort({ from: 1, _id: 1 })
       .limit(3)
       .lean(),
@@ -1114,9 +1112,7 @@ const handleExecutiveDecisionSupport = async (parsed: ParsedAssistantIntent, his
   return withLanguageMetadata(parsed, history, {
     intent: 'executive_decision_support',
     status: 'success',
-    reply: `${decision.executiveSummary}
-
-Top decision: ${decision.topDecision}`,
+    reply: `${decision.executiveSummary}\n\nTop decision: ${decision.topDecision}`,
     data: withResolutionSource(parsed, {
       metrics: {
         unpaidBookings,
