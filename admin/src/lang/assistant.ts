@@ -48,6 +48,11 @@ const strings = new LocalizedStrings({
     COPY: 'Copier',
     COPIED: 'Copié',
     USE_IN_COMPOSER: 'Utiliser dans la zone de saisie',
+    ACTION_CENTER: 'Centre d’action',
+    USE_DECISION: 'Utiliser la décision',
+    USE_DRAFT: 'Utiliser le brouillon',
+    USE_TASKS: 'Utiliser les tâches',
+    USE_FOLLOWUP: 'Utiliser le suivi',
   },
   en: {
     TITLE: 'AI Admin Assistant',
@@ -95,6 +100,11 @@ const strings = new LocalizedStrings({
     COPY: 'Copy',
     COPIED: 'Copied',
     USE_IN_COMPOSER: 'Use in composer',
+    ACTION_CENTER: 'Action center',
+    USE_DECISION: 'Use decision',
+    USE_DRAFT: 'Use draft',
+    USE_TASKS: 'Use tasks',
+    USE_FOLLOWUP: 'Use follow-up',
   },
   ar: {
     TITLE: 'مساعد الإدارة بالذكاء الاصطناعي',
@@ -142,6 +152,11 @@ const strings = new LocalizedStrings({
     COPY: 'نسخ',
     COPIED: 'تم النسخ',
     USE_IN_COMPOSER: 'استخدم في مربع الكتابة',
+    ACTION_CENTER: 'مركز الإجراءات',
+    USE_DECISION: 'استخدم القرار',
+    USE_DRAFT: 'استخدم المسودة',
+    USE_TASKS: 'استخدم المهام',
+    USE_FOLLOWUP: 'استخدم المتابعة',
   },
   es: {
     TITLE: 'Asistente admin con IA',
@@ -189,6 +204,11 @@ const strings = new LocalizedStrings({
     COPY: 'Copiar',
     COPIED: 'Copiado',
     USE_IN_COMPOSER: 'Usar en el cuadro de texto',
+    ACTION_CENTER: 'Centro de acción',
+    USE_DECISION: 'Usar decisión',
+    USE_DRAFT: 'Usar borrador',
+    USE_TASKS: 'Usar tareas',
+    USE_FOLLOWUP: 'Usar seguimiento',
   },
 })
 
