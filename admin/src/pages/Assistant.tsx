@@ -314,6 +314,9 @@ const Assistant = () => {
                   setMessage(value)
                   void submitMessage(value)
                 }}
+                onUseInComposer={(value) => {
+                  setMessage(value)
+                }}
               />
 
               <AssistantChatComposer

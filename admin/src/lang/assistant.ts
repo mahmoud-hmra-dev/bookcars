@@ -47,6 +47,7 @@ const strings = new LocalizedStrings({
     SUBJECT: 'Objet',
     COPY: 'Copier',
     COPIED: 'Copié',
+    USE_IN_COMPOSER: 'Utiliser dans la zone de saisie',
   },
   en: {
     TITLE: 'AI Admin Assistant',
@@ -93,6 +94,7 @@ const strings = new LocalizedStrings({
     SUBJECT: 'Subject',
     COPY: 'Copy',
     COPIED: 'Copied',
+    USE_IN_COMPOSER: 'Use in composer',
   },
   ar: {
     TITLE: 'مساعد الإدارة بالذكاء الاصطناعي',
@@ -139,6 +141,7 @@ const strings = new LocalizedStrings({
     SUBJECT: 'الموضوع',
     COPY: 'نسخ',
     COPIED: 'تم النسخ',
+    USE_IN_COMPOSER: 'استخدم في مربع الكتابة',
   },
   es: {
     TITLE: 'Asistente admin con IA',
@@ -185,6 +188,7 @@ const strings = new LocalizedStrings({
     SUBJECT: 'Asunto',
     COPY: 'Copiar',
     COPIED: 'Copiado',
+    USE_IN_COMPOSER: 'Usar en el cuadro de texto',
   },
 })
 
