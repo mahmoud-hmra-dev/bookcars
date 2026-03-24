@@ -21,6 +21,7 @@ export const ASSISTANT_LLM_RESPONSE_SCHEMA = {
           'customer_health',
           'risk_alerts',
           'smart_recommendations',
+          'executive_decision_support',
           'ops_summary',
           'send_email',
           'create_meeting',
@@ -110,40 +111,20 @@ export const buildAssistantLlmSystemPrompt = () => `You classify BookCars admin 
 
 BookCars domain:
 - This is an internal admin assistant for a car-rental and booking operations team.
-- Safe backend-supported intents are: booking_summary, booking_search, supplier_search, customer_search, car_availability, car_search, fleet_overview, revenue_summary, supplier_performance, customer_health, risk_alerts, smart_recommendations, ops_summary, send_email, create_meeting.
-- supplier_performance is for ranking suppliers, weak suppliers, top suppliers, activity quality, or operational performance.
-- customer_health is for customer quality, blacklisted users, inactive verified users, risky customer clusters, or follow-up opportunities.
-- risk_alerts is for urgent operational risks, anomalies, bottlenecks, cancellations, unpaid pressure, or fleet constraints.
-- smart_recommendations is for “what should we do now”, next best actions, concrete recommendations, or management suggestions.
-- ops_summary is for broad operational overviews when no narrower analytical intent is clearly best.
-- send_email and create_meeting are intent captures only. They are not executed by the LLM.
+- Safe backend-supported intents are: booking_summary, booking_search, supplier_search, customer_search, car_availability, car_search, fleet_overview, revenue_summary, supplier_performance, customer_health, risk_alerts, smart_recommendations, executive_decision_support, ops_summary, send_email, create_meeting.
+- executive_decision_support is for questions like: what should management do now, give me an action plan, summarize the situation and tell me the best next move, or connect all current signals into one recommendation.
 
 Safety rules:
 - Return JSON only via the provided schema.
 - Never claim you executed anything.
 - Never invent database results, counts, priorities, availability, revenue, emails sent, or meetings created.
 - You only classify, detect language, extract entities, and decide whether clarification is needed.
-- Prefer a safe supported intent over unknown when the request can be served by backend tools.
-- If the user asks an analytical/open question, choose the most specific supported analytical intent instead of unknown.
+- Prefer the most specific supported analytical intent over unknown.
 
 Clarification rules:
 - Ask for clarification only when the backend truly needs a missing field to execute safely.
 - Do not ask unnecessary clarification for analytical intents if a useful answer can still be produced.
-- clarificationQuestion must be short, direct, and in the user's language.
-
-Conversation rules:
-- Use recent history for follow-ups and pronouns like "those", "them", "same city", or "what about tomorrow".
-- Prefer the latest explicit user instruction when history conflicts.
-- If history resolves the ambiguity, set needsClarification=false.
-
-Language rules:
-- Understand mixed English/French/Arabic/Spanish input.
-- Detect inputLanguage using a short BCP-47 style code when possible.
-- replyLanguage should normally match the user's latest language unless history clearly indicates they want another language.
-
-Extraction rules:
-- dateRangeLabel can only be today, tomorrow, or null.
-- filters should only be set when the user explicitly asks for them or clearly implies them from context.`
+- clarificationQuestion must be short, direct, and in the user's language.`
 
 export const buildAssistantLlmUserPrompt = (
   message: string,

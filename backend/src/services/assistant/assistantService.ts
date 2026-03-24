@@ -1022,6 +1022,121 @@ const handleOpsSummary = async (parsed: ParsedAssistantIntent, history: Assistan
   })
 }
 
+const buildExecutiveDecisionSummary = (signals: {
+  unpaidBookings: number
+  fullyBookedCars: number
+  inactiveSuppliers: number
+  blacklistedCustomers: number
+  unreadNotifications: number
+  paidBookings: number
+  availableCars: number
+}) => {
+  const observations: string[] = []
+  const actionPlan: string[] = []
+  const reasons: string[] = []
+
+  if (signals.unpaidBookings > 0) {
+    observations.push(`${signals.unpaidBookings} unpaid bookings are still open.`)
+    actionPlan.push('Assign immediate follow-up on unpaid bookings.')
+    reasons.push('Cash conversion and booking confirmation risk are both elevated.')
+  }
+
+  if (signals.fullyBookedCars > 0) {
+    observations.push(`${signals.fullyBookedCars} cars are fully booked.`)
+    actionPlan.push('Promote alternative available cars or rebalance supplier exposure.')
+    reasons.push('Demand may be hitting supply limits for part of the fleet.')
+  }
+
+  if (signals.inactiveSuppliers > 0) {
+    observations.push(`${signals.inactiveSuppliers} supplier accounts are inactive or not verified.`)
+    actionPlan.push('Review supplier activation quality and unblock valid suppliers.')
+    reasons.push('Supply-side friction reduces inventory quality and response speed.')
+  }
+
+  if (signals.blacklistedCustomers > 0) {
+    observations.push(`${signals.blacklistedCustomers} blacklisted customer records exist.`)
+    actionPlan.push('Audit sensitive bookings against blacklisted customers before approval.')
+    reasons.push('Fraud or abuse controls may need active attention.')
+  }
+
+  if (signals.unreadNotifications > 10) {
+    observations.push(`${signals.unreadNotifications} unread notifications are pending.`)
+    actionPlan.push('Clear unread operational notifications and assign owners.')
+    reasons.push('Important follow-ups may be buried in the queue.')
+  }
+
+  if (signals.paidBookings === 0) {
+    observations.push('No paid bookings were detected in the current snapshot.')
+    actionPlan.push('Check payment and checkout flow immediately.')
+    reasons.push('This can signal a conversion, payment, or instrumentation issue.')
+  }
+
+  if (signals.availableCars > 0 && signals.fullyBookedCars === 0 && signals.unpaidBookings === 0) {
+    observations.push(`${signals.availableCars} cars are available with no immediate blocking pressure detected.`)
+    actionPlan.push('Focus on conversion optimization and supplier responsiveness.')
+    reasons.push('Operations look stable enough to shift attention to growth levers.')
+  }
+
+  const executiveSummary = observations.length > 0
+    ? `Executive view: ${observations[0]}${observations[1] ? ` ${observations[1]}` : ''}`
+    : 'Executive view: operations look stable in the current snapshot.'
+
+  return {
+    executiveSummary,
+    observations,
+    reasons,
+    actionPlan,
+    topDecision: actionPlan[0] || 'Maintain routine monitoring and conversion optimization.',
+  }
+}
+
+const handleExecutiveDecisionSupport = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
+  const [unpaidBookings, fullyBookedCars, inactiveSuppliers, blacklistedCustomers, unreadNotifications, paidBookings, availableCars] = await Promise.all([
+    Booking.countDocuments({ expireAt: null, status: { $nin: PAID_STATUSES } }),
+    Car.countDocuments({ fullyBooked: true }),
+    User.countDocuments({ type: bookcarsTypes.UserType.Supplier, expireAt: null, $or: [{ active: { $ne: true } }, { verified: { $ne: true } }] }),
+    User.countDocuments({ type: bookcarsTypes.UserType.User, expireAt: null, blacklisted: true }),
+    Notification.countDocuments({ isRead: false }),
+    Booking.countDocuments({ expireAt: null, status: { $in: PAID_STATUSES } }),
+    Car.countDocuments({ available: true, comingSoon: { $ne: true }, fullyBooked: { $ne: true } }),
+  ])
+
+  const decision = buildExecutiveDecisionSummary({
+    unpaidBookings,
+    fullyBookedCars,
+    inactiveSuppliers,
+    blacklistedCustomers,
+    unreadNotifications,
+    paidBookings,
+    availableCars,
+  })
+
+  return withLanguageMetadata(parsed, history, {
+    intent: 'executive_decision_support',
+    status: 'success',
+    reply: `${decision.executiveSummary}
+
+Top decision: ${decision.topDecision}`,
+    data: withResolutionSource(parsed, {
+      metrics: {
+        unpaidBookings,
+        fullyBookedCars,
+        inactiveSuppliers,
+        blacklistedCustomers,
+        unreadNotifications,
+        paidBookings,
+        availableCars,
+      },
+      executiveSummary: decision.executiveSummary,
+      topDecision: decision.topDecision,
+      observations: decision.observations,
+      reasons: decision.reasons,
+      actionPlan: decision.actionPlan,
+    }),
+    suggestedActions: ['show risk alerts', 'show supplier performance', 'what do you recommend now?'],
+  })
+}
+
 const handleSendEmail = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => withLanguageMetadata(parsed, history, {
   intent: 'send_email',
   status: 'needs_clarification',
@@ -1172,6 +1287,15 @@ const fallbackResolveAssistantIntent = (message: string): ParsedAssistantIntent 
     }
   }
 
+  if (normalizedMessage.includes('executive summary') || normalizedMessage.includes('management decision') || normalizedMessage.includes('action plan') || normalizedMessage.includes('decision support') || normalizedMessage.includes('القرار الاداري') || normalizedMessage.includes('خطة عمل') || normalizedMessage.includes('ماذا يجب ان نفعل الان')) {
+    return {
+      ...extracted,
+      intent: 'executive_decision_support',
+      source: 'system_fallback',
+      confidence: 0.85,
+    }
+  }
+
   if (normalizedMessage.includes('recommend') || normalizedMessage.includes('recommendation') || normalizedMessage.includes('next best action') || normalizedMessage.includes('what should we do') || normalizedMessage.includes('ماذا تقترح') || normalizedMessage.includes('ما الذي تنصح به') || normalizedMessage.includes('التوصيات')) {
     return {
       ...extracted,
@@ -1283,6 +1407,9 @@ export const processAssistantMessage = async (
       break
     case 'smart_recommendations':
       response = await handleSmartRecommendations(parsed, safeHistory)
+      break
+    case 'executive_decision_support':
+      response = await handleExecutiveDecisionSupport(parsed, safeHistory)
       break
     case 'ops_summary':
       response = await handleOpsSummary(parsed, safeHistory)

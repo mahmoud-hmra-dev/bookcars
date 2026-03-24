@@ -16,6 +16,7 @@ const SUPPORTED_INTENTS: AssistantIntent[] = [
   'customer_health',
   'risk_alerts',
   'smart_recommendations',
+  'executive_decision_support',
   'ops_summary',
   'send_email',
   'create_meeting',

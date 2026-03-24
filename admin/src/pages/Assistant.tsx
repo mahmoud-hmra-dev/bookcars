@@ -25,7 +25,11 @@ const quickExamples = [
   'find car BMW',
   'available cars tomorrow in Beirut',
   'show revenue today',
-  'what needs attention today?',
+  'show supplier performance',
+  'show customer health',
+  'show risk alerts',
+  'what do you recommend now?',
+  'give me an executive action plan',
 ]
 
 const Assistant = () => {
