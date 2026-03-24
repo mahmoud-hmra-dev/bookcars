@@ -30,6 +30,9 @@ const quickExamples = [
   'show risk alerts',
   'what do you recommend now?',
   'give me an executive action plan',
+  'draft a supplier message',
+  'show follow-up plan',
+  'generate today task list',
 ]
 
 const Assistant = () => {

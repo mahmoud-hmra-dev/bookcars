@@ -1137,6 +1137,79 @@ Top decision: ${decision.topDecision}`,
   })
 }
 
+const handleMessageDraft = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
+  const recipient = parsed.searchTerm || 'the stakeholder'
+  const draft = [
+    `Hello ${recipient},`,
+    '',
+    'I am following up regarding the current operational situation and would like to align on the next steps as soon as possible.',
+    'Please review the pending items on your side and confirm the update today.',
+    '',
+    'Best regards,',
+    'BookCars Admin',
+  ].join('\n')
+
+  return withLanguageMetadata(parsed, history, {
+    intent: 'message_draft',
+    status: 'success',
+    reply: `I prepared a draft message for ${recipient}.`,
+    data: withResolutionSource(parsed, {
+      recipient,
+      channel: parsed.email ? 'email' : 'generic',
+      subject: `Operational follow-up${parsed.dateRange ? ` - ${parsed.dateRange.label}` : ''}`,
+      draft,
+    }),
+    suggestedActions: ['show follow-up plan', 'give me an executive action plan'],
+  })
+}
+
+const handleFollowupPlan = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
+  const focus = parsed.searchTerm || 'operations backlog'
+  const plan = [
+    { step: 1, action: `Review all records related to ${focus}.`, owner: 'Admin ops', urgency: 'high' },
+    { step: 2, action: 'Contact the responsible supplier or customer with a concise update request.', owner: 'Admin ops', urgency: 'high' },
+    { step: 3, action: 'Set a same-day deadline and record the response status.', owner: 'Admin ops', urgency: 'medium' },
+    { step: 4, action: 'Escalate unresolved items to management if no response arrives.', owner: 'Manager', urgency: 'medium' },
+  ]
+
+  return withLanguageMetadata(parsed, history, {
+    intent: 'followup_plan',
+    status: 'success',
+    reply: `I prepared a follow-up plan for ${focus}.`,
+    data: withResolutionSource(parsed, {
+      focus,
+      followupPlan: plan,
+    }),
+    suggestedActions: ['draft a supplier message', 'generate today task list'],
+  })
+}
+
+const handleTasklistGeneration = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
+  const [unpaidBookings, inactiveSuppliers, unreadNotifications, fullyBookedCars] = await Promise.all([
+    Booking.countDocuments({ expireAt: null, status: { $nin: PAID_STATUSES } }),
+    User.countDocuments({ type: bookcarsTypes.UserType.Supplier, expireAt: null, $or: [{ active: { $ne: true } }, { verified: { $ne: true } }] }),
+    Notification.countDocuments({ isRead: false }),
+    Car.countDocuments({ fullyBooked: true }),
+  ])
+
+  const tasks = [
+    { priority: 'P1', task: `Review ${unpaidBookings} unpaid booking(s).`, owner: 'Admin ops' },
+    { priority: 'P1', task: `Review ${inactiveSuppliers} inactive/unverified supplier account(s).`, owner: 'Supplier management' },
+    { priority: 'P2', task: `Clear ${unreadNotifications} unread notification(s).`, owner: 'Admin ops' },
+    { priority: 'P2', task: `Inspect ${fullyBookedCars} fully booked car(s) for supply pressure.`, owner: 'Fleet ops' },
+  ]
+
+  return withLanguageMetadata(parsed, history, {
+    intent: 'tasklist_generation',
+    status: 'success',
+    reply: 'I generated a practical admin task list for the current snapshot.',
+    data: withResolutionSource(parsed, {
+      tasks,
+    }),
+    suggestedActions: ['what do you recommend now?', 'draft a supplier message'],
+  })
+}
+
 const handleSendEmail = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => withLanguageMetadata(parsed, history, {
   intent: 'send_email',
   status: 'needs_clarification',
@@ -1287,6 +1360,33 @@ const fallbackResolveAssistantIntent = (message: string): ParsedAssistantIntent 
     }
   }
 
+  if (normalizedMessage.includes('draft a message') || normalizedMessage.includes('draft message') || normalizedMessage.includes('write a message') || normalizedMessage.includes('اكتب رساله') || normalizedMessage.includes('صياغه رساله')) {
+    return {
+      ...extracted,
+      intent: 'message_draft',
+      source: 'system_fallback',
+      confidence: 0.83,
+    }
+  }
+
+  if (normalizedMessage.includes('follow-up plan') || normalizedMessage.includes('follow up plan') || normalizedMessage.includes('متابعه') || normalizedMessage.includes('خطة متابعه')) {
+    return {
+      ...extracted,
+      intent: 'followup_plan',
+      source: 'system_fallback',
+      confidence: 0.82,
+    }
+  }
+
+  if (normalizedMessage.includes('task list') || normalizedMessage.includes('todo list') || normalizedMessage.includes('generate tasks') || normalizedMessage.includes('قائمه مهام') || normalizedMessage.includes('مهام اليوم')) {
+    return {
+      ...extracted,
+      intent: 'tasklist_generation',
+      source: 'system_fallback',
+      confidence: 0.84,
+    }
+  }
+
   if (normalizedMessage.includes('executive summary') || normalizedMessage.includes('management decision') || normalizedMessage.includes('action plan') || normalizedMessage.includes('decision support') || normalizedMessage.includes('القرار الاداري') || normalizedMessage.includes('خطة عمل') || normalizedMessage.includes('ماذا يجب ان نفعل الان')) {
     return {
       ...extracted,
@@ -1410,6 +1510,15 @@ export const processAssistantMessage = async (
       break
     case 'executive_decision_support':
       response = await handleExecutiveDecisionSupport(parsed, safeHistory)
+      break
+    case 'message_draft':
+      response = await handleMessageDraft(parsed, safeHistory)
+      break
+    case 'followup_plan':
+      response = await handleFollowupPlan(parsed, safeHistory)
+      break
+    case 'tasklist_generation':
+      response = await handleTasklistGeneration(parsed, safeHistory)
       break
     case 'ops_summary':
       response = await handleOpsSummary(parsed, safeHistory)

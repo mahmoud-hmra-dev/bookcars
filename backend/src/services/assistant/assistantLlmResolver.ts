@@ -17,6 +17,9 @@ const SUPPORTED_INTENTS: AssistantIntent[] = [
   'risk_alerts',
   'smart_recommendations',
   'executive_decision_support',
+  'message_draft',
+  'followup_plan',
+  'tasklist_generation',
   'ops_summary',
   'send_email',
   'create_meeting',
@@ -32,9 +35,7 @@ const normalizeLanguage = (language?: string) => {
 }
 
 const normalizeLlmResolution = (message: string, normalizedMessage: string, resolution: AssistantLlmResolution): ParsedAssistantIntent | null => {
-  if (!isSupportedIntent(resolution.intent)) {
-    return null
-  }
+  if (!isSupportedIntent(resolution.intent)) return null
 
   return {
     intent: resolution.intent,
@@ -61,13 +62,8 @@ const normalizeLlmResolution = (message: string, normalizedMessage: string, reso
   }
 }
 
-export const resolveAssistantIntentWithLlm = async (
-  parsed: ParsedAssistantIntent,
-  history: AssistantConversationTurn[] = [],
-): Promise<ParsedAssistantIntent | null> => {
-  if (!isAssistantLlmEnabled()) {
-    return null
-  }
+export const resolveAssistantIntentWithLlm = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[] = []): Promise<ParsedAssistantIntent | null> => {
+  if (!isAssistantLlmEnabled()) return null
 
   try {
     const llmResolution = await fetchAssistantLlmResolution(parsed.originalMessage, {
@@ -91,10 +87,7 @@ export const resolveAssistantIntentWithLlm = async (
       recentTurns: history.slice(-6),
     })
 
-    if (!llmResolution) {
-      return null
-    }
-
+    if (!llmResolution) return null
     return normalizeLlmResolution(parsed.originalMessage, parsed.normalizedMessage, llmResolution as AssistantLlmResolution)
   } catch (err) {
     logger.error('[assistant.resolveAssistantIntentWithLlm] ERROR', err)
@@ -102,18 +95,11 @@ export const resolveAssistantIntentWithLlm = async (
   }
 }
 
-export const localizeAssistantResponse = async (
-  response: AssistantResponse,
-  parsed: ParsedAssistantIntent,
-): Promise<AssistantResponse> => {
+export const localizeAssistantResponse = async (response: AssistantResponse, parsed: ParsedAssistantIntent): Promise<AssistantResponse> => {
   const targetLanguage = normalizeLanguage(parsed.replyLanguage || parsed.inputLanguage)
 
   if (!targetLanguage || targetLanguage === 'en') {
-    return {
-      ...response,
-      inputLanguage: normalizeLanguage(parsed.inputLanguage),
-      replyLanguage: targetLanguage || 'en',
-    }
+    return { ...response, inputLanguage: normalizeLanguage(parsed.inputLanguage), replyLanguage: targetLanguage || 'en' }
   }
 
   try {
@@ -126,11 +112,7 @@ export const localizeAssistantResponse = async (
     })
 
     if (!localized?.reply) {
-      return {
-        ...response,
-        inputLanguage: normalizeLanguage(parsed.inputLanguage),
-        replyLanguage: targetLanguage,
-      }
+      return { ...response, inputLanguage: normalizeLanguage(parsed.inputLanguage), replyLanguage: targetLanguage }
     }
 
     return {
@@ -141,10 +123,6 @@ export const localizeAssistantResponse = async (
     }
   } catch (err) {
     logger.error('[assistant.localizeAssistantResponse] ERROR', err)
-    return {
-      ...response,
-      inputLanguage: normalizeLanguage(parsed.inputLanguage),
-      replyLanguage: targetLanguage,
-    }
+    return { ...response, inputLanguage: normalizeLanguage(parsed.inputLanguage), replyLanguage: targetLanguage }
   }
 }

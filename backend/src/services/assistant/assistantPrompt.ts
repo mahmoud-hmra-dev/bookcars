@@ -22,6 +22,9 @@ export const ASSISTANT_LLM_RESPONSE_SCHEMA = {
           'risk_alerts',
           'smart_recommendations',
           'executive_decision_support',
+          'message_draft',
+          'followup_plan',
+          'tasklist_generation',
           'ops_summary',
           'send_email',
           'create_meeting',
@@ -44,37 +47,16 @@ export const ASSISTANT_LLM_RESPONSE_SCHEMA = {
         type: 'string',
       },
       replyLanguage: {
-        type: 'string',
-      },
+        type: 'string' },
       entities: {
         type: 'object',
         additionalProperties: false,
         required: ['searchTerm', 'email', 'locationQuery', 'dateRangeLabel', 'filters'],
         properties: {
-          searchTerm: {
-            anyOf: [
-              { type: 'string' },
-              { type: 'null' },
-            ],
-          },
-          email: {
-            anyOf: [
-              { type: 'string' },
-              { type: 'null' },
-            ],
-          },
-          locationQuery: {
-            anyOf: [
-              { type: 'string' },
-              { type: 'null' },
-            ],
-          },
-          dateRangeLabel: {
-            anyOf: [
-              { type: 'string', enum: ['today', 'tomorrow'] },
-              { type: 'null' },
-            ],
-          },
+          searchTerm: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+          email: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+          locationQuery: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+          dateRangeLabel: { anyOf: [{ type: 'string', enum: ['today', 'tomorrow'] }, { type: 'null' }] },
           filters: {
             type: 'object',
             additionalProperties: false,
@@ -111,30 +93,24 @@ export const buildAssistantLlmSystemPrompt = () => `You classify BookCars admin 
 
 BookCars domain:
 - This is an internal admin assistant for a car-rental and booking operations team.
-- Safe backend-supported intents are: booking_summary, booking_search, supplier_search, customer_search, car_availability, car_search, fleet_overview, revenue_summary, supplier_performance, customer_health, risk_alerts, smart_recommendations, executive_decision_support, ops_summary, send_email, create_meeting.
-- executive_decision_support is for questions like: what should management do now, give me an action plan, summarize the situation and tell me the best next move, or connect all current signals into one recommendation.
+- Safe backend-supported intents also include message_draft, followup_plan, and tasklist_generation.
+- message_draft is for writing a supplier/customer/admin message draft, usually based on operations context.
+- followup_plan is for creating a follow-up sequence or communication plan.
+- tasklist_generation is for producing an actionable task list for the admin team.
+- These intents prepare content only; they do not send anything.
 
 Safety rules:
 - Return JSON only via the provided schema.
 - Never claim you executed anything.
-- Never invent database results, counts, priorities, availability, revenue, emails sent, or meetings created.
+- Never invent database results, counts, priorities, availability, revenue, emails sent, meetings created, or messages sent.
 - You only classify, detect language, extract entities, and decide whether clarification is needed.
-- Prefer the most specific supported analytical intent over unknown.
-
-Clarification rules:
-- Ask for clarification only when the backend truly needs a missing field to execute safely.
-- Do not ask unnecessary clarification for analytical intents if a useful answer can still be produced.
-- clarificationQuestion must be short, direct, and in the user's language.`
+- Prefer the most specific supported intent over unknown.`
 
 export const buildAssistantLlmUserPrompt = (
   message: string,
   parserContext: Record<string, unknown>,
   conversationContext: Record<string, unknown>,
-) => JSON.stringify({
-  message,
-  parserContext,
-  conversationContext,
-}, null, 2)
+) => JSON.stringify({ message, parserContext, conversationContext }, null, 2)
 
 export const buildAssistantReplyLocalizationSystemPrompt = () => `You rewrite BookCars admin assistant replies for the admin user.
 
@@ -151,8 +127,4 @@ export const buildAssistantReplyLocalizationUserPrompt = (
   reply: string,
   targetLanguage: string,
   context: Record<string, unknown>,
-) => JSON.stringify({
-  targetLanguage,
-  reply,
-  context,
-}, null, 2)
+) => JSON.stringify({ targetLanguage, reply, context }, null, 2)
