@@ -24,11 +24,11 @@ const inferInputLanguage = (value: string) => {
     return 'ar'
   }
 
-  if (/[¿¡]/.test(normalized) || /\b(hola|buscar|reserva|reservas|coche|coches|proveedor|mañana|hoy|disponible|disponibles|prioridad|seguimiento)\b/i.test(normalized)) {
+  if (/[¿¡]/.test(normalized) || /\b(hola|buscar|reserva|reservas|coche|coches|proveedor|cliente|mañana|hoy|disponible|disponibles|prioridad|seguimiento|ingreso|ingresos)\b/i.test(normalized)) {
     return 'es'
   }
 
-  if (/\b(bonjour|réservation|réservations|voiture|voitures|fournisseur|demain|aujourd'hui|disponible|disponibles|priorite|priorité|suivi)\b/i.test(normalized)) {
+  if (/\b(bonjour|réservation|réservations|voiture|voitures|fournisseur|client|demain|aujourd'hui|disponible|disponibles|priorite|priorité|suivi|revenu|revenus)\b/i.test(normalized)) {
     return 'fr'
   }
 
@@ -63,9 +63,9 @@ export const getDateRangeFromLabel = (label?: AssistantDateRangeLabel) => {
 }
 
 const parseDateRange = (message: string) => getDateRangeFromLabel(
-  message.includes('tomorrow')
+  message.includes('tomorrow') || message.includes('غدا') || message.includes('بكرا') || message.includes('demain')
     ? 'tomorrow'
-    : message.includes('today')
+    : message.includes('today') || message.includes('اليوم') || message.includes('aujourd') || message.includes('hoy')
       ? 'today'
       : undefined,
 )
@@ -89,15 +89,43 @@ export const parseAssistantMessage = (message: string): ParsedAssistantIntent =>
   const replyLanguage = inputLanguage
 
   const email = normalizedMessage.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/)?.[0]
-  const supplierSearchTerm = parseSearchTerm(normalizedMessage, [/find supplier\s+(.+)$/])
-  const bookingSearchTerm = parseSearchTerm(normalizedMessage, [/find booking\s+(.+)$/])
+  const supplierSearchTerm = parseSearchTerm(normalizedMessage, [
+    /find supplier\s+(.+)$/,
+    /supplier\s+(.+)$/,
+    /ابحث عن المورد\s+(.+)$/,
+    /المورد\s+(.+)$/,
+  ])
+  const bookingSearchTerm = parseSearchTerm(normalizedMessage, [
+    /find booking\s+(.+)$/,
+    /booking\s+(.+)$/,
+    /ابحث عن الحجز\s+(.+)$/,
+    /الحجز\s+(.+)$/,
+  ])
+  const customerSearchTerm = parseSearchTerm(normalizedMessage, [
+    /find customer\s+(.+)$/,
+    /find driver\s+(.+)$/,
+    /customer\s+(.+)$/,
+    /driver\s+(.+)$/,
+    /ابحث عن العميل\s+(.+)$/,
+    /ابحث عن السائق\s+(.+)$/,
+    /العميل\s+(.+)$/,
+    /السائق\s+(.+)$/,
+  ])
+  const carSearchTerm = parseSearchTerm(normalizedMessage, [
+    /find car\s+(.+)$/,
+    /car\s+(.+)$/,
+    /السياره\s+(.+)$/,
+    /ابحث عن سياره\s+(.+)$/,
+  ])
   const meetingSearchTerm = parseSearchTerm(normalizedMessage, [
     /with supplier\s+(.+?)(?:\s+today|\s+tomorrow|\s+at\s+\d{1,2}(?::\d{2})?)?$/,
     /with\s+(.+?)(?:\s+today|\s+tomorrow|\s+at\s+\d{1,2}(?::\d{2})?)?$/,
   ])
   const locationQuery = parseSearchTerm(normalizedMessage, [
     /(?:available cars?|cars? available)(?:\s+\w+)?\s+in\s+(.+)$/,
+    /(?:السيارات المتاحه|سيارات متاحه|السيارات المتوفره|سيارات متوفره)(?:\s+\w+)?\s+في\s+(.+)$/,
     /in\s+(.+)$/,
+    /في\s+(.+)$/,
   ])
 
   return {
@@ -105,11 +133,15 @@ export const parseAssistantMessage = (message: string): ParsedAssistantIntent =>
     originalMessage: message,
     normalizedMessage,
     email,
-    searchTerm: supplierSearchTerm || bookingSearchTerm || meetingSearchTerm,
+    searchTerm: supplierSearchTerm || bookingSearchTerm || customerSearchTerm || carSearchTerm || meetingSearchTerm,
     locationQuery,
     dateRange,
     filters: {
       unpaid: normalizedMessage.includes('unpaid') || normalizedMessage.includes('غير مدفوع') || normalizedMessage.includes('impay') || normalizedMessage.includes('impag'),
+      paid: normalizedMessage.includes('paid') || normalizedMessage.includes('مدفوع') || normalizedMessage.includes('paye') || normalizedMessage.includes('payé'),
+      cancelled: normalizedMessage.includes('cancelled') || normalizedMessage.includes('canceled') || normalizedMessage.includes('ملغي') || normalizedMessage.includes('annule') || normalizedMessage.includes('annulé'),
+      reserved: normalizedMessage.includes('reserved') || normalizedMessage.includes('محجوز') || normalizedMessage.includes('reserve') || normalizedMessage.includes('réservé'),
+      active: normalizedMessage.includes('active') || normalizedMessage.includes('نشط') || normalizedMessage.includes('actif'),
     },
     source: 'llm_primary',
     confidence: 0.2,

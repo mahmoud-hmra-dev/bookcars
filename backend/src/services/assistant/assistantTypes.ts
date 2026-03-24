@@ -2,7 +2,11 @@ export type AssistantIntent =
   | 'booking_summary'
   | 'booking_search'
   | 'supplier_search'
+  | 'customer_search'
   | 'car_availability'
+  | 'car_search'
+  | 'fleet_overview'
+  | 'revenue_summary'
   | 'ops_summary'
   | 'send_email'
   | 'create_meeting'
@@ -46,6 +50,10 @@ export interface ParsedAssistantIntent {
   dateRange?: ParsedDateRange
   filters?: {
     unpaid?: boolean
+    paid?: boolean
+    cancelled?: boolean
+    reserved?: boolean
+    active?: boolean
   }
   source?: AssistantSource
   confidence?: number
@@ -64,6 +72,10 @@ export interface AssistantLlmResolution {
   dateRangeLabel?: AssistantDateRangeLabel
   filters?: {
     unpaid?: boolean
+    paid?: boolean
+    cancelled?: boolean
+    reserved?: boolean
+    active?: boolean
   }
   needsClarification: boolean
   clarificationQuestion?: string

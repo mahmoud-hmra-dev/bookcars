@@ -21,7 +21,10 @@ const quickExamples = [
   'show unpaid bookings today',
   'find booking Mahmoud',
   'find supplier Youssef',
+  'find customer Mahmoud',
+  'find car BMW',
   'available cars tomorrow in Beirut',
+  'show revenue today',
   'what needs attention today?',
 ]
 

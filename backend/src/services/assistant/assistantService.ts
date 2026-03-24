@@ -72,9 +72,10 @@ const findSuppliers = async (searchTerm: string) => {
     $or: [
       { fullName: { $regex: regex } },
       { email: { $regex: regex } },
+      { phone: { $regex: regex } },
     ],
   })
-    .select('_id fullName email phone active verified')
+    .select('_id fullName email phone active verified payLater licenseRequired')
     .sort({ fullName: 1, _id: 1 })
     .limit(MAX_RESULTS)
     .lean()
@@ -87,13 +88,75 @@ const findSuppliers = async (searchTerm: string) => {
     type: bookcarsTypes.UserType.Supplier,
     expireAt: null,
   })
-    .select('_id fullName email phone active verified')
+    .select('_id fullName email phone active verified payLater licenseRequired')
     .sort({ fullName: 1, _id: 1 })
     .limit(100)
     .lean()
 
   return fallbackSuppliers
-    .filter((supplier) => matchNormalized(supplier.fullName, searchTerm) || matchNormalized(supplier.email, searchTerm))
+    .filter((supplier) => matchNormalized(supplier.fullName, searchTerm) || matchNormalized(supplier.email, searchTerm) || matchNormalized(supplier.phone, searchTerm))
+    .slice(0, MAX_RESULTS)
+}
+
+const findCustomers = async (searchTerm: string) => {
+  const regex = new RegExp(buildFlexibleNamePattern(searchTerm), 'i')
+  const customers = await User.find({
+    type: bookcarsTypes.UserType.User,
+    expireAt: null,
+    $or: [
+      { fullName: { $regex: regex } },
+      { email: { $regex: regex } },
+      { phone: { $regex: regex } },
+    ],
+  })
+    .select('_id fullName email phone active verified blacklisted createdAt')
+    .sort({ createdAt: -1, _id: 1 })
+    .limit(MAX_RESULTS)
+    .lean()
+
+  if (customers.length > 0) {
+    return customers
+  }
+
+  const fallbackCustomers = await User.find({
+    type: bookcarsTypes.UserType.User,
+    expireAt: null,
+  })
+    .select('_id fullName email phone active verified blacklisted createdAt')
+    .sort({ createdAt: -1, _id: 1 })
+    .limit(150)
+    .lean()
+
+  return fallbackCustomers
+    .filter((customer) => matchNormalized(customer.fullName, searchTerm) || matchNormalized(customer.email, searchTerm) || matchNormalized(customer.phone, searchTerm))
+    .slice(0, MAX_RESULTS)
+}
+
+const findCars = async (searchTerm: string) => {
+  const regex = new RegExp(escapeRegex(searchTerm), 'i')
+  const cars = await Car.find({
+    $or: [
+      { name: { $regex: regex } },
+      { licensePlate: { $regex: regex } },
+    ],
+  })
+    .populate<{ supplier: { fullName?: string, email?: string } }>('supplier')
+    .sort({ updatedAt: -1, _id: 1 })
+    .limit(MAX_RESULTS)
+    .lean()
+
+  if (cars.length > 0) {
+    return cars
+  }
+
+  const fallbackCars = await Car.find({})
+    .populate<{ supplier: { fullName?: string, email?: string } }>('supplier')
+    .sort({ updatedAt: -1, _id: 1 })
+    .limit(150)
+    .lean()
+
+  return fallbackCars
+    .filter((car) => matchNormalized(car.name, searchTerm) || matchNormalized(car.licensePlate, searchTerm) || matchNormalized(car.supplier?.fullName, searchTerm))
     .slice(0, MAX_RESULTS)
 }
 
@@ -189,8 +252,19 @@ const summarizeBookings = async (parsed: ParsedAssistantIntent, history: Assista
     match.from = { $gte: parsed.dateRange.from, $lte: parsed.dateRange.to }
   }
 
+  const requestedStatuses: string[] = []
   if (parsed.filters?.unpaid) {
     match.status = { $nin: PAID_STATUSES }
+    requestedStatuses.push('unpaid')
+  } else if (parsed.filters?.paid) {
+    match.status = { $in: PAID_STATUSES }
+    requestedStatuses.push('paid')
+  } else if (parsed.filters?.cancelled) {
+    match.status = bookcarsTypes.BookingStatus.Cancelled
+    requestedStatuses.push('cancelled')
+  } else if (parsed.filters?.reserved) {
+    match.status = bookcarsTypes.BookingStatus.Reserved
+    requestedStatuses.push('reserved')
   }
 
   const bookings = await Booking.find(match)
@@ -202,7 +276,7 @@ const summarizeBookings = async (parsed: ParsedAssistantIntent, history: Assista
     .lean()
 
   const total = await Booking.countDocuments(match)
-  const summaryLabel = [parsed.filters?.unpaid ? 'unpaid' : null, parsed.dateRange?.label ?? null].filter(Boolean).join(' ')
+  const summaryLabel = [requestedStatuses.join(', '), parsed.dateRange?.label ?? null].filter(Boolean).join(' ')
 
   return withLanguageMetadata(parsed, history, {
     intent: 'booking_summary',
@@ -214,6 +288,9 @@ const summarizeBookings = async (parsed: ParsedAssistantIntent, history: Assista
       total,
       filters: {
         unpaid: !!parsed.filters?.unpaid,
+        paid: !!parsed.filters?.paid,
+        cancelled: !!parsed.filters?.cancelled,
+        reserved: !!parsed.filters?.reserved,
         dateRange: parsed.dateRange ? {
           label: parsed.dateRange.label,
           from: parsed.dateRange.from,
@@ -290,9 +367,34 @@ const handleSupplierSearch = async (parsed: ParsedAssistantIntent, history: Assi
     data: withResolutionSource(parsed, {
       searchTerm: parsed.searchTerm,
       suppliers,
-      matchingNotes: 'Current matching is practical MVP matching across fullName/email with Arabic normalization and a small Youssef/يوسف alias fallback.',
     }),
     suggestedActions: suppliers.length === 0 ? ['Try a full name, Arabic spelling, or email address.'] : undefined,
+  })
+}
+
+const handleCustomerSearch = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
+  if (!parsed.searchTerm) {
+    return withLanguageMetadata(parsed, history, {
+      intent: 'customer_search',
+      status: 'needs_clarification',
+      reply: parsed.clarificationQuestion || 'Tell me which customer to find by full name, email, or phone.',
+      suggestedActions: ['Try: find customer Mahmoud'],
+    })
+  }
+
+  const customers = await findCustomers(parsed.searchTerm)
+
+  return withLanguageMetadata(parsed, history, {
+    intent: 'customer_search',
+    status: 'success',
+    reply: customers.length > 0
+      ? `Found ${customers.length} matching customer${customers.length > 1 ? 's' : ''}.`
+      : `No customers matched "${parsed.searchTerm}".`,
+    data: withResolutionSource(parsed, {
+      searchTerm: parsed.searchTerm,
+      customers,
+    }),
+    suggestedActions: customers.length === 0 ? ['Try a full name, phone number, or email.'] : undefined,
   })
 }
 
@@ -386,11 +488,13 @@ const handleCarAvailability = async (parsed: ParsedAssistantIntent, history: Ass
     .map((car) => ({
       _id: car._id,
       name: car.name,
+      licensePlate: car.licensePlate,
       supplier: car.supplier ? {
         fullName: car.supplier.fullName,
         email: car.supplier.email,
       } : null,
       dailyPrice: car.dailyPrice,
+      deposit: car.deposit,
       available: car.available,
       blockOnPay: !!car.blockOnPay,
     }))
@@ -414,6 +518,156 @@ const handleCarAvailability = async (parsed: ParsedAssistantIntent, history: Ass
   })
 }
 
+const handleCarSearch = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
+  if (!parsed.searchTerm) {
+    return withLanguageMetadata(parsed, history, {
+      intent: 'car_search',
+      status: 'needs_clarification',
+      reply: parsed.clarificationQuestion || 'Tell me which car to find by name, plate, or supplier.',
+      suggestedActions: ['Try: find car BMW'],
+    })
+  }
+
+  const cars = await findCars(parsed.searchTerm)
+
+  return withLanguageMetadata(parsed, history, {
+    intent: 'car_search',
+    status: 'success',
+    reply: cars.length > 0
+      ? `Found ${cars.length} matching car${cars.length > 1 ? 's' : ''}.`
+      : `No cars matched "${parsed.searchTerm}".`,
+    data: withResolutionSource(parsed, {
+      searchTerm: parsed.searchTerm,
+      cars: cars.map((car) => ({
+        _id: car._id,
+        name: car.name,
+        licensePlate: car.licensePlate,
+        dailyPrice: car.dailyPrice,
+        deposit: car.deposit,
+        available: car.available,
+        fullyBooked: car.fullyBooked,
+        comingSoon: car.comingSoon,
+        trips: car.trips,
+        supplier: car.supplier ? {
+          fullName: car.supplier.fullName,
+          email: car.supplier.email,
+        } : null,
+      })),
+    }),
+    suggestedActions: cars.length === 0 ? ['Try the plate number, supplier name, or broader car name.'] : undefined,
+  })
+}
+
+const handleFleetOverview = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
+  const [
+    totalCars,
+    availableCars,
+    unavailableCars,
+    fullyBookedCars,
+    comingSoonCars,
+    topCars,
+  ] = await Promise.all([
+    Car.countDocuments({}),
+    Car.countDocuments({ available: true, comingSoon: { $ne: true }, fullyBooked: { $ne: true } }),
+    Car.countDocuments({ available: false }),
+    Car.countDocuments({ fullyBooked: true }),
+    Car.countDocuments({ comingSoon: true }),
+    Car.find({})
+      .populate<{ supplier: { fullName?: string } }>('supplier')
+      .sort({ trips: -1, updatedAt: -1, _id: 1 })
+      .limit(5)
+      .lean(),
+  ])
+
+  return withLanguageMetadata(parsed, history, {
+    intent: 'fleet_overview',
+    status: 'success',
+    reply: `Fleet overview: ${availableCars} available, ${fullyBookedCars} fully booked, ${comingSoonCars} coming soon, ${unavailableCars} unavailable, out of ${totalCars} total cars.`,
+    data: withResolutionSource(parsed, {
+      metrics: {
+        totalCars,
+        availableCars,
+        unavailableCars,
+        fullyBookedCars,
+        comingSoonCars,
+      },
+      topUtilizedCars: topCars.map((car) => ({
+        _id: car._id,
+        name: car.name,
+        licensePlate: car.licensePlate,
+        trips: car.trips,
+        available: car.available,
+        fullyBooked: car.fullyBooked,
+        supplier: car.supplier?.fullName || null,
+      })),
+    }),
+    suggestedActions: ['show available cars today', 'find car BMW', 'what needs attention today?'],
+  })
+}
+
+const handleRevenueSummary = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
+  const match: Record<string, unknown> = {
+    expireAt: null,
+    status: { $in: PAID_STATUSES },
+  }
+
+  if (parsed.dateRange) {
+    match.from = { $gte: parsed.dateRange.from, $lte: parsed.dateRange.to }
+  }
+
+  const paidBookings = await Booking.find(match)
+    .populate<{ supplier: { fullName?: string } }>('supplier')
+    .sort({ from: 1, _id: 1 })
+    .lean()
+
+  const totalRevenue = paidBookings.reduce((sum, booking) => sum + (booking.price || 0), 0)
+  const bookingCount = paidBookings.length
+  const avgBookingValue = bookingCount > 0 ? totalRevenue / bookingCount : 0
+
+  const supplierRevenueMap = new Map<string, { supplierId: string, supplierName: string, revenue: number, bookings: number }>()
+  for (const booking of paidBookings) {
+    const supplierId = booking.supplier?._id?.toString() || 'unknown'
+    const existing = supplierRevenueMap.get(supplierId) || {
+      supplierId,
+      supplierName: booking.supplier?.fullName || 'Unknown supplier',
+      revenue: 0,
+      bookings: 0,
+    }
+
+    existing.revenue += booking.price || 0
+    existing.bookings += 1
+    supplierRevenueMap.set(supplierId, existing)
+  }
+
+  const topSuppliers = Array.from(supplierRevenueMap.values())
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 5)
+
+  return withLanguageMetadata(parsed, history, {
+    intent: 'revenue_summary',
+    status: 'success',
+    reply: bookingCount > 0
+      ? `Revenue summary${parsed.dateRange ? ` for ${parsed.dateRange.label}` : ''}: ${bookingCount} paid bookings totaling ${totalRevenue.toFixed(2)}.`
+      : `No paid bookings found${parsed.dateRange ? ` for ${parsed.dateRange.label}` : ''}.`,
+    data: withResolutionSource(parsed, {
+      filters: {
+        dateRange: parsed.dateRange ? {
+          label: parsed.dateRange.label,
+          from: parsed.dateRange.from,
+          to: parsed.dateRange.to,
+        } : undefined,
+      },
+      metrics: {
+        bookingCount,
+        totalRevenue,
+        avgBookingValue,
+      },
+      topSuppliers,
+    }),
+    suggestedActions: ['show paid bookings today', 'what needs attention today?'],
+  })
+}
+
 const handleOpsSummary = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
   const now = new Date()
   const activeRange = parsed.dateRange ?? {
@@ -432,18 +686,22 @@ const handleOpsSummary = async (parsed: ParsedAssistantIntent, history: Assistan
     totalOpenBookings,
     unpaidBookings,
     upcomingBookings,
+    cancelledBookings,
     activeSuppliers,
     inactiveSuppliers,
     availableCarsCount,
+    fullyBookedCarsCount,
     sampleUnpaidBookings,
     sampleUpcomingBookings,
   ] = await Promise.all([
     Booking.countDocuments(baseMatch),
     Booking.countDocuments({ ...baseMatch, status: { $nin: PAID_STATUSES } }),
     Booking.countDocuments({ ...dateMatch, to: { $gte: now } }),
+    Booking.countDocuments({ ...baseMatch, status: bookcarsTypes.BookingStatus.Cancelled }),
     User.countDocuments({ type: bookcarsTypes.UserType.Supplier, expireAt: null, active: true }),
     User.countDocuments({ type: bookcarsTypes.UserType.Supplier, expireAt: null, $or: [{ active: { $ne: true } }, { verified: { $ne: true } }] }),
     Car.countDocuments({ available: true, comingSoon: { $ne: true }, fullyBooked: { $ne: true } }),
+    Car.countDocuments({ fullyBooked: true }),
     Booking.find({ ...baseMatch, status: { $nin: PAID_STATUSES } })
       .populate<{ driver: { fullName?: string }, supplier: { fullName?: string }, car: { name?: string } }>('driver supplier car')
       .sort({ from: 1, _id: 1 })
@@ -462,25 +720,29 @@ const handleOpsSummary = async (parsed: ParsedAssistantIntent, history: Assistan
     priorities.push(`Follow up on ${unpaidBookings} unpaid booking${unpaidBookings > 1 ? 's' : ''}.`)
   }
 
-  if (upcomingBookings > 0) {
-    priorities.push(`Monitor ${upcomingBookings} upcoming booking${upcomingBookings > 1 ? 's' : ''} for ${activeRange.label}.`)
+  if (fullyBookedCarsCount > 0) {
+    priorities.push(`${fullyBookedCarsCount} car${fullyBookedCarsCount > 1 ? 's are' : ' is'} fully booked and may constrain demand.`)
   }
 
   if (inactiveSuppliers > 0) {
     priorities.push(`Review ${inactiveSuppliers} supplier account${inactiveSuppliers > 1 ? 's' : ''} that are inactive or unverified.`)
   }
 
+  if (cancelledBookings > 0) {
+    priorities.push(`${cancelledBookings} cancelled booking${cancelledBookings > 1 ? 's' : ''} may need review.`)
+  }
+
   if (priorities.length === 0) {
-    priorities.push('No immediate operational risks detected in the current lightweight checks.')
+    priorities.push('No immediate operational risks detected in the current checks.')
   }
 
   const reply = [
     `Ops summary for ${activeRange.label}:`,
-    `- ${priorities[0]}`,
-    priorities[1] ? `- ${priorities[1]}` : null,
-    priorities[2] ? `- ${priorities[2]}` : null,
+    ...priorities.slice(0, 4).map((item) => `- ${item}`),
     `- Fleet signal: ${availableCarsCount} cars currently marked available.`,
-  ].filter(Boolean).join('\n')
+    `- Supplier signal: ${activeSuppliers} active suppliers.`,
+    `- Booking signal: ${upcomingBookings} upcoming bookings in range.`,
+  ].join('\n')
 
   return withLanguageMetadata(parsed, history, {
     intent: 'ops_summary',
@@ -492,9 +754,11 @@ const handleOpsSummary = async (parsed: ParsedAssistantIntent, history: Assistan
         totalOpenBookings,
         unpaidBookings,
         upcomingBookings,
+        cancelledBookings,
         activeSuppliers,
         inactiveOrUnverifiedSuppliers: inactiveSuppliers,
         availableCarsCount,
+        fullyBookedCarsCount,
       },
       priorities,
       samples: {
@@ -522,6 +786,7 @@ const handleOpsSummary = async (parsed: ParsedAssistantIntent, history: Assistan
       'show unpaid bookings today',
       'find supplier Youssef',
       'available cars tomorrow in Beirut',
+      'show revenue today',
     ],
   })
 }
@@ -558,13 +823,15 @@ const handleCreateMeeting = async (parsed: ParsedAssistantIntent, history: Assis
 const buildUnknownAssistantResponse = (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): AssistantResponse => withLanguageMetadata(parsed, history, {
   intent: 'unknown',
   status: 'needs_clarification',
-  reply: parsed.clarificationQuestion || 'I can help with booking summaries, booking search, supplier search, car availability, operations summaries, email drafting, or meeting requests.',
+  reply: parsed.clarificationQuestion || 'I can help with bookings, suppliers, customers, cars, fleet overview, revenue summaries, email drafting, or meeting requests.',
   data: withResolutionSource(parsed),
   suggestedActions: [
     'show unpaid bookings today',
     'find booking Mahmoud',
     'find supplier Youssef',
+    'find customer Mahmoud',
     'available cars tomorrow in Beirut',
+    'show revenue today',
     'what needs attention today?',
   ],
 })
@@ -573,7 +840,7 @@ const fallbackResolveAssistantIntent = (message: string): ParsedAssistantIntent 
   const extracted = parseAssistantMessage(message)
   const normalizedMessage = extracted.normalizedMessage
 
-  if (/^(send email|email)\b/.test(normalizedMessage)) {
+  if (/^(send email|email|ارسل ايميل|ارسل بريد)/.test(normalizedMessage)) {
     return {
       ...extracted,
       intent: 'send_email',
@@ -584,7 +851,7 @@ const fallbackResolveAssistantIntent = (message: string): ParsedAssistantIntent 
     }
   }
 
-  if (/^(create meeting|schedule meeting|book meeting)\b/.test(normalizedMessage)) {
+  if (/^(create meeting|schedule meeting|book meeting|انشئ اجتماع|حدد اجتماع)/.test(normalizedMessage)) {
     return {
       ...extracted,
       intent: 'create_meeting',
@@ -599,7 +866,7 @@ const fallbackResolveAssistantIntent = (message: string): ParsedAssistantIntent 
     }
   }
 
-  if (normalizedMessage.includes('available cars') || normalizedMessage.startsWith('available car')) {
+  if (normalizedMessage.includes('available cars') || normalizedMessage.includes('السيارات المتاحه') || normalizedMessage.includes('السيارات المتوفره')) {
     return {
       ...extracted,
       intent: 'car_availability',
@@ -614,7 +881,7 @@ const fallbackResolveAssistantIntent = (message: string): ParsedAssistantIntent 
     }
   }
 
-  if (normalizedMessage.startsWith('find supplier')) {
+  if (normalizedMessage.startsWith('find supplier') || normalizedMessage.includes('ابحث عن المورد') || normalizedMessage.startsWith('supplier ')) {
     return {
       ...extracted,
       intent: 'supplier_search',
@@ -625,21 +892,50 @@ const fallbackResolveAssistantIntent = (message: string): ParsedAssistantIntent 
     }
   }
 
-  if (normalizedMessage.startsWith('find booking')) {
+  if (normalizedMessage.startsWith('find customer') || normalizedMessage.startsWith('find driver') || normalizedMessage.includes('ابحث عن العميل') || normalizedMessage.includes('ابحث عن السائق')) {
     return {
       ...extracted,
-      intent: 'booking_search',
+      intent: 'customer_search',
       source: 'system_fallback',
       confidence: extracted.searchTerm ? 0.82 : 0.45,
       needsClarification: !extracted.searchTerm,
-      clarificationQuestion: !extracted.searchTerm ? 'Which booking should I look for?' : undefined,
+      clarificationQuestion: !extracted.searchTerm ? 'Which customer should I look for?' : undefined,
+    }
+  }
+
+  if (normalizedMessage.startsWith('find car') || normalizedMessage.includes('ابحث عن سياره') || normalizedMessage.startsWith('car ')) {
+    return {
+      ...extracted,
+      intent: 'car_search',
+      source: 'system_fallback',
+      confidence: extracted.searchTerm ? 0.82 : 0.45,
+      needsClarification: !extracted.searchTerm,
+      clarificationQuestion: !extracted.searchTerm ? 'Which car should I look for?' : undefined,
+    }
+  }
+
+  if (normalizedMessage.includes('revenue') || normalizedMessage.includes('income') || normalizedMessage.includes('الايراد') || normalizedMessage.includes('الايرادات') || normalizedMessage.includes('الدخل')) {
+    return {
+      ...extracted,
+      intent: 'revenue_summary',
+      source: 'system_fallback',
+      confidence: 0.75,
+    }
+  }
+
+  if (normalizedMessage.includes('fleet') || normalizedMessage.includes('inventory') || normalizedMessage.includes('الاسطول') || normalizedMessage.includes('السيارات')) {
+    return {
+      ...extracted,
+      intent: 'fleet_overview',
+      source: 'system_fallback',
+      confidence: 0.72,
     }
   }
 
   if ([
     'ops summary', 'operations summary', 'what needs attention', 'needs attention', 'what should i prioritize',
     'what should we prioritize', 'prioritize', 'priorities', 'follow up', 'follow-up', 'what needs follow up',
-    'general analysis', 'overview', 'status overview', 'anything urgent',
+    'general analysis', 'overview', 'status overview', 'anything urgent', 'ماذا يحتاج اهتمام', 'وش المهم', 'ما الذي يحتاج متابعه',
   ].some((pattern) => normalizedMessage.includes(pattern))) {
     return {
       ...extracted,
@@ -649,7 +945,7 @@ const fallbackResolveAssistantIntent = (message: string): ParsedAssistantIntent 
     }
   }
 
-  if (normalizedMessage.includes('booking') || normalizedMessage.includes('bookings')) {
+  if (normalizedMessage.includes('booking') || normalizedMessage.includes('bookings') || normalizedMessage.includes('الحجز') || normalizedMessage.includes('الحجوزات')) {
     return {
       ...extracted,
       intent: 'booking_summary',
@@ -664,7 +960,7 @@ const fallbackResolveAssistantIntent = (message: string): ParsedAssistantIntent 
     source: 'system_fallback',
     confidence: 0.18,
     needsClarification: true,
-    clarificationQuestion: 'What would you like me to help with: bookings, suppliers, cars, email, meetings, or operations summary?',
+    clarificationQuestion: 'What would you like me to help with: bookings, suppliers, customers, cars, fleet, revenue, or operations?',
   }
 }
 
@@ -694,8 +990,20 @@ export const processAssistantMessage = async (
     case 'supplier_search':
       response = await handleSupplierSearch(parsed, safeHistory)
       break
+    case 'customer_search':
+      response = await handleCustomerSearch(parsed, safeHistory)
+      break
     case 'car_availability':
       response = await handleCarAvailability(parsed, safeHistory)
+      break
+    case 'car_search':
+      response = await handleCarSearch(parsed, safeHistory)
+      break
+    case 'fleet_overview':
+      response = await handleFleetOverview(parsed, safeHistory)
+      break
+    case 'revenue_summary':
+      response = await handleRevenueSummary(parsed, safeHistory)
       break
     case 'ops_summary':
       response = await handleOpsSummary(parsed, safeHistory)
