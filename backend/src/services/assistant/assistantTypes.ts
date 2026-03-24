@@ -1,93 +1,45 @@
 export type AssistantIntent =
-  | 'booking_summary'
-  | 'booking_search'
-  | 'supplier_search'
-  | 'customer_search'
-  | 'car_availability'
-  | 'car_search'
+  | 'dashboard_overview'
+  | 'bookings_overview'
   | 'fleet_overview'
-  | 'revenue_summary'
-  | 'supplier_performance'
-  | 'customer_health'
-  | 'risk_alerts'
-  | 'smart_recommendations'
-  | 'executive_decision_support'
-  | 'message_draft'
-  | 'followup_plan'
-  | 'tasklist_generation'
-  | 'ops_summary'
-  | 'send_email'
-  | 'create_meeting'
+  | 'suppliers_overview'
+  | 'customers_overview'
+  | 'risk_overview'
+  | 'revenue_overview'
+  | 'search_bookings'
+  | 'search_cars'
+  | 'search_suppliers'
+  | 'search_customers'
+  | 'draft_supplier_message'
+  | 'draft_customer_message'
+  | 'draft_followup_plan'
+  | 'draft_task_list'
   | 'unknown'
 
 export type AssistantStatus = 'success' | 'needs_clarification' | 'error'
-export type AssistantSource = 'llm_primary' | 'system_fallback'
-export type AssistantDateRangeLabel = 'today' | 'tomorrow'
 
 export interface AssistantConversationTurn {
   role: 'user' | 'assistant'
   text: string
 }
 
+export interface AssistantResponseCard {
+  type: 'metric' | 'decision' | 'alert' | 'list' | 'draft' | 'table'
+  title: string
+  value?: string | number
+  severity?: 'info' | 'success' | 'warning' | 'error'
+  items?: string[]
+  rows?: Record<string, unknown>[]
+  body?: string
+}
+
 export interface AssistantResponse {
   intent: AssistantIntent
   status: AssistantStatus
+  title: string
+  summary: string
   reply: string
-  replyLanguage: string
-  inputLanguage: string
+  cards: AssistantResponseCard[]
+  suggestions: string[]
   data?: Record<string, unknown>
-  suggestedActions?: string[]
-  contextUsed?: {
-    historyTurns: number
-  }
-}
-
-export interface ParsedDateRange {
-  label: AssistantDateRangeLabel
-  from: Date
-  to: Date
-}
-
-export interface ParsedAssistantIntent {
-  intent: AssistantIntent
-  originalMessage: string
-  normalizedMessage: string
-  searchTerm?: string
-  email?: string
-  locationQuery?: string
-  dateRange?: ParsedDateRange
-  filters?: {
-    unpaid?: boolean
-    paid?: boolean
-    cancelled?: boolean
-    reserved?: boolean
-    active?: boolean
-  }
-  source?: AssistantSource
-  confidence?: number
-  fallbackRecommended?: boolean
-  needsClarification?: boolean
-  clarificationQuestion?: string
-  inputLanguage?: string
-  replyLanguage?: string
-}
-
-export interface AssistantLlmResolution {
-  intent: AssistantIntent
-  searchTerm?: string
-  email?: string
-  locationQuery?: string
-  dateRangeLabel?: AssistantDateRangeLabel
-  filters?: {
-    unpaid?: boolean
-    paid?: boolean
-    cancelled?: boolean
-    reserved?: boolean
-    active?: boolean
-  }
-  needsClarification: boolean
-  clarificationQuestion?: string
-  confidence?: number
-  inputLanguage?: string
-  replyLanguage?: string
 }

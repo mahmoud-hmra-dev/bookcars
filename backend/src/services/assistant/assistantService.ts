@@ -1,18 +1,9 @@
-import mongoose from 'mongoose'
 import * as bookcarsTypes from ':bookcars-types'
 import Booking from '../../models/Booking'
 import Car from '../../models/Car'
-import Location from '../../models/Location'
-import LocationValue from '../../models/LocationValue'
-import User from '../../models/User'
 import Notification from '../../models/Notification'
-import * as logger from '../../utils/logger'
-import { normalizeAssistantText, parseAssistantMessage } from './assistantParser'
-import { localizeAssistantResponse, resolveAssistantIntentWithLlm } from './assistantLlmResolver'
-import { AssistantConversationTurn, AssistantResponse, ParsedAssistantIntent } from './assistantTypes'
-
-const MAX_RESULTS = 10
-const MAX_HISTORY_TURNS = 6
+import User from '../../models/User'
+import { AssistantConversationTurn, AssistantIntent, AssistantResponse, AssistantResponseCard } from './assistantTypes'
 
 const PAID_STATUSES = [
   bookcarsTypes.BookingStatus.Paid,
@@ -20,1540 +11,354 @@ const PAID_STATUSES = [
   bookcarsTypes.BookingStatus.Deposit,
 ]
 
-const BLOCKING_BOOKING_STATUSES = [
-  bookcarsTypes.BookingStatus.Paid,
-  bookcarsTypes.BookingStatus.PaidInFull,
-  bookcarsTypes.BookingStatus.Deposit,
-  bookcarsTypes.BookingStatus.Reserved,
-]
+const normalize = (value: string) => value.toLowerCase().trim()
+const containsAny = (text: string, terms: string[]) => terms.some((term) => text.includes(term))
 
-const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-
-const buildFlexibleNamePattern = (value: string) => {
-  const normalized = normalizeAssistantText(value)
-  const escaped = escapeRegex(normalized)
-  return escaped
-    .replace(/youssef/g, '(?:youssef|يوسف)')
-    .replace(/يوسف/g, '(?:youssef|يوسف)')
-}
-
-const isObjectId = (value?: string) => !!(value && mongoose.Types.ObjectId.isValid(value))
-const toObjectId = (value: string) => new mongoose.Types.ObjectId(value)
-const matchNormalized = (source: string | null | undefined, query: string) => normalizeAssistantText(source || '').includes(normalizeAssistantText(query))
-
-const sanitizeAssistantHistory = (history: AssistantConversationTurn[] = []) => history
-  .filter((turn) => turn && (turn.role === 'user' || turn.role === 'assistant') && typeof turn.text === 'string')
-  .map((turn) => ({ role: turn.role, text: turn.text.trim() }))
-  .filter((turn) => turn.text)
-  .slice(-MAX_HISTORY_TURNS)
-
-const withLanguageMetadata = (
-  parsed: ParsedAssistantIntent,
-  history: AssistantConversationTurn[],
-  response: Omit<AssistantResponse, 'inputLanguage' | 'replyLanguage' | 'contextUsed'>,
-): AssistantResponse => ({
-  ...response,
-  inputLanguage: parsed.inputLanguage || 'en',
-  replyLanguage: parsed.replyLanguage || parsed.inputLanguage || 'en',
-  contextUsed: {
-    historyTurns: history.length,
-  },
+const metricCard = (title: string, value: string | number, severity: AssistantResponseCard['severity'] = 'info'): AssistantResponseCard => ({
+  type: 'metric',
+  title,
+  value,
+  severity,
 })
 
-const withResolutionSource = (parsed: ParsedAssistantIntent, data?: Record<string, unknown>) => ({
-  ...(data || {}),
-  resolutionSource: parsed.source,
+const listCard = (title: string, items: string[], severity: AssistantResponseCard['severity'] = 'info'): AssistantResponseCard => ({
+  type: 'list',
+  title,
+  items,
+  severity,
 })
 
-const findSuppliers = async (searchTerm: string) => {
-  const regex = new RegExp(buildFlexibleNamePattern(searchTerm), 'i')
-  const suppliers = await User.find({
-    type: bookcarsTypes.UserType.Supplier,
-    expireAt: null,
-    $or: [
-      { fullName: { $regex: regex } },
-      { email: { $regex: regex } },
-      { phone: { $regex: regex } },
-    ],
-  })
-    .select('_id fullName email phone active verified payLater licenseRequired')
-    .sort({ fullName: 1, _id: 1 })
-    .limit(MAX_RESULTS)
-    .lean()
+const draftCard = (title: string, body: string): AssistantResponseCard => ({
+  type: 'draft',
+  title,
+  body,
+})
 
-  if (suppliers.length > 0) {
-    return suppliers
-  }
+const tableCard = (title: string, rows: Record<string, unknown>[]): AssistantResponseCard => ({
+  type: 'table',
+  title,
+  rows,
+})
 
-  const fallbackSuppliers = await User.find({
-    type: bookcarsTypes.UserType.Supplier,
-    expireAt: null,
-  })
-    .select('_id fullName email phone active verified payLater licenseRequired')
-    .sort({ fullName: 1, _id: 1 })
-    .limit(100)
-    .lean()
+const decisionCard = (title: string, body: string, severity: AssistantResponseCard['severity'] = 'success'): AssistantResponseCard => ({
+  type: 'decision',
+  title,
+  body,
+  severity,
+})
 
-  return fallbackSuppliers
-    .filter((supplier) => matchNormalized(supplier.fullName, searchTerm) || matchNormalized(supplier.email, searchTerm) || matchNormalized(supplier.phone, searchTerm))
-    .slice(0, MAX_RESULTS)
+const alertCard = (title: string, items: string[], severity: AssistantResponseCard['severity'] = 'warning'): AssistantResponseCard => ({
+  type: 'alert',
+  title,
+  items,
+  severity,
+})
+
+const makeResponse = (payload: AssistantResponse): AssistantResponse => payload
+
+const detectIntent = (message: string): AssistantIntent => {
+  const text = normalize(message)
+
+  if (containsAny(text, ['supplier message', 'رسالة مورد', 'message supplier'])) return 'draft_supplier_message'
+  if (containsAny(text, ['customer message', 'رسالة عميل', 'message customer'])) return 'draft_customer_message'
+  if (containsAny(text, ['follow-up', 'follow up', 'خطة متابعة'])) return 'draft_followup_plan'
+  if (containsAny(text, ['task list', 'todo', 'مهام'])) return 'draft_task_list'
+  if (containsAny(text, ['search booking', 'find booking', 'ابحث عن حجز'])) return 'search_bookings'
+  if (containsAny(text, ['search car', 'find car', 'ابحث عن سيارة'])) return 'search_cars'
+  if (containsAny(text, ['search supplier', 'find supplier', 'ابحث عن مورد'])) return 'search_suppliers'
+  if (containsAny(text, ['search customer', 'find customer', 'ابحث عن عميل'])) return 'search_customers'
+  if (containsAny(text, ['revenue', 'income', 'إيراد', 'ايراد'])) return 'revenue_overview'
+  if (containsAny(text, ['risk', 'alert', 'مخاطر', 'تنبيهات'])) return 'risk_overview'
+  if (containsAny(text, ['supplier performance', 'suppliers overview', 'الموردين'])) return 'suppliers_overview'
+  if (containsAny(text, ['customer health', 'customers overview', 'العملاء'])) return 'customers_overview'
+  if (containsAny(text, ['fleet', 'cars overview', 'الأسطول', 'السيارات'])) return 'fleet_overview'
+  if (containsAny(text, ['booking overview', 'bookings overview', 'الحجوزات'])) return 'bookings_overview'
+  if (containsAny(text, ['dashboard', 'overview', 'ملخص', 'what should we do', 'ماذا نفعل'])) return 'dashboard_overview'
+
+  return 'unknown'
 }
 
-const findCustomers = async (searchTerm: string) => {
-  const regex = new RegExp(buildFlexibleNamePattern(searchTerm), 'i')
-  const customers = await User.find({
-    type: bookcarsTypes.UserType.User,
-    expireAt: null,
-    $or: [
-      { fullName: { $regex: regex } },
-      { email: { $regex: regex } },
-      { phone: { $regex: regex } },
-    ],
-  })
-    .select('_id fullName email phone active verified blacklisted createdAt')
-    .sort({ createdAt: -1, _id: 1 })
-    .limit(MAX_RESULTS)
-    .lean()
-
-  if (customers.length > 0) {
-    return customers
-  }
-
-  const fallbackCustomers = await User.find({
-    type: bookcarsTypes.UserType.User,
-    expireAt: null,
-  })
-    .select('_id fullName email phone active verified blacklisted createdAt')
-    .sort({ createdAt: -1, _id: 1 })
-    .limit(150)
-    .lean()
-
-  return fallbackCustomers
-    .filter((customer) => matchNormalized(customer.fullName, searchTerm) || matchNormalized(customer.email, searchTerm) || matchNormalized(customer.phone, searchTerm))
-    .slice(0, MAX_RESULTS)
+const extractSearchTerm = (message: string) => {
+  const trimmed = message.trim()
+  const parts = trimmed.split(/find booking|find car|find supplier|find customer|ابحث عن حجز|ابحث عن سيارة|ابحث عن مورد|ابحث عن عميل/i)
+  return parts.length > 1 ? parts[1].trim() : trimmed
 }
 
-const findCars = async (searchTerm: string) => {
-  const regex = new RegExp(escapeRegex(searchTerm), 'i')
-  const cars = await Car.find({
-    $or: [
-      { name: { $regex: regex } },
-      { licensePlate: { $regex: regex } },
-    ],
-  })
-    .populate<{ supplier: { fullName?: string, email?: string } }>('supplier')
-    .sort({ updatedAt: -1, _id: 1 })
-    .limit(MAX_RESULTS)
-    .lean()
-
-  if (cars.length > 0) {
-    return cars
-  }
-
-  const fallbackCars = await Car.find({})
-    .populate<{ supplier: { fullName?: string, email?: string } }>('supplier')
-    .sort({ updatedAt: -1, _id: 1 })
-    .limit(150)
-    .lean()
-
-  return fallbackCars
-    .filter((car) => matchNormalized(car.name, searchTerm) || matchNormalized(car.licensePlate, searchTerm) || matchNormalized(car.supplier?.fullName, searchTerm))
-    .slice(0, MAX_RESULTS)
-}
-
-const getBookingSearchFilter = (searchTerm: string): Record<string, unknown> => {
-  const regex = new RegExp(escapeRegex(searchTerm), 'i')
-
-  if (isObjectId(searchTerm)) {
-    return {
-      $or: [
-        { _id: toObjectId(searchTerm) },
-        { 'driver._id': toObjectId(searchTerm) },
-        { 'supplier._id': toObjectId(searchTerm) },
-        { 'car._id': toObjectId(searchTerm) },
-      ],
-    }
-  }
-
-  return {
-    $or: [
-      { 'driver.fullName': { $regex: regex } },
-      { 'driver.email': { $regex: regex } },
-      { 'supplier.fullName': { $regex: regex } },
-      { 'supplier.email': { $regex: regex } },
-      { 'car.name': { $regex: regex } },
-    ],
-  }
-}
-
-const searchBookings = async (searchTerm: string) => {
-  const match: Record<string, unknown> = {
-    $and: [
-      { expireAt: null },
-      getBookingSearchFilter(searchTerm),
-    ],
-  }
-
-  return Booking.aggregate([
-    {
-      $lookup: {
-        from: 'User',
-        localField: 'supplier',
-        foreignField: '_id',
-        as: 'supplier',
-      },
-    },
-    { $unwind: '$supplier' },
-    {
-      $lookup: {
-        from: 'User',
-        localField: 'driver',
-        foreignField: '_id',
-        as: 'driver',
-      },
-    },
-    { $unwind: '$driver' },
-    {
-      $lookup: {
-        from: 'Car',
-        localField: 'car',
-        foreignField: '_id',
-        as: 'car',
-      },
-    },
-    { $unwind: '$car' },
-    { $match: match },
-    { $sort: { createdAt: -1, _id: 1 } },
-    { $limit: MAX_RESULTS },
-    {
-      $project: {
-        _id: 1,
-        status: 1,
-        from: 1,
-        to: 1,
-        createdAt: 1,
-        price: 1,
-        'driver._id': 1,
-        'driver.fullName': 1,
-        'driver.email': 1,
-        'supplier._id': 1,
-        'supplier.fullName': 1,
-        'supplier.email': 1,
-        'car._id': 1,
-        'car.name': 1,
-      },
-    },
-  ])
-}
-
-const summarizeBookings = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
-  const match: Record<string, unknown> = { expireAt: null }
-
-  if (parsed.dateRange) {
-    match.from = { $gte: parsed.dateRange.from, $lte: parsed.dateRange.to }
-  }
-
-  const requestedStatuses: string[] = []
-  if (parsed.filters?.unpaid) {
-    match.status = { $nin: PAID_STATUSES }
-    requestedStatuses.push('unpaid')
-  } else if (parsed.filters?.paid) {
-    match.status = { $in: PAID_STATUSES }
-    requestedStatuses.push('paid')
-  } else if (parsed.filters?.cancelled) {
-    match.status = bookcarsTypes.BookingStatus.Cancelled
-    requestedStatuses.push('cancelled')
-  } else if (parsed.filters?.reserved) {
-    match.status = bookcarsTypes.BookingStatus.Reserved
-    requestedStatuses.push('reserved')
-  }
-
-  const bookings = await Booking.find(match)
-    .populate<{ driver: { fullName?: string, email?: string } }>('driver')
-    .populate<{ supplier: { fullName?: string, email?: string } }>('supplier')
-    .populate<{ car: { name?: string } }>('car')
-    .sort({ from: 1, _id: 1 })
-    .limit(MAX_RESULTS)
-    .lean()
-
-  const total = await Booking.countDocuments(match)
-  const summaryLabel = [requestedStatuses.join(', '), parsed.dateRange?.label ?? null].filter(Boolean).join(' ')
-
-  return withLanguageMetadata(parsed, history, {
-    intent: 'booking_summary',
-    status: 'success',
-    reply: total > 0
-      ? `Found ${total} ${summaryLabel || ''} booking${total > 1 ? 's' : ''}.`.replace(/\s+/g, ' ').trim()
-      : `No ${summaryLabel || ''} bookings found.`.replace(/\s+/g, ' ').trim(),
-    data: withResolutionSource(parsed, {
-      total,
-      filters: {
-        unpaid: !!parsed.filters?.unpaid,
-        paid: !!parsed.filters?.paid,
-        cancelled: !!parsed.filters?.cancelled,
-        reserved: !!parsed.filters?.reserved,
-        dateRange: parsed.dateRange ? {
-          label: parsed.dateRange.label,
-          from: parsed.dateRange.from,
-          to: parsed.dateRange.to,
-        } : undefined,
-      },
-      bookings: bookings.map((booking) => ({
-        _id: booking._id,
-        status: booking.status,
-        from: booking.from,
-        to: booking.to,
-        price: booking.price,
-        driver: booking.driver ? {
-          fullName: booking.driver.fullName,
-          email: booking.driver.email,
-        } : null,
-        supplier: booking.supplier ? {
-          fullName: booking.supplier.fullName,
-          email: booking.supplier.email,
-        } : null,
-        car: booking.car ? {
-          name: booking.car.name,
-        } : null,
-      })),
-    }),
-    suggestedActions: total > MAX_RESULTS ? ['Refine by driver, supplier, or exact date.'] : undefined,
-  })
-}
-
-const handleBookingSearch = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
-  if (!parsed.searchTerm) {
-    return withLanguageMetadata(parsed, history, {
-      intent: 'booking_search',
-      status: 'needs_clarification',
-      reply: parsed.clarificationQuestion || 'Tell me which booking to find by ID, driver name, supplier name, or email.',
-      suggestedActions: ['Try: find booking Mahmoud'],
-    })
-  }
-
-  const bookings = await searchBookings(parsed.searchTerm)
-
-  return withLanguageMetadata(parsed, history, {
-    intent: 'booking_search',
-    status: 'success',
-    reply: bookings.length > 0
-      ? `Found ${bookings.length} matching booking${bookings.length > 1 ? 's' : ''}.`
-      : `No bookings matched "${parsed.searchTerm}".`,
-    data: withResolutionSource(parsed, {
-      searchTerm: parsed.searchTerm,
-      bookings,
-    }),
-    suggestedActions: bookings.length === 0 ? ['Try a full name, email, or booking ID.'] : undefined,
-  })
-}
-
-const handleSupplierSearch = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
-  if (!parsed.searchTerm) {
-    return withLanguageMetadata(parsed, history, {
-      intent: 'supplier_search',
-      status: 'needs_clarification',
-      reply: parsed.clarificationQuestion || 'Tell me which supplier to find by full name or email.',
-      suggestedActions: ['Try: find supplier Youssef'],
-    })
-  }
-
-  const suppliers = await findSuppliers(parsed.searchTerm)
-
-  return withLanguageMetadata(parsed, history, {
-    intent: 'supplier_search',
-    status: 'success',
-    reply: suppliers.length > 0
-      ? `Found ${suppliers.length} matching supplier${suppliers.length > 1 ? 's' : ''}.`
-      : `No suppliers matched "${parsed.searchTerm}".`,
-    data: withResolutionSource(parsed, {
-      searchTerm: parsed.searchTerm,
-      suppliers,
-    }),
-    suggestedActions: suppliers.length === 0 ? ['Try a full name, Arabic spelling, or email address.'] : undefined,
-  })
-}
-
-const handleCustomerSearch = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
-  if (!parsed.searchTerm) {
-    return withLanguageMetadata(parsed, history, {
-      intent: 'customer_search',
-      status: 'needs_clarification',
-      reply: parsed.clarificationQuestion || 'Tell me which customer to find by full name, email, or phone.',
-      suggestedActions: ['Try: find customer Mahmoud'],
-    })
-  }
-
-  const customers = await findCustomers(parsed.searchTerm)
-
-  return withLanguageMetadata(parsed, history, {
-    intent: 'customer_search',
-    status: 'success',
-    reply: customers.length > 0
-      ? `Found ${customers.length} matching customer${customers.length > 1 ? 's' : ''}.`
-      : `No customers matched "${parsed.searchTerm}".`,
-    data: withResolutionSource(parsed, {
-      searchTerm: parsed.searchTerm,
-      customers,
-    }),
-    suggestedActions: customers.length === 0 ? ['Try a full name, phone number, or email.'] : undefined,
-  })
-}
-
-const resolveLocationIds = async (locationQuery: string) => {
-  const regex = new RegExp(escapeRegex(locationQuery), 'i')
-  const values = await LocationValue.find({ value: { $regex: regex } })
-    .select('_id value language')
-    .limit(20)
-    .lean()
-
-  let locationValueIds = values.map((value) => value._id)
-
-  if (locationValueIds.length === 0) {
-    const allValues = await LocationValue.find({}).select('_id value language').limit(200).lean()
-    locationValueIds = allValues
-      .filter((value) => matchNormalized(value.value, locationQuery))
-      .map((value) => value._id)
-  }
-
-  if (locationValueIds.length === 0) {
-    return { locations: [], values: [] }
-  }
-
-  const locations = await Location.find({ values: { $in: locationValueIds } })
-    .select('_id values')
-    .lean()
-
-  return { locations, values }
-}
-
-const handleCarAvailability = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
-  if (!parsed.dateRange) {
-    return withLanguageMetadata(parsed, history, {
-      intent: 'car_availability',
-      status: 'needs_clarification',
-      reply: parsed.clarificationQuestion || 'Tell me which date to check, for example today or tomorrow.',
-      suggestedActions: ['Try: available cars tomorrow in Beirut'],
-    })
-  }
-
-  if (!parsed.locationQuery) {
-    return withLanguageMetadata(parsed, history, {
-      intent: 'car_availability',
-      status: 'needs_clarification',
-      reply: parsed.clarificationQuestion || 'Tell me which location to search.',
-      suggestedActions: ['Try: available cars tomorrow in Beirut'],
-    })
-  }
-
-  const { locations } = await resolveLocationIds(parsed.locationQuery)
-  const locationIds = locations.map((location) => location._id)
-
-  if (locationIds.length === 0) {
-    return withLanguageMetadata(parsed, history, {
-      intent: 'car_availability',
-      status: 'success',
-      reply: `No locations matched "${parsed.locationQuery}".`,
-      data: withResolutionSource(parsed, {
-        searchLocation: parsed.locationQuery,
-        availableCars: [],
-      }),
-      suggestedActions: ['Try another spelling or a broader city name.'],
-    })
-  }
-
-  const overlappingBookings = await Booking.find({
-    expireAt: null,
-    status: { $in: BLOCKING_BOOKING_STATUSES },
-    from: { $lte: parsed.dateRange.to },
-    to: { $gte: parsed.dateRange.from },
-  })
-    .select('car')
-    .lean()
-
-  const blockedCarIds = new Set(overlappingBookings.map((booking) => booking.car?.toString()).filter(Boolean))
-
-  const cars = await Car.find({
-    available: true,
-    comingSoon: { $ne: true },
-    fullyBooked: { $ne: true },
-    locations: { $in: locationIds },
-  })
-    .populate<{ supplier: { fullName?: string, email?: string } }>('supplier')
-    .sort({ dailyPrice: 1, _id: 1 })
-    .limit(50)
-    .lean()
-
-  const availableCars = cars
-    .filter((car) => !car.blockOnPay || !blockedCarIds.has(car._id.toString()))
-    .slice(0, MAX_RESULTS)
-    .map((car) => ({
-      _id: car._id,
-      name: car.name,
-      licensePlate: car.licensePlate,
-      supplier: car.supplier ? {
-        fullName: car.supplier.fullName,
-        email: car.supplier.email,
-      } : null,
-      dailyPrice: car.dailyPrice,
-      deposit: car.deposit,
-      available: car.available,
-      blockOnPay: !!car.blockOnPay,
-    }))
-
-  return withLanguageMetadata(parsed, history, {
-    intent: 'car_availability',
-    status: 'success',
-    reply: availableCars.length > 0
-      ? `Found ${availableCars.length} available car${availableCars.length > 1 ? 's' : ''} for ${parsed.dateRange.label} in ${parsed.locationQuery}.`
-      : `No available cars found for ${parsed.dateRange.label} in ${parsed.locationQuery}.`,
-    data: withResolutionSource(parsed, {
-      searchLocation: parsed.locationQuery,
-      dateRange: {
-        label: parsed.dateRange.label,
-        from: parsed.dateRange.from,
-        to: parsed.dateRange.to,
-      },
-      availableCars,
-    }),
-    suggestedActions: availableCars.length === 0 ? ['Try another location or date.'] : undefined,
-  })
-}
-
-const handleCarSearch = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
-  if (!parsed.searchTerm) {
-    return withLanguageMetadata(parsed, history, {
-      intent: 'car_search',
-      status: 'needs_clarification',
-      reply: parsed.clarificationQuestion || 'Tell me which car to find by name, plate, or supplier.',
-      suggestedActions: ['Try: find car BMW'],
-    })
-  }
-
-  const cars = await findCars(parsed.searchTerm)
-
-  return withLanguageMetadata(parsed, history, {
-    intent: 'car_search',
-    status: 'success',
-    reply: cars.length > 0
-      ? `Found ${cars.length} matching car${cars.length > 1 ? 's' : ''}.`
-      : `No cars matched "${parsed.searchTerm}".`,
-    data: withResolutionSource(parsed, {
-      searchTerm: parsed.searchTerm,
-      cars: cars.map((car) => ({
-        _id: car._id,
-        name: car.name,
-        licensePlate: car.licensePlate,
-        dailyPrice: car.dailyPrice,
-        deposit: car.deposit,
-        available: car.available,
-        fullyBooked: car.fullyBooked,
-        comingSoon: car.comingSoon,
-        trips: car.trips,
-        supplier: car.supplier ? {
-          fullName: car.supplier.fullName,
-          email: car.supplier.email,
-        } : null,
-      })),
-    }),
-    suggestedActions: cars.length === 0 ? ['Try the plate number, supplier name, or broader car name.'] : undefined,
-  })
-}
-
-const handleFleetOverview = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
-  const [
-    totalCars,
-    availableCars,
-    unavailableCars,
-    fullyBookedCars,
-    comingSoonCars,
-    topCars,
-  ] = await Promise.all([
-    Car.countDocuments({}),
-    Car.countDocuments({ available: true, comingSoon: { $ne: true }, fullyBooked: { $ne: true } }),
-    Car.countDocuments({ available: false }),
-    Car.countDocuments({ fullyBooked: true }),
-    Car.countDocuments({ comingSoon: true }),
-    Car.find({})
-      .populate<{ supplier: { _id?: string, fullName?: string } }>('supplier')
-      .sort({ trips: -1, updatedAt: -1, _id: 1 })
-      .limit(5)
-      .lean(),
-  ])
-
-  return withLanguageMetadata(parsed, history, {
-    intent: 'fleet_overview',
-    status: 'success',
-    reply: `Fleet overview: ${availableCars} available, ${fullyBookedCars} fully booked, ${comingSoonCars} coming soon, ${unavailableCars} unavailable, out of ${totalCars} total cars.`,
-    data: withResolutionSource(parsed, {
-      metrics: {
-        totalCars,
-        availableCars,
-        unavailableCars,
-        fullyBookedCars,
-        comingSoonCars,
-      },
-      topUtilizedCars: topCars.map((car) => ({
-        _id: car._id,
-        name: car.name,
-        licensePlate: car.licensePlate,
-        trips: car.trips,
-        available: car.available,
-        fullyBooked: car.fullyBooked,
-        supplier: car.supplier?.fullName || null,
-      })),
-    }),
-    suggestedActions: ['show available cars today', 'find car BMW', 'what needs attention today?'],
-  })
-}
-
-const handleRevenueSummary = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
-  const match: Record<string, unknown> = {
-    expireAt: null,
-    status: { $in: PAID_STATUSES },
-  }
-
-  if (parsed.dateRange) {
-    match.from = { $gte: parsed.dateRange.from, $lte: parsed.dateRange.to }
-  }
-
-  const paidBookings = await Booking.find(match)
-    .populate<{ supplier: { _id?: string, fullName?: string } }>('supplier')
-    .sort({ from: 1, _id: 1 })
-    .lean()
-
-  const totalRevenue = paidBookings.reduce((sum, booking) => sum + (booking.price || 0), 0)
-  const bookingCount = paidBookings.length
-  const avgBookingValue = bookingCount > 0 ? totalRevenue / bookingCount : 0
-
-  const supplierRevenueMap = new Map<string, { supplierId: string, supplierName: string, revenue: number, bookings: number }>()
-  for (const booking of paidBookings) {
-    const supplierId = booking.supplier?._id?.toString() || 'unknown'
-    const existing = supplierRevenueMap.get(supplierId) || {
-      supplierId,
-      supplierName: booking.supplier?.fullName || 'Unknown supplier',
-      revenue: 0,
-      bookings: 0,
-    }
-
-    existing.revenue += booking.price || 0
-    existing.bookings += 1
-    supplierRevenueMap.set(supplierId, existing)
-  }
-
-  const topSuppliers = Array.from(supplierRevenueMap.values())
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 5)
-
-  return withLanguageMetadata(parsed, history, {
-    intent: 'revenue_summary',
-    status: 'success',
-    reply: bookingCount > 0
-      ? `Revenue summary${parsed.dateRange ? ` for ${parsed.dateRange.label}` : ''}: ${bookingCount} paid bookings totaling ${totalRevenue.toFixed(2)}.`
-      : `No paid bookings found${parsed.dateRange ? ` for ${parsed.dateRange.label}` : ''}.`,
-    data: withResolutionSource(parsed, {
-      filters: {
-        dateRange: parsed.dateRange ? {
-          label: parsed.dateRange.label,
-          from: parsed.dateRange.from,
-          to: parsed.dateRange.to,
-        } : undefined,
-      },
-      metrics: {
-        bookingCount,
-        totalRevenue,
-        avgBookingValue,
-      },
-      topSuppliers,
-    }),
-    suggestedActions: ['show paid bookings today', 'what needs attention today?'],
-  })
-}
-
-const handleSupplierPerformance = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
-  const paidMatch: Record<string, unknown> = { expireAt: null, status: { $in: PAID_STATUSES } }
-  const unpaidMatch: Record<string, unknown> = { expireAt: null, status: { $nin: PAID_STATUSES } }
-
-  if (parsed.dateRange) {
-    paidMatch.from = { $gte: parsed.dateRange.from, $lte: parsed.dateRange.to }
-    unpaidMatch.from = { $gte: parsed.dateRange.from, $lte: parsed.dateRange.to }
-  }
-
-  const [paidBookings, unpaidBookings, suppliers] = await Promise.all([
-    Booking.find(paidMatch).populate<{ supplier: { _id?: string, fullName?: string } }>('supplier').lean(),
-    Booking.find(unpaidMatch).populate<{ supplier: { _id?: string, fullName?: string } }>('supplier').lean(),
-    User.find({ type: bookcarsTypes.UserType.Supplier, expireAt: null }).select('_id fullName active verified').lean(),
-  ])
-
-  const scoreMap = new Map<string, { supplierId: string, supplierName: string, paidRevenue: number, paidBookings: number, unpaidBookings: number, active: boolean, verified: boolean, score: number }>()
-
-  for (const supplier of suppliers) {
-    scoreMap.set(supplier._id.toString(), {
-      supplierId: supplier._id.toString(),
-      supplierName: supplier.fullName,
-      paidRevenue: 0,
-      paidBookings: 0,
-      unpaidBookings: 0,
-      active: !!supplier.active,
-      verified: !!supplier.verified,
-      score: 0,
-    })
-  }
-
-  for (const booking of paidBookings) {
-    const supplierId = booking.supplier?._id?.toString()
-    if (!supplierId || !scoreMap.has(supplierId)) continue
-    const row = scoreMap.get(supplierId)!
-    row.paidRevenue += booking.price || 0
-    row.paidBookings += 1
-  }
-
-  for (const booking of unpaidBookings) {
-    const supplierId = booking.supplier?._id?.toString()
-    if (!supplierId || !scoreMap.has(supplierId)) continue
-    const row = scoreMap.get(supplierId)!
-    row.unpaidBookings += 1
-  }
-
-  const rows = Array.from(scoreMap.values()).map((row) => ({
-    ...row,
-    score: (row.paidRevenue / 100) + (row.paidBookings * 8) - (row.unpaidBookings * 10) + (row.active ? 10 : -15) + (row.verified ? 5 : -10),
-  }))
-
-  const topSuppliers = [...rows].sort((a, b) => b.score - a.score).slice(0, 5)
-  const weakestSuppliers = [...rows].sort((a, b) => a.score - b.score).slice(0, 5)
-
-  return withLanguageMetadata(parsed, history, {
-    intent: 'supplier_performance',
-    status: 'success',
-    reply: `Supplier performance analyzed across ${rows.length} suppliers. ${topSuppliers[0] ? `Top supplier right now is ${topSuppliers[0].supplierName}.` : ''}`.trim(),
-    data: withResolutionSource(parsed, {
-      topSuppliers,
-      weakestSuppliers,
-      totalSuppliers: rows.length,
-    }),
-    suggestedActions: ['find supplier Youssef', 'show unpaid bookings today', 'what do you recommend now?'],
-  })
-}
-
-const handleCustomerHealth = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
-  const customers = await User.find({ type: bookcarsTypes.UserType.User, expireAt: null })
-    .select('_id fullName email active verified blacklisted createdAt')
-    .lean()
-
-  const bookings = await Booking.find({ expireAt: null })
-    .select('driver price status')
-    .lean()
-
-  const stats = new Map<string, { customerId: string, fullName: string, email: string, active: boolean, verified: boolean, blacklisted: boolean, bookings: number, paidBookings: number, unpaidBookings: number, revenue: number, healthScore: number }>()
-
-  for (const customer of customers) {
-    stats.set(customer._id.toString(), {
-      customerId: customer._id.toString(),
-      fullName: customer.fullName,
-      email: customer.email,
-      active: !!customer.active,
-      verified: !!customer.verified,
-      blacklisted: !!customer.blacklisted,
-      bookings: 0,
-      paidBookings: 0,
-      unpaidBookings: 0,
-      revenue: 0,
-      healthScore: 0,
-    })
-  }
-
-  for (const booking of bookings) {
-    const driverId = booking.driver?.toString()
-    if (!driverId || !stats.has(driverId)) continue
-    const row = stats.get(driverId)!
-    row.bookings += 1
-    row.revenue += booking.price || 0
-    if (PAID_STATUSES.includes(booking.status as bookcarsTypes.BookingStatus)) {
-      row.paidBookings += 1
-    } else {
-      row.unpaidBookings += 1
-    }
-  }
-
-  const rows = Array.from(stats.values()).map((row) => ({
-    ...row,
-    healthScore: (row.paidBookings * 10) + (row.revenue / 100) - (row.unpaidBookings * 12) + (row.active ? 5 : -10) + (row.verified ? 5 : -10) + (row.blacklisted ? -50 : 0),
-  }))
-
-  const riskyCustomers = rows.filter((row) => row.blacklisted || row.unpaidBookings > 1 || !row.verified).sort((a, b) => a.healthScore - b.healthScore).slice(0, 8)
-  const bestCustomers = [...rows].sort((a, b) => b.healthScore - a.healthScore).slice(0, 8)
-
-  return withLanguageMetadata(parsed, history, {
-    intent: 'customer_health',
-    status: 'success',
-    reply: `Customer health reviewed across ${rows.length} customers. ${riskyCustomers.length > 0 ? `${riskyCustomers.length} customer records need closer attention.` : 'No obvious customer risk clusters found.'}`,
-    data: withResolutionSource(parsed, {
-      riskyCustomers,
-      bestCustomers,
-      metrics: {
-        totalCustomers: rows.length,
-        blacklistedCustomers: rows.filter((row) => row.blacklisted).length,
-        unverifiedCustomers: rows.filter((row) => !row.verified).length,
-      },
-    }),
-    suggestedActions: ['find customer Mahmoud', 'show risk alerts', 'what needs attention today?'],
-  })
-}
-
-const handleRiskAlerts = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
-  const now = new Date()
-  const dayStart = new Date(now)
-  dayStart.setHours(0, 0, 0, 0)
-  const dayEnd = new Date(now)
-  dayEnd.setHours(23, 59, 59, 999)
-
-  const [unpaidBookings, cancelledBookings, fullyBookedCars, inactiveSuppliers, staleNotifications] = await Promise.all([
+const buildDashboardOverview = async (): Promise<AssistantResponse> => {
+  const [unpaidBookings, paidBookings, activeSuppliers, riskySuppliers, availableCars, fullyBookedCars, unreadNotifications] = await Promise.all([
     Booking.countDocuments({ expireAt: null, status: { $nin: PAID_STATUSES } }),
-    Booking.countDocuments({ expireAt: null, status: bookcarsTypes.BookingStatus.Cancelled, from: { $gte: dayStart, $lte: dayEnd } }),
-    Car.countDocuments({ fullyBooked: true }),
-    User.countDocuments({ type: bookcarsTypes.UserType.Supplier, expireAt: null, $or: [{ active: { $ne: true } }, { verified: { $ne: true } }] }),
-    Notification.countDocuments({ isRead: false }),
-  ])
-
-  const alerts = []
-  if (unpaidBookings > 3) alerts.push({ severity: 'high', label: 'Unpaid bookings pressure', value: unpaidBookings, note: 'Too many unpaid bookings are still open.' })
-  if (cancelledBookings > 2) alerts.push({ severity: 'medium', label: 'Cancellation spike', value: cancelledBookings, note: 'There is a noticeable cancellation count today.' })
-  if (fullyBookedCars > 0) alerts.push({ severity: 'medium', label: 'Fleet saturation', value: fullyBookedCars, note: 'Some cars are fully booked and may block demand.' })
-  if (inactiveSuppliers > 0) alerts.push({ severity: 'medium', label: 'Inactive or unverified suppliers', value: inactiveSuppliers, note: 'Supplier accounts need review.' })
-  if (staleNotifications > 10) alerts.push({ severity: 'low', label: 'Unread ops notifications', value: staleNotifications, note: 'Unread notifications are piling up.' })
-
-  return withLanguageMetadata(parsed, history, {
-    intent: 'risk_alerts',
-    status: 'success',
-    reply: alerts.length > 0
-      ? `Detected ${alerts.length} operational risk alert${alerts.length > 1 ? 's' : ''}.`
-      : 'No strong operational risk alerts were detected in the current quick scan.',
-    data: withResolutionSource(parsed, {
-      alerts,
-      metrics: {
-        unpaidBookings,
-        cancelledBookings,
-        fullyBookedCars,
-        inactiveSuppliers,
-        unreadNotifications: staleNotifications,
-      },
-    }),
-    suggestedActions: ['show unpaid bookings today', 'show supplier performance', 'what do you recommend now?'],
-  })
-}
-
-const handleSmartRecommendations = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
-  const [unpaidBookings, fullyBookedCars, inactiveSuppliers, blacklistedCustomers, availableCars, paidBookings] = await Promise.all([
-    Booking.countDocuments({ expireAt: null, status: { $nin: PAID_STATUSES } }),
-    Car.countDocuments({ fullyBooked: true }),
-    User.countDocuments({ type: bookcarsTypes.UserType.Supplier, expireAt: null, $or: [{ active: { $ne: true } }, { verified: { $ne: true } }] }),
-    User.countDocuments({ type: bookcarsTypes.UserType.User, expireAt: null, blacklisted: true }),
-    Car.countDocuments({ available: true, comingSoon: { $ne: true }, fullyBooked: { $ne: true } }),
     Booking.countDocuments({ expireAt: null, status: { $in: PAID_STATUSES } }),
-  ])
-
-  const recommendations: string[] = []
-
-  if (unpaidBookings > 0) {
-    recommendations.push(`Prioritize unpaid bookings follow-up first (${unpaidBookings} open).`)
-  }
-
-  if (fullyBookedCars > 0 && availableCars < fullyBookedCars) {
-    recommendations.push('Rebalance fleet exposure or promote currently available cars because fully booked cars are constraining supply.')
-  }
-
-  if (inactiveSuppliers > 0) {
-    recommendations.push(`Review ${inactiveSuppliers} inactive or unverified supplier accounts and unblock the good ones quickly.`)
-  }
-
-  if (blacklistedCustomers > 0) {
-    recommendations.push(`Audit blacklisted customer records (${blacklistedCustomers}) before approving sensitive new bookings.`)
-  }
-
-  if (paidBookings === 0) {
-    recommendations.push('Investigate checkout/payment flow because there are no paid bookings in the current snapshot.')
-  }
-
-  if (recommendations.length === 0) {
-    recommendations.push('Focus on conversion: push available cars, monitor new bookings, and keep supplier response times tight.')
-  }
-
-  return withLanguageMetadata(parsed, history, {
-    intent: 'smart_recommendations',
-    status: 'success',
-    reply: `Top recommendations right now:\n- ${recommendations.join('\\n- ')}`,
-    data: withResolutionSource(parsed, {
-      recommendations,
-      metrics: {
-        unpaidBookings,
-        fullyBookedCars,
-        inactiveSuppliers,
-        blacklistedCustomers,
-        availableCars,
-        paidBookings,
-      },
-    }),
-    suggestedActions: ['show risk alerts', 'show supplier performance', 'show customer health'],
-  })
-}
-
-const handleOpsSummary = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
-  const now = new Date()
-  const activeRange = parsed.dateRange ?? {
-    label: 'today',
-    from: new Date(new Date().setHours(0, 0, 0, 0)),
-    to: new Date(new Date().setHours(23, 59, 59, 999)),
-  }
-
-  const baseMatch: Record<string, unknown> = { expireAt: null }
-  const dateMatch: Record<string, unknown> = {
-    expireAt: null,
-    from: { $gte: activeRange.from, $lte: activeRange.to },
-  }
-
-  const [
-    totalOpenBookings,
-    unpaidBookings,
-    upcomingBookings,
-    cancelledBookings,
-    activeSuppliers,
-    inactiveSuppliers,
-    availableCarsCount,
-    fullyBookedCarsCount,
-    sampleUnpaidBookings,
-    sampleUpcomingBookings,
-  ] = await Promise.all([
-    Booking.countDocuments(baseMatch),
-    Booking.countDocuments({ ...baseMatch, status: { $nin: PAID_STATUSES } }),
-    Booking.countDocuments({ ...dateMatch, to: { $gte: now } }),
-    Booking.countDocuments({ ...baseMatch, status: bookcarsTypes.BookingStatus.Cancelled }),
     User.countDocuments({ type: bookcarsTypes.UserType.Supplier, expireAt: null, active: true }),
     User.countDocuments({ type: bookcarsTypes.UserType.Supplier, expireAt: null, $or: [{ active: { $ne: true } }, { verified: { $ne: true } }] }),
     Car.countDocuments({ available: true, comingSoon: { $ne: true }, fullyBooked: { $ne: true } }),
     Car.countDocuments({ fullyBooked: true }),
-    Booking.find({ ...baseMatch, status: { $nin: PAID_STATUSES } })
-      .populate<{ driver: { _id?: string, fullName?: string }, supplier: { _id?: string, fullName?: string }, car: { _id?: string, name?: string } }>('driver supplier car')
-      .sort({ from: 1, _id: 1 })
-      .limit(3)
-      .lean(),
-    Booking.find({ ...dateMatch, to: { $gte: now } })
-      .populate<{ driver: { _id?: string, fullName?: string }, supplier: { _id?: string, fullName?: string }, car: { _id?: string, name?: string } }>('driver supplier car')
-      .sort({ from: 1, _id: 1 })
-      .limit(3)
-      .lean(),
+    Notification.countDocuments({ isRead: false }),
   ])
 
-  const priorities: string[] = []
+  const actions: string[] = []
+  if (unpaidBookings > 0) actions.push(`Follow up ${unpaidBookings} unpaid bookings immediately.`)
+  if (riskySuppliers > 0) actions.push(`Review ${riskySuppliers} inactive or unverified suppliers.`)
+  if (fullyBookedCars > 0) actions.push(`Check fleet pressure caused by ${fullyBookedCars} fully booked cars.`)
+  if (unreadNotifications > 0) actions.push(`Clear ${unreadNotifications} unread notifications.`)
+  if (actions.length === 0) actions.push('Operations look stable. Focus on conversion and response speed.')
 
-  if (unpaidBookings > 0) {
-    priorities.push(`Follow up on ${unpaidBookings} unpaid booking${unpaidBookings > 1 ? 's' : ''}.`)
-  }
-
-  if (fullyBookedCarsCount > 0) {
-    priorities.push(`${fullyBookedCarsCount} car${fullyBookedCarsCount > 1 ? 's are' : ' is'} fully booked and may constrain demand.`)
-  }
-
-  if (inactiveSuppliers > 0) {
-    priorities.push(`Review ${inactiveSuppliers} supplier account${inactiveSuppliers > 1 ? 's' : ''} that are inactive or unverified.`)
-  }
-
-  if (cancelledBookings > 0) {
-    priorities.push(`${cancelledBookings} cancelled booking${cancelledBookings > 1 ? 's' : ''} may need review.`)
-  }
-
-  if (priorities.length === 0) {
-    priorities.push('No immediate operational risks detected in the current checks.')
-  }
-
-  const reply = [
-    `Ops summary for ${activeRange.label}:`,
-    ...priorities.slice(0, 4).map((item) => `- ${item}`),
-    `- Fleet signal: ${availableCarsCount} cars currently marked available.`,
-    `- Supplier signal: ${activeSuppliers} active suppliers.`,
-    `- Booking signal: ${upcomingBookings} upcoming bookings in range.`,
-  ].join('\n')
-
-  return withLanguageMetadata(parsed, history, {
-    intent: 'ops_summary',
+  return makeResponse({
+    intent: 'dashboard_overview',
     status: 'success',
-    reply,
-    data: withResolutionSource(parsed, {
-      dateRange: activeRange,
-      metrics: {
-        totalOpenBookings,
-        unpaidBookings,
-        upcomingBookings,
-        cancelledBookings,
-        activeSuppliers,
-        inactiveOrUnverifiedSuppliers: inactiveSuppliers,
-        availableCarsCount,
-        fullyBookedCarsCount,
-      },
-      priorities,
-      samples: {
-        unpaidBookings: sampleUnpaidBookings.map((booking) => ({
-          _id: booking._id,
-          status: booking.status,
-          from: booking.from,
-          to: booking.to,
-          driver: booking.driver ? booking.driver.fullName : null,
-          supplier: booking.supplier ? booking.supplier.fullName : null,
-          car: booking.car ? booking.car.name : null,
-        })),
-        upcomingBookings: sampleUpcomingBookings.map((booking) => ({
-          _id: booking._id,
-          status: booking.status,
-          from: booking.from,
-          to: booking.to,
-          driver: booking.driver ? booking.driver.fullName : null,
-          supplier: booking.supplier ? booking.supplier.fullName : null,
-          car: booking.car ? booking.car.name : null,
-        })),
-      },
-    }),
-    suggestedActions: [
-      'show unpaid bookings today',
-      'find supplier Youssef',
-      'available cars tomorrow in Beirut',
-      'show revenue today',
+    title: 'Operations dashboard overview',
+    summary: 'A concise operational snapshot for the admin team.',
+    reply: actions[0],
+    cards: [
+      decisionCard('Top decision', actions[0]),
+      metricCard('Unpaid bookings', unpaidBookings, unpaidBookings > 0 ? 'warning' : 'success'),
+      metricCard('Paid bookings', paidBookings, 'success'),
+      metricCard('Active suppliers', activeSuppliers),
+      metricCard('Risky suppliers', riskySuppliers, riskySuppliers > 0 ? 'warning' : 'success'),
+      metricCard('Available cars', availableCars),
+      metricCard('Fully booked cars', fullyBookedCars, fullyBookedCars > 0 ? 'warning' : 'success'),
+      metricCard('Unread notifications', unreadNotifications, unreadNotifications > 0 ? 'warning' : 'success'),
+      listCard('Recommended actions', actions),
     ],
+    suggestions: ['bookings overview', 'fleet overview', 'risk overview', 'draft supplier message'],
   })
 }
 
-const buildExecutiveDecisionSummary = (signals: {
-  unpaidBookings: number
-  fullyBookedCars: number
-  inactiveSuppliers: number
-  blacklistedCustomers: number
-  unreadNotifications: number
-  paidBookings: number
-  availableCars: number
-}) => {
-  const observations: string[] = []
-  const actionPlan: string[] = []
-  const reasons: string[] = []
+const buildBookingsOverview = async (): Promise<AssistantResponse> => {
+  const [total, unpaid, cancelled, recent] = await Promise.all([
+    Booking.countDocuments({ expireAt: null }),
+    Booking.countDocuments({ expireAt: null, status: { $nin: PAID_STATUSES } }),
+    Booking.countDocuments({ expireAt: null, status: bookcarsTypes.BookingStatus.Cancelled }),
+    Booking.find({ expireAt: null }).sort({ createdAt: -1 }).limit(8).select('_id status from to price').lean(),
+  ])
 
-  if (signals.unpaidBookings > 0) {
-    observations.push(`${signals.unpaidBookings} unpaid bookings are still open.`)
-    actionPlan.push('Assign immediate follow-up on unpaid bookings.')
-    reasons.push('Cash conversion and booking confirmation risk are both elevated.')
-  }
-
-  if (signals.fullyBookedCars > 0) {
-    observations.push(`${signals.fullyBookedCars} cars are fully booked.`)
-    actionPlan.push('Promote alternative available cars or rebalance supplier exposure.')
-    reasons.push('Demand may be hitting supply limits for part of the fleet.')
-  }
-
-  if (signals.inactiveSuppliers > 0) {
-    observations.push(`${signals.inactiveSuppliers} supplier accounts are inactive or not verified.`)
-    actionPlan.push('Review supplier activation quality and unblock valid suppliers.')
-    reasons.push('Supply-side friction reduces inventory quality and response speed.')
-  }
-
-  if (signals.blacklistedCustomers > 0) {
-    observations.push(`${signals.blacklistedCustomers} blacklisted customer records exist.`)
-    actionPlan.push('Audit sensitive bookings against blacklisted customers before approval.')
-    reasons.push('Fraud or abuse controls may need active attention.')
-  }
-
-  if (signals.unreadNotifications > 10) {
-    observations.push(`${signals.unreadNotifications} unread notifications are pending.`)
-    actionPlan.push('Clear unread operational notifications and assign owners.')
-    reasons.push('Important follow-ups may be buried in the queue.')
-  }
-
-  if (signals.paidBookings === 0) {
-    observations.push('No paid bookings were detected in the current snapshot.')
-    actionPlan.push('Check payment and checkout flow immediately.')
-    reasons.push('This can signal a conversion, payment, or instrumentation issue.')
-  }
-
-  if (signals.availableCars > 0 && signals.fullyBookedCars === 0 && signals.unpaidBookings === 0) {
-    observations.push(`${signals.availableCars} cars are available with no immediate blocking pressure detected.`)
-    actionPlan.push('Focus on conversion optimization and supplier responsiveness.')
-    reasons.push('Operations look stable enough to shift attention to growth levers.')
-  }
-
-  const executiveSummary = observations.length > 0
-    ? `Executive view: ${observations[0]}${observations[1] ? ` ${observations[1]}` : ''}`
-    : 'Executive view: operations look stable in the current snapshot.'
-
-  return {
-    executiveSummary,
-    observations,
-    reasons,
-    actionPlan,
-    topDecision: actionPlan[0] || 'Maintain routine monitoring and conversion optimization.',
-  }
+  return makeResponse({
+    intent: 'bookings_overview',
+    status: 'success',
+    title: 'Bookings overview',
+    summary: 'Current booking flow snapshot.',
+    reply: `There are ${total} bookings in the system and ${unpaid} still need payment follow-up.`,
+    cards: [
+      metricCard('Total bookings', total),
+      metricCard('Unpaid bookings', unpaid, unpaid > 0 ? 'warning' : 'success'),
+      metricCard('Cancelled bookings', cancelled, cancelled > 0 ? 'warning' : 'success'),
+      tableCard('Recent bookings', recent.map((item) => ({ id: item._id, status: item.status, from: item.from, to: item.to, price: item.price }))),
+    ],
+    suggestions: ['search bookings', 'draft follow-up plan', 'risk overview'],
+  })
 }
 
-const handleExecutiveDecisionSupport = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
-  const [unpaidBookings, fullyBookedCars, inactiveSuppliers, blacklistedCustomers, unreadNotifications, paidBookings, availableCars] = await Promise.all([
-    Booking.countDocuments({ expireAt: null, status: { $nin: PAID_STATUSES } }),
-    Car.countDocuments({ fullyBooked: true }),
-    User.countDocuments({ type: bookcarsTypes.UserType.Supplier, expireAt: null, $or: [{ active: { $ne: true } }, { verified: { $ne: true } }] }),
-    User.countDocuments({ type: bookcarsTypes.UserType.User, expireAt: null, blacklisted: true }),
-    Notification.countDocuments({ isRead: false }),
-    Booking.countDocuments({ expireAt: null, status: { $in: PAID_STATUSES } }),
+const buildFleetOverview = async (): Promise<AssistantResponse> => {
+  const [totalCars, availableCars, fullyBookedCars, comingSoonCars, recentCars] = await Promise.all([
+    Car.countDocuments({}),
     Car.countDocuments({ available: true, comingSoon: { $ne: true }, fullyBooked: { $ne: true } }),
+    Car.countDocuments({ fullyBooked: true }),
+    Car.countDocuments({ comingSoon: true }),
+    Car.find({}).sort({ updatedAt: -1 }).limit(8).select('_id name dailyPrice available fullyBooked comingSoon').lean(),
   ])
 
-  const decision = buildExecutiveDecisionSummary({
-    unpaidBookings,
-    fullyBookedCars,
-    inactiveSuppliers,
-    blacklistedCustomers,
-    unreadNotifications,
-    paidBookings,
-    availableCars,
-  })
-
-  return withLanguageMetadata(parsed, history, {
-    intent: 'executive_decision_support',
+  return makeResponse({
+    intent: 'fleet_overview',
     status: 'success',
-    reply: `${decision.executiveSummary}\n\nTop decision: ${decision.topDecision}`,
-    data: withResolutionSource(parsed, {
-      metrics: {
-        unpaidBookings,
-        fullyBookedCars,
-        inactiveSuppliers,
-        blacklistedCustomers,
-        unreadNotifications,
-        paidBookings,
-        availableCars,
-      },
-      executiveSummary: decision.executiveSummary,
-      topDecision: decision.topDecision,
-      observations: decision.observations,
-      reasons: decision.reasons,
-      actionPlan: decision.actionPlan,
-    }),
-    suggestedActions: ['show risk alerts', 'show supplier performance', 'what do you recommend now?'],
+    title: 'Fleet overview',
+    summary: 'Availability and pressure across the fleet.',
+    reply: `Fleet health: ${availableCars} available cars out of ${totalCars}.`,
+    cards: [
+      metricCard('Total cars', totalCars),
+      metricCard('Available cars', availableCars, 'success'),
+      metricCard('Fully booked cars', fullyBookedCars, fullyBookedCars > 0 ? 'warning' : 'success'),
+      metricCard('Coming soon cars', comingSoonCars),
+      tableCard('Recent fleet updates', recentCars.map((item) => ({ id: item._id, name: item.name, dailyPrice: item.dailyPrice, available: item.available, fullyBooked: item.fullyBooked, comingSoon: item.comingSoon }))),
+    ],
+    suggestions: ['search cars', 'risk overview', 'dashboard overview'],
   })
 }
 
-const handleMessageDraft = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
-  const recipient = parsed.searchTerm || 'the stakeholder'
-  const draft = [
-    `Hello ${recipient},`,
-    '',
-    'I am following up regarding the current operational situation and would like to align on the next steps as soon as possible.',
-    'Please review the pending items on your side and confirm the update today.',
-    '',
-    'Best regards,',
-    'BookCars Admin',
-  ].join('\n')
+const buildSuppliersOverview = async (): Promise<AssistantResponse> => {
+  const suppliers = await User.find({ type: bookcarsTypes.UserType.Supplier, expireAt: null })
+    .sort({ createdAt: -1 })
+    .limit(10)
+    .select('_id fullName email active verified payLater')
+    .lean()
 
-  return withLanguageMetadata(parsed, history, {
-    intent: 'message_draft',
+  const inactiveCount = suppliers.filter((supplier) => !supplier.active || !supplier.verified).length
+
+  return makeResponse({
+    intent: 'suppliers_overview',
     status: 'success',
-    reply: `I prepared a draft message for ${recipient}.`,
-    data: withResolutionSource(parsed, {
-      recipient,
-      channel: parsed.email ? 'email' : 'generic',
-      subject: `Operational follow-up${parsed.dateRange ? ` - ${parsed.dateRange.label}` : ''}`,
-      draft,
-    }),
-    suggestedActions: ['show follow-up plan', 'give me an executive action plan'],
+    title: 'Suppliers overview',
+    summary: 'Operational state of supplier accounts.',
+    reply: inactiveCount > 0 ? `${inactiveCount} supplier accounts need attention.` : 'Supplier accounts look healthy in the current sample.',
+    cards: [
+      metricCard('Suppliers in sample', suppliers.length),
+      metricCard('Suppliers needing attention', inactiveCount, inactiveCount > 0 ? 'warning' : 'success'),
+      tableCard('Suppliers', suppliers.map((supplier) => ({ id: supplier._id, name: supplier.fullName, email: supplier.email, active: supplier.active, verified: supplier.verified, payLater: supplier.payLater }))),
+    ],
+    suggestions: ['search suppliers', 'draft supplier message', 'risk overview'],
   })
 }
 
-const handleFollowupPlan = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
-  const focus = parsed.searchTerm || 'operations backlog'
-  const plan = [
-    { step: 1, action: `Review all records related to ${focus}.`, owner: 'Admin ops', urgency: 'high' },
-    { step: 2, action: 'Contact the responsible supplier or customer with a concise update request.', owner: 'Admin ops', urgency: 'high' },
-    { step: 3, action: 'Set a same-day deadline and record the response status.', owner: 'Admin ops', urgency: 'medium' },
-    { step: 4, action: 'Escalate unresolved items to management if no response arrives.', owner: 'Manager', urgency: 'medium' },
-  ]
+const buildCustomersOverview = async (): Promise<AssistantResponse> => {
+  const customers = await User.find({ type: bookcarsTypes.UserType.User, expireAt: null })
+    .sort({ createdAt: -1 })
+    .limit(10)
+    .select('_id fullName email active verified blacklisted')
+    .lean()
 
-  return withLanguageMetadata(parsed, history, {
-    intent: 'followup_plan',
+  const blacklisted = customers.filter((customer) => customer.blacklisted).length
+
+  return makeResponse({
+    intent: 'customers_overview',
     status: 'success',
-    reply: `I prepared a follow-up plan for ${focus}.`,
-    data: withResolutionSource(parsed, {
-      focus,
-      followupPlan: plan,
-    }),
-    suggestedActions: ['draft a supplier message', 'generate today task list'],
+    title: 'Customers overview',
+    summary: 'Quick quality and trust snapshot for customer accounts.',
+    reply: blacklisted > 0 ? `${blacklisted} customers are blacklisted in the current sample.` : 'No blacklisted customers in the current sample.',
+    cards: [
+      metricCard('Customers in sample', customers.length),
+      metricCard('Blacklisted customers', blacklisted, blacklisted > 0 ? 'warning' : 'success'),
+      tableCard('Customers', customers.map((customer) => ({ id: customer._id, name: customer.fullName, email: customer.email, active: customer.active, verified: customer.verified, blacklisted: customer.blacklisted }))),
+    ],
+    suggestions: ['search customers', 'draft customer message', 'dashboard overview'],
   })
 }
 
-const handleTasklistGeneration = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => {
-  const [unpaidBookings, inactiveSuppliers, unreadNotifications, fullyBookedCars] = await Promise.all([
+const buildRevenueOverview = async (): Promise<AssistantResponse> => {
+  const paidBookings = await Booking.find({ expireAt: null, status: { $in: PAID_STATUSES } }).select('price').lean()
+  const totalRevenue = paidBookings.reduce((sum, booking) => sum + (booking.price || 0), 0)
+
+  return makeResponse({
+    intent: 'revenue_overview',
+    status: 'success',
+    title: 'Revenue overview',
+    summary: 'Revenue based on paid bookings only.',
+    reply: `Paid bookings currently represent ${totalRevenue.toFixed(2)} in tracked revenue.`,
+    cards: [
+      metricCard('Paid bookings', paidBookings.length, 'success'),
+      metricCard('Tracked revenue', totalRevenue.toFixed(2), 'success'),
+    ],
+    suggestions: ['bookings overview', 'dashboard overview'],
+  })
+}
+
+const buildRiskOverview = async (): Promise<AssistantResponse> => {
+  const [unpaidBookings, riskySuppliers, fullyBookedCars, unreadNotifications] = await Promise.all([
     Booking.countDocuments({ expireAt: null, status: { $nin: PAID_STATUSES } }),
     User.countDocuments({ type: bookcarsTypes.UserType.Supplier, expireAt: null, $or: [{ active: { $ne: true } }, { verified: { $ne: true } }] }),
-    Notification.countDocuments({ isRead: false }),
     Car.countDocuments({ fullyBooked: true }),
+    Notification.countDocuments({ isRead: false }),
   ])
 
-  const tasks = [
-    { priority: 'P1', task: `Review ${unpaidBookings} unpaid booking(s).`, owner: 'Admin ops' },
-    { priority: 'P1', task: `Review ${inactiveSuppliers} inactive/unverified supplier account(s).`, owner: 'Supplier management' },
-    { priority: 'P2', task: `Clear ${unreadNotifications} unread notification(s).`, owner: 'Admin ops' },
-    { priority: 'P2', task: `Inspect ${fullyBookedCars} fully booked car(s) for supply pressure.`, owner: 'Fleet ops' },
-  ]
+  const alerts: string[] = []
+  if (unpaidBookings > 0) alerts.push(`${unpaidBookings} bookings still need payment follow-up.`)
+  if (riskySuppliers > 0) alerts.push(`${riskySuppliers} supplier accounts require review.`)
+  if (fullyBookedCars > 0) alerts.push(`${fullyBookedCars} cars are fully booked and may reduce flexibility.`)
+  if (unreadNotifications > 0) alerts.push(`${unreadNotifications} unread notifications may hide pending actions.`)
+  if (alerts.length === 0) alerts.push('No obvious operational risks detected in the quick scan.')
 
-  return withLanguageMetadata(parsed, history, {
-    intent: 'tasklist_generation',
+  return makeResponse({
+    intent: 'risk_overview',
     status: 'success',
-    reply: 'I generated a practical admin task list for the current snapshot.',
-    data: withResolutionSource(parsed, {
-      tasks,
-    }),
-    suggestedActions: ['what do you recommend now?', 'draft a supplier message'],
+    title: 'Risk overview',
+    summary: 'Operational risk alerts built from project data.',
+    reply: alerts[0],
+    cards: [
+      alertCard('Risk alerts', alerts, alerts.length > 1 ? 'warning' : 'success'),
+      metricCard('Unpaid bookings', unpaidBookings, unpaidBookings > 0 ? 'warning' : 'success'),
+      metricCard('Risky suppliers', riskySuppliers, riskySuppliers > 0 ? 'warning' : 'success'),
+      metricCard('Fully booked cars', fullyBookedCars, fullyBookedCars > 0 ? 'warning' : 'success'),
+      metricCard('Unread notifications', unreadNotifications, unreadNotifications > 0 ? 'warning' : 'success'),
+    ],
+    suggestions: ['dashboard overview', 'draft follow-up plan', 'draft supplier message'],
   })
 }
 
-const handleSendEmail = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => withLanguageMetadata(parsed, history, {
-  intent: 'send_email',
-  status: 'needs_clarification',
-  reply: parsed.email
-    ? `Email sending is not enabled in this assistant yet. I captured ${parsed.email}, but a safe reviewed send flow still needs to be implemented.`
-    : parsed.clarificationQuestion || 'Email sending is not enabled in this assistant yet. Tell me the recipient, subject, and body when the safe send flow is ready.',
-  data: withResolutionSource(parsed, {
-    email: parsed.email,
-  }),
-  suggestedActions: ['Collect recipient, subject, and message body before enabling sending.'],
-})
+const buildSearchTable = async (intent: AssistantIntent, message: string): Promise<AssistantResponse> => {
+  const term = extractSearchTerm(message)
+  const regex = new RegExp(term, 'i')
 
-const handleCreateMeeting = async (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): Promise<AssistantResponse> => withLanguageMetadata(parsed, history, {
-  intent: 'create_meeting',
-  status: 'needs_clarification',
-  reply: parsed.searchTerm
-    ? `Meeting creation is not enabled yet. I captured ${parsed.searchTerm}${parsed.dateRange ? ` for ${parsed.dateRange.label}` : ''}, but calendar integration still needs a reviewed implementation.`
-    : parsed.clarificationQuestion || 'Meeting creation is not enabled yet. Tell me who, when, and which calendar once scheduling is implemented.',
-  data: withResolutionSource(parsed, {
-    supplierOrAttendee: parsed.searchTerm,
-    dateRange: parsed.dateRange ? {
-      label: parsed.dateRange.label,
-      from: parsed.dateRange.from,
-      to: parsed.dateRange.to,
-    } : undefined,
-  }),
-  suggestedActions: ['Confirm attendees, exact time, timezone, and calendar before enabling creation.'],
-})
-
-const buildUnknownAssistantResponse = (parsed: ParsedAssistantIntent, history: AssistantConversationTurn[]): AssistantResponse => withLanguageMetadata(parsed, history, {
-  intent: 'unknown',
-  status: 'needs_clarification',
-  reply: parsed.clarificationQuestion || 'I can help with bookings, suppliers, customers, cars, fleet overview, revenue summaries, email drafting, or meeting requests.',
-  data: withResolutionSource(parsed),
-  suggestedActions: [
-    'show unpaid bookings today',
-    'find booking Mahmoud',
-    'find supplier Youssef',
-    'find customer Mahmoud',
-    'available cars tomorrow in Beirut',
-    'show revenue today',
-    'what needs attention today?',
-  ],
-})
-
-const fallbackResolveAssistantIntent = (message: string): ParsedAssistantIntent => {
-  const extracted = parseAssistantMessage(message)
-  const normalizedMessage = extracted.normalizedMessage
-
-  if (/^(send email|email|ارسل ايميل|ارسل بريد)/.test(normalizedMessage)) {
-    return {
-      ...extracted,
-      intent: 'send_email',
-      source: 'system_fallback',
-      confidence: extracted.email ? 0.78 : 0.5,
-      needsClarification: !extracted.email,
-      clarificationQuestion: !extracted.email ? 'Who should receive the email?' : undefined,
-    }
+  if (intent === 'search_bookings') {
+    const rows = await Booking.find({ expireAt: null }).sort({ createdAt: -1 }).limit(20).select('_id status from to price').lean()
+    const filtered = rows.filter((row) => String(row._id).includes(term) || String(row.status).match(regex))
+    return makeResponse({ intent, status: 'success', title: 'Booking search', summary: `Search results for ${term}.`, reply: `Found ${filtered.length} booking result(s).`, cards: [tableCard('Bookings', filtered.map((row) => ({ id: row._id, status: row.status, from: row.from, to: row.to, price: row.price })))], suggestions: ['bookings overview'] })
   }
 
-  if (/^(create meeting|schedule meeting|book meeting|انشئ اجتماع|حدد اجتماع)/.test(normalizedMessage)) {
-    return {
-      ...extracted,
-      intent: 'create_meeting',
-      source: 'system_fallback',
-      confidence: extracted.searchTerm && extracted.dateRange ? 0.8 : 0.52,
-      needsClarification: !extracted.searchTerm || !extracted.dateRange,
-      clarificationQuestion: !extracted.searchTerm
-        ? 'Who should the meeting be with?'
-        : !extracted.dateRange
-          ? 'When should I schedule the meeting?'
-          : undefined,
-    }
+  if (intent === 'search_cars') {
+    const rows = await Car.find({ $or: [{ name: { $regex: regex } }, { licensePlate: { $regex: regex } }] }).limit(20).select('_id name licensePlate dailyPrice available fullyBooked').lean()
+    return makeResponse({ intent, status: 'success', title: 'Car search', summary: `Search results for ${term}.`, reply: `Found ${rows.length} car result(s).`, cards: [tableCard('Cars', rows.map((row) => ({ id: row._id, name: row.name, licensePlate: row.licensePlate, dailyPrice: row.dailyPrice, available: row.available, fullyBooked: row.fullyBooked })))], suggestions: ['fleet overview'] })
   }
 
-  if (normalizedMessage.includes('available cars') || normalizedMessage.includes('السيارات المتاحه') || normalizedMessage.includes('السيارات المتوفره')) {
-    return {
-      ...extracted,
-      intent: 'car_availability',
-      source: 'system_fallback',
-      confidence: extracted.locationQuery && extracted.dateRange ? 0.84 : 0.46,
-      needsClarification: !extracted.dateRange || !extracted.locationQuery,
-      clarificationQuestion: !extracted.dateRange
-        ? 'Which date should I check for car availability?'
-        : !extracted.locationQuery
-          ? 'Which location should I search for available cars?'
-          : undefined,
-    }
+  if (intent === 'search_suppliers') {
+    const rows = await User.find({ type: bookcarsTypes.UserType.Supplier, expireAt: null, $or: [{ fullName: { $regex: regex } }, { email: { $regex: regex } }] }).limit(20).select('_id fullName email active verified').lean()
+    return makeResponse({ intent, status: 'success', title: 'Supplier search', summary: `Search results for ${term}.`, reply: `Found ${rows.length} supplier result(s).`, cards: [tableCard('Suppliers', rows.map((row) => ({ id: row._id, name: row.fullName, email: row.email, active: row.active, verified: row.verified })))], suggestions: ['suppliers overview', 'draft supplier message'] })
   }
 
-  if (normalizedMessage.startsWith('find supplier') || normalizedMessage.includes('ابحث عن المورد') || normalizedMessage.startsWith('supplier ')) {
-    return {
-      ...extracted,
-      intent: 'supplier_search',
-      source: 'system_fallback',
-      confidence: extracted.searchTerm ? 0.82 : 0.45,
-      needsClarification: !extracted.searchTerm,
-      clarificationQuestion: !extracted.searchTerm ? 'Which supplier should I look for?' : undefined,
-    }
-  }
-
-  if (normalizedMessage.startsWith('find customer') || normalizedMessage.startsWith('find driver') || normalizedMessage.includes('ابحث عن العميل') || normalizedMessage.includes('ابحث عن السائق')) {
-    return {
-      ...extracted,
-      intent: 'customer_search',
-      source: 'system_fallback',
-      confidence: extracted.searchTerm ? 0.82 : 0.45,
-      needsClarification: !extracted.searchTerm,
-      clarificationQuestion: !extracted.searchTerm ? 'Which customer should I look for?' : undefined,
-    }
-  }
-
-  if (normalizedMessage.startsWith('find car') || normalizedMessage.includes('ابحث عن سياره') || normalizedMessage.startsWith('car ')) {
-    return {
-      ...extracted,
-      intent: 'car_search',
-      source: 'system_fallback',
-      confidence: extracted.searchTerm ? 0.82 : 0.45,
-      needsClarification: !extracted.searchTerm,
-      clarificationQuestion: !extracted.searchTerm ? 'Which car should I look for?' : undefined,
-    }
-  }
-
-  if (normalizedMessage.includes('top suppliers') || normalizedMessage.includes('supplier performance') || normalizedMessage.includes('best supplier') || normalizedMessage.includes('الموردين الافضل') || normalizedMessage.includes('اداء المورد')) {
-    return {
-      ...extracted,
-      intent: 'supplier_performance',
-      source: 'system_fallback',
-      confidence: 0.78,
-    }
-  }
-
-  if (normalizedMessage.includes('customer health') || normalizedMessage.includes('risky customers') || normalizedMessage.includes('blacklisted') || normalizedMessage.includes('العملاء الخطرين') || normalizedMessage.includes('العملاء المحظورين') || normalizedMessage.includes('صحه العملاء')) {
-    return {
-      ...extracted,
-      intent: 'customer_health',
-      source: 'system_fallback',
-      confidence: 0.77,
-    }
-  }
-
-  if (normalizedMessage.includes('risk') || normalizedMessage.includes('risks') || normalizedMessage.includes('alerts') || normalizedMessage.includes('urgent issues') || normalizedMessage.includes('المخاطر') || normalizedMessage.includes('تنبيهات') || normalizedMessage.includes('عاجل')) {
-    return {
-      ...extracted,
-      intent: 'risk_alerts',
-      source: 'system_fallback',
-      confidence: 0.8,
-    }
-  }
-
-  if (normalizedMessage.includes('draft a message') || normalizedMessage.includes('draft message') || normalizedMessage.includes('write a message') || normalizedMessage.includes('اكتب رساله') || normalizedMessage.includes('صياغه رساله')) {
-    return {
-      ...extracted,
-      intent: 'message_draft',
-      source: 'system_fallback',
-      confidence: 0.83,
-    }
-  }
-
-  if (normalizedMessage.includes('follow-up plan') || normalizedMessage.includes('follow up plan') || normalizedMessage.includes('متابعه') || normalizedMessage.includes('خطة متابعه')) {
-    return {
-      ...extracted,
-      intent: 'followup_plan',
-      source: 'system_fallback',
-      confidence: 0.82,
-    }
-  }
-
-  if (normalizedMessage.includes('task list') || normalizedMessage.includes('todo list') || normalizedMessage.includes('generate tasks') || normalizedMessage.includes('قائمه مهام') || normalizedMessage.includes('مهام اليوم')) {
-    return {
-      ...extracted,
-      intent: 'tasklist_generation',
-      source: 'system_fallback',
-      confidence: 0.84,
-    }
-  }
-
-  if (normalizedMessage.includes('executive summary') || normalizedMessage.includes('management decision') || normalizedMessage.includes('action plan') || normalizedMessage.includes('decision support') || normalizedMessage.includes('القرار الاداري') || normalizedMessage.includes('خطة عمل') || normalizedMessage.includes('ماذا يجب ان نفعل الان')) {
-    return {
-      ...extracted,
-      intent: 'executive_decision_support',
-      source: 'system_fallback',
-      confidence: 0.85,
-    }
-  }
-
-  if (normalizedMessage.includes('recommend') || normalizedMessage.includes('recommendation') || normalizedMessage.includes('next best action') || normalizedMessage.includes('what should we do') || normalizedMessage.includes('ماذا تقترح') || normalizedMessage.includes('ما الذي تنصح به') || normalizedMessage.includes('التوصيات')) {
-    return {
-      ...extracted,
-      intent: 'smart_recommendations',
-      source: 'system_fallback',
-      confidence: 0.82,
-    }
-  }
-
-  if (normalizedMessage.includes('revenue') || normalizedMessage.includes('income') || normalizedMessage.includes('الايراد') || normalizedMessage.includes('الايرادات') || normalizedMessage.includes('الدخل')) {
-    return {
-      ...extracted,
-      intent: 'revenue_summary',
-      source: 'system_fallback',
-      confidence: 0.75,
-    }
-  }
-
-  if (normalizedMessage.includes('fleet') || normalizedMessage.includes('inventory') || normalizedMessage.includes('الاسطول') || normalizedMessage.includes('السيارات')) {
-    return {
-      ...extracted,
-      intent: 'fleet_overview',
-      source: 'system_fallback',
-      confidence: 0.72,
-    }
-  }
-
-  if ([
-    'ops summary', 'operations summary', 'what needs attention', 'needs attention', 'what should i prioritize',
-    'what should we prioritize', 'prioritize', 'priorities', 'follow up', 'follow-up', 'what needs follow up',
-    'general analysis', 'overview', 'status overview', 'anything urgent', 'ماذا يحتاج اهتمام', 'وش المهم', 'ما الذي يحتاج متابعه',
-  ].some((pattern) => normalizedMessage.includes(pattern))) {
-    return {
-      ...extracted,
-      intent: 'ops_summary',
-      source: 'system_fallback',
-      confidence: 0.72,
-    }
-  }
-
-  if (normalizedMessage.includes('booking') || normalizedMessage.includes('bookings') || normalizedMessage.includes('الحجز') || normalizedMessage.includes('الحجوزات')) {
-    return {
-      ...extracted,
-      intent: 'booking_summary',
-      source: 'system_fallback',
-      confidence: 0.7,
-    }
-  }
-
-  return {
-    ...extracted,
-    intent: 'unknown',
-    source: 'system_fallback',
-    confidence: 0.18,
-    needsClarification: true,
-    clarificationQuestion: 'What would you like me to help with: bookings, suppliers, customers, cars, fleet, revenue, or operations?',
-  }
+  const rows = await User.find({ type: bookcarsTypes.UserType.User, expireAt: null, $or: [{ fullName: { $regex: regex } }, { email: { $regex: regex } }] }).limit(20).select('_id fullName email active verified blacklisted').lean()
+  return makeResponse({ intent, status: 'success', title: 'Customer search', summary: `Search results for ${term}.`, reply: `Found ${rows.length} customer result(s).`, cards: [tableCard('Customers', rows.map((row) => ({ id: row._id, name: row.fullName, email: row.email, active: row.active, verified: row.verified, blacklisted: row.blacklisted })))], suggestions: ['customers overview', 'draft customer message'] })
 }
 
-const resolveAssistantIntent = async (message: string, history: AssistantConversationTurn[] = []) => {
-  const extracted = parseAssistantMessage(message)
-  const llmResolved = await resolveAssistantIntentWithLlm(extracted, history)
+const buildDraftResponse = (intent: AssistantIntent): AssistantResponse => {
+  if (intent === 'draft_supplier_message') {
+    const draft = 'Subject: Operations follow-up\n\nHello,\n\nPlease review your pending operational items and confirm status today, especially unpaid bookings or inactive supply issues.\n\nBest regards,\nBookCars Admin'
+    return makeResponse({ intent, status: 'success', title: 'Supplier message draft', summary: 'A professional draft the admin can copy and use.', reply: 'Prepared a supplier message draft.', cards: [draftCard('Supplier draft', draft)], suggestions: ['suppliers overview', 'risk overview'] })
+  }
 
-  return llmResolved || fallbackResolveAssistantIntent(message)
+  if (intent === 'draft_customer_message') {
+    const draft = 'Subject: Booking follow-up\n\nHello,\n\nWe are contacting you regarding your booking status. Please confirm the pending information or payment update so we can proceed smoothly.\n\nBest regards,\nBookCars Admin'
+    return makeResponse({ intent, status: 'success', title: 'Customer message draft', summary: 'A professional customer follow-up draft.', reply: 'Prepared a customer message draft.', cards: [draftCard('Customer draft', draft)], suggestions: ['customers overview', 'bookings overview'] })
+  }
+
+  if (intent === 'draft_followup_plan') {
+    return makeResponse({ intent, status: 'success', title: 'Follow-up plan', summary: 'A professional follow-up checklist.', reply: 'Prepared a follow-up plan.', cards: [listCard('Follow-up steps', ['Review the affected records.', 'Contact the relevant supplier or customer.', 'Set a deadline for response.', 'Escalate unresolved items to management.'])], suggestions: ['draft supplier message', 'draft task list'] })
+  }
+
+  return makeResponse({ intent, status: 'success', title: 'Task list', summary: 'A practical admin task list.', reply: 'Prepared an admin task list.', cards: [listCard('Today tasks', ['Review unpaid bookings.', 'Check risky suppliers.', 'Clear unread notifications.', 'Inspect fully booked fleet pressure.'])], suggestions: ['dashboard overview', 'risk overview'] })
 }
 
-export const processAssistantMessage = async (
-  message: string,
-  history: AssistantConversationTurn[] = [],
-): Promise<AssistantResponse> => {
-  const safeHistory = sanitizeAssistantHistory(history)
-  const parsed = await resolveAssistantIntent(message, safeHistory)
+export const processAssistantMessage = async (message: string, _history: AssistantConversationTurn[] = []): Promise<AssistantResponse> => {
+  const intent = detectIntent(message)
 
-  let response: AssistantResponse
-
-  switch (parsed.intent) {
-    case 'booking_summary':
-      response = await summarizeBookings(parsed, safeHistory)
-      break
-    case 'booking_search':
-      response = await handleBookingSearch(parsed, safeHistory)
-      break
-    case 'supplier_search':
-      response = await handleSupplierSearch(parsed, safeHistory)
-      break
-    case 'customer_search':
-      response = await handleCustomerSearch(parsed, safeHistory)
-      break
-    case 'car_availability':
-      response = await handleCarAvailability(parsed, safeHistory)
-      break
-    case 'car_search':
-      response = await handleCarSearch(parsed, safeHistory)
-      break
-    case 'fleet_overview':
-      response = await handleFleetOverview(parsed, safeHistory)
-      break
-    case 'revenue_summary':
-      response = await handleRevenueSummary(parsed, safeHistory)
-      break
-    case 'supplier_performance':
-      response = await handleSupplierPerformance(parsed, safeHistory)
-      break
-    case 'customer_health':
-      response = await handleCustomerHealth(parsed, safeHistory)
-      break
-    case 'risk_alerts':
-      response = await handleRiskAlerts(parsed, safeHistory)
-      break
-    case 'smart_recommendations':
-      response = await handleSmartRecommendations(parsed, safeHistory)
-      break
-    case 'executive_decision_support':
-      response = await handleExecutiveDecisionSupport(parsed, safeHistory)
-      break
-    case 'message_draft':
-      response = await handleMessageDraft(parsed, safeHistory)
-      break
-    case 'followup_plan':
-      response = await handleFollowupPlan(parsed, safeHistory)
-      break
-    case 'tasklist_generation':
-      response = await handleTasklistGeneration(parsed, safeHistory)
-      break
-    case 'ops_summary':
-      response = await handleOpsSummary(parsed, safeHistory)
-      break
-    case 'send_email':
-      response = await handleSendEmail(parsed, safeHistory)
-      break
-    case 'create_meeting':
-      response = await handleCreateMeeting(parsed, safeHistory)
-      break
+  switch (intent) {
+    case 'dashboard_overview': return buildDashboardOverview()
+    case 'bookings_overview': return buildBookingsOverview()
+    case 'fleet_overview': return buildFleetOverview()
+    case 'suppliers_overview': return buildSuppliersOverview()
+    case 'customers_overview': return buildCustomersOverview()
+    case 'risk_overview': return buildRiskOverview()
+    case 'revenue_overview': return buildRevenueOverview()
+    case 'search_bookings':
+    case 'search_cars':
+    case 'search_suppliers':
+    case 'search_customers':
+      return buildSearchTable(intent, message)
+    case 'draft_supplier_message':
+    case 'draft_customer_message':
+    case 'draft_followup_plan':
+    case 'draft_task_list':
+      return buildDraftResponse(intent)
     default:
-      response = buildUnknownAssistantResponse(parsed, safeHistory)
-      break
+      return makeResponse({
+        intent: 'unknown',
+        status: 'needs_clarification',
+        title: 'Assistant',
+        summary: 'The request needs a clearer supported command.',
+        reply: 'Ask for a dashboard overview, bookings, fleet, suppliers, customers, risk, revenue, search, or a draft action.',
+        cards: [listCard('Try one of these', ['dashboard overview', 'bookings overview', 'fleet overview', 'risk overview', 'search supplier Mahmoud', 'draft supplier message'])],
+        suggestions: ['dashboard overview', 'bookings overview', 'fleet overview', 'risk overview'],
+      })
   }
-
-  return localizeAssistantResponse(response, parsed)
 }
 
-export const safeProcessAssistantMessage = async (
-  message: string,
-  history: AssistantConversationTurn[] = [],
-): Promise<AssistantResponse> => {
-  const parsed = parseAssistantMessage(message)
-  const safeHistory = sanitizeAssistantHistory(history)
-
+export const safeProcessAssistantMessage = async (message: string, history: AssistantConversationTurn[] = []): Promise<AssistantResponse> => {
   try {
-    return await processAssistantMessage(message, safeHistory)
-  } catch (err) {
-    logger.error('[assistant.processAssistantMessage] ERROR', err)
-
-    return {
-      intent: parsed.intent,
+    return await processAssistantMessage(message, history)
+  } catch {
+    return makeResponse({
+      intent: 'unknown',
       status: 'error',
+      title: 'Assistant error',
+      summary: 'The assistant could not process the request.',
       reply: 'Something went wrong while processing the assistant request.',
-      inputLanguage: parsed.inputLanguage || 'en',
-      replyLanguage: parsed.replyLanguage || parsed.inputLanguage || 'en',
-      contextUsed: {
-        historyTurns: safeHistory.length,
-      },
-    }
+      cards: [],
+      suggestions: ['dashboard overview'],
+    })
   }
 }

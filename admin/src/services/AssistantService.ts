@@ -1,25 +1,21 @@
 import axiosInstance from './axiosInstance'
 
 export type AssistantIntent =
-  | 'booking_summary'
-  | 'booking_search'
-  | 'supplier_search'
-  | 'customer_search'
-  | 'car_availability'
-  | 'car_search'
+  | 'dashboard_overview'
+  | 'bookings_overview'
   | 'fleet_overview'
-  | 'revenue_summary'
-  | 'supplier_performance'
-  | 'customer_health'
-  | 'risk_alerts'
-  | 'smart_recommendations'
-  | 'executive_decision_support'
-  | 'message_draft'
-  | 'followup_plan'
-  | 'tasklist_generation'
-  | 'ops_summary'
-  | 'send_email'
-  | 'create_meeting'
+  | 'suppliers_overview'
+  | 'customers_overview'
+  | 'risk_overview'
+  | 'revenue_overview'
+  | 'search_bookings'
+  | 'search_cars'
+  | 'search_suppliers'
+  | 'search_customers'
+  | 'draft_supplier_message'
+  | 'draft_customer_message'
+  | 'draft_followup_plan'
+  | 'draft_task_list'
   | 'unknown'
 
 export type AssistantStatus = 'success' | 'needs_clarification' | 'error'
@@ -29,17 +25,25 @@ export interface AssistantConversationTurn {
   text: string
 }
 
+export interface AssistantResponseCard {
+  type: 'metric' | 'decision' | 'alert' | 'list' | 'draft' | 'table'
+  title: string
+  value?: string | number
+  severity?: 'info' | 'success' | 'warning' | 'error'
+  items?: string[]
+  rows?: Record<string, unknown>[]
+  body?: string
+}
+
 export interface AssistantResponse {
   intent: AssistantIntent
   status: AssistantStatus
+  title: string
+  summary: string
   reply: string
-  replyLanguage: string
-  inputLanguage: string
+  cards: AssistantResponseCard[]
+  suggestions: string[]
   data?: Record<string, unknown>
-  suggestedActions?: string[]
-  contextUsed?: {
-    historyTurns: number
-  }
 }
 
 interface AssistantMessagePayload {
@@ -54,11 +58,7 @@ export interface AssistantVoiceResponse {
 
 export const sendMessage = (message: string, history: AssistantConversationTurn[] = []): Promise<AssistantResponse> => (
   axiosInstance
-    .post(
-      '/api/assistant/message',
-      { message, history } as AssistantMessagePayload,
-      { withCredentials: true }
-    )
+    .post('/api/assistant/message', { message, history } as AssistantMessagePayload, { withCredentials: true })
     .then((res) => res.data)
 )
 
