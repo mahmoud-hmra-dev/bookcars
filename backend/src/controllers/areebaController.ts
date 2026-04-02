@@ -66,6 +66,22 @@ export const createSession = async (req: Request, res: Response) => {
 }
 
 /**
+ * Lightweight page returned inside the Areeba lightbox iframe after
+ * a successful payment. It sends a postMessage to the parent window
+ * so the React checkout page knows the payment completed.
+ */
+export const paymentComplete = (_req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8')
+  res.send(`<!doctype html><html><head><meta charset="utf-8"></head><body>
+<script>
+  try { window.parent.postMessage({ areebaPaymentComplete: true }, '*'); }
+  catch(e) {}
+</script>
+<p style="text-align:center;margin-top:40px;font-family:sans-serif">Payment processed. You may close this window.</p>
+</body></html>`)
+}
+
+/**
  * Verify an Areeba payment and finalize the booking.
  *
  * @async

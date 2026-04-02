@@ -158,8 +158,6 @@ const Checkout = () => {
   const payInFull = useWatch({ control, name: 'payInFull' })
 
   // Areeba inline lightbox
-  const areebaClosedByCallbackRef = useRef(false)
-
   const handleAreebaComplete = useCallback(async () => {
     if (!areebaSessionRef.current || !bookingId || !sessionId) {
       return
@@ -192,29 +190,35 @@ const Checkout = () => {
     }
 
     const session = areebaSessionRef.current
-    areebaClosedByCallbackRef.current = false
 
-    // Define global callbacks before loading the script
+    // Listen for postMessage from the data-complete page (loaded inside
+    // the lightbox iframe after successful payment).
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.areebaPaymentComplete) {
+        handleAreebaComplete()
+      }
+    }
+    window.addEventListener('message', onMessage)
+
     // data-error and data-cancel support function names
     ;(window as any).areebaErrorCallback = () => {
-      areebaClosedByCallbackRef.current = true
       setPaymentFailed(true)
       setAreebaReady(false)
     }
     ;(window as any).areebaCancelCallback = () => {
-      areebaClosedByCallbackRef.current = true
       setAreebaReady(false)
     }
+
+    // data-complete must be a URL. After payment, the lightbox iframe
+    // navigates to this URL. The backend returns a small HTML page that
+    // sends postMessage({ areebaPaymentComplete: true }) to the parent.
+    const completeUrl = `${env.API_HOST.replace(/\/$/, '')}/api/areeba/payment-complete`
 
     const script = document.createElement('script')
     script.src = 'https://epayment.areeba.com/checkout/version/60/checkout.js'
     script.setAttribute('data-error', 'areebaErrorCallback')
     script.setAttribute('data-cancel', 'areebaCancelCallback')
-    // data-complete requires a URL (not a function name).
-    // The lightbox iframe navigates to this URL on success, then the SDK
-    // detects the navigation and closes the lightbox. Our poll then picks
-    // up the closure and calls verify-payment.
-    script.setAttribute('data-complete', `${window.location.origin}/checkout-complete`)
+    script.setAttribute('data-complete', completeUrl)
     script.onload = () => {
       const CheckoutSDK = (window as any).Checkout
       if (!CheckoutSDK) {
@@ -242,44 +246,11 @@ const Checkout = () => {
         },
       })
       CheckoutSDK.showLightbox()
-
-      // Watch for lightbox close: if it closes without error/cancel callback,
-      // the payment completed — verify it with the backend.
-      // Phase 1: wait for the lightbox to appear in the DOM.
-      // Phase 2: once detected, watch for it to disappear (with debounce).
-      let lightboxDetected = false
-      let absentCount = 0
-      const ABSENT_THRESHOLD = 3 // must be absent 3 consecutive checks (1.5s)
-
-      const poll = setInterval(() => {
-        const lightbox = document.getElementById('checkout-iframe')
-          || document.querySelector('iframe[name="checkout-iframe"]')
-          || document.querySelector('.mce-modal')
-
-        if (lightbox) {
-          lightboxDetected = true
-          absentCount = 0
-        } else if (lightboxDetected) {
-          absentCount += 1
-          if (absentCount >= ABSENT_THRESHOLD) {
-            clearInterval(poll)
-            if (!areebaClosedByCallbackRef.current) {
-              handleAreebaComplete()
-            }
-          }
-        }
-      }, 500)
-
-      // Store interval for cleanup
-      ;(window as any).__areebaPoll = poll
     }
     document.body.appendChild(script)
 
     return () => {
-      if ((window as any).__areebaPoll) {
-        clearInterval((window as any).__areebaPoll)
-        delete (window as any).__areebaPoll
-      }
+      window.removeEventListener('message', onMessage)
       if (script.parentNode) {
         script.parentNode.removeChild(script)
       }
