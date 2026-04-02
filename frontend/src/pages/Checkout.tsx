@@ -242,14 +242,27 @@ const Checkout = () => {
 
       // Watch for lightbox close: if it closes without error/cancel callback,
       // the payment completed — verify it with the backend.
+      // Phase 1: wait for the lightbox to appear in the DOM.
+      // Phase 2: once detected, watch for it to disappear (with debounce).
+      let lightboxDetected = false
+      let absentCount = 0
+      const ABSENT_THRESHOLD = 3 // must be absent 3 consecutive checks (1.5s)
+
       const poll = setInterval(() => {
         const lightbox = document.getElementById('checkout-iframe')
           || document.querySelector('iframe[name="checkout-iframe"]')
           || document.querySelector('.mce-modal')
-        if (!lightbox) {
-          clearInterval(poll)
-          if (!areebaClosedByCallbackRef.current) {
-            handleAreebaComplete()
+
+        if (lightbox) {
+          lightboxDetected = true
+          absentCount = 0
+        } else if (lightboxDetected) {
+          absentCount += 1
+          if (absentCount >= ABSENT_THRESHOLD) {
+            clearInterval(poll)
+            if (!areebaClosedByCallbackRef.current) {
+              handleAreebaComplete()
+            }
           }
         }
       }, 500)
