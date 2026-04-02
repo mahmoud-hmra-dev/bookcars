@@ -158,6 +158,8 @@ const Checkout = () => {
   const payInFull = useWatch({ control, name: 'payInFull' })
 
   // Areeba inline lightbox
+  const areebaClosedByCallbackRef = useRef(false)
+
   const handleAreebaComplete = useCallback(async () => {
     if (!areebaSessionRef.current || !bookingId || !sessionId) {
       return
@@ -190,24 +192,26 @@ const Checkout = () => {
     }
 
     const session = areebaSessionRef.current
+    areebaClosedByCallbackRef.current = false
 
     // Define global callbacks before loading the script
+    // data-error and data-cancel support function names
     ;(window as any).areebaErrorCallback = () => {
+      areebaClosedByCallbackRef.current = true
       setPaymentFailed(true)
       setAreebaReady(false)
     }
     ;(window as any).areebaCancelCallback = () => {
+      areebaClosedByCallbackRef.current = true
       setAreebaReady(false)
-    }
-    ;(window as any).areebaCompleteCallback = () => {
-      handleAreebaComplete()
     }
 
     const script = document.createElement('script')
     script.src = 'https://epayment.areeba.com/checkout/version/60/checkout.js'
     script.setAttribute('data-error', 'areebaErrorCallback')
     script.setAttribute('data-cancel', 'areebaCancelCallback')
-    script.setAttribute('data-complete', 'areebaCompleteCallback')
+    // data-complete only supports URLs, not function names.
+    // We omit it and detect completion by watching for the lightbox to close.
     script.onload = () => {
       const CheckoutSDK = (window as any).Checkout
       if (!CheckoutSDK) {
@@ -235,16 +239,36 @@ const Checkout = () => {
         },
       })
       CheckoutSDK.showLightbox()
+
+      // Watch for lightbox close: if it closes without error/cancel callback,
+      // the payment completed — verify it with the backend.
+      const poll = setInterval(() => {
+        const lightbox = document.getElementById('checkout-iframe')
+          || document.querySelector('iframe[name="checkout-iframe"]')
+          || document.querySelector('.mce-modal')
+        if (!lightbox) {
+          clearInterval(poll)
+          if (!areebaClosedByCallbackRef.current) {
+            handleAreebaComplete()
+          }
+        }
+      }, 500)
+
+      // Store interval for cleanup
+      ;(window as any).__areebaPoll = poll
     }
     document.body.appendChild(script)
 
     return () => {
+      if ((window as any).__areebaPoll) {
+        clearInterval((window as any).__areebaPoll)
+        delete (window as any).__areebaPoll
+      }
       if (script.parentNode) {
         script.parentNode.removeChild(script)
       }
       delete (window as any).areebaErrorCallback
       delete (window as any).areebaCancelCallback
-      delete (window as any).areebaCompleteCallback
     }
   }, [areebaReady, handleAreebaComplete])
 
