@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   OutlinedInput,
@@ -110,6 +110,9 @@ const Checkout = () => {
   const [payPalLoaded, setPayPalLoaded] = useState(false)
   const [payPalInit, setPayPalInit] = useState(false)
   const [payPalProcessing, setPayPalProcessing] = useState(false)
+  const [areebaReady, setAreebaReady] = useState(false)
+  const [areebaProcessing, setAreebaProcessing] = useState(false)
+  const areebaSessionRef = useRef<{ sessionId: string; orderId: string; merchantId: string; amount: string; currency: string } | null>(null)
 
   const birthDateRef = useRef<HTMLInputElement | null>(null)
   const additionalDriverBirthDateRef = useRef<HTMLInputElement | null>(null)
@@ -153,6 +156,97 @@ const Checkout = () => {
   const payLater = useWatch({ control, name: 'payLater' })
   const payDeposit = useWatch({ control, name: 'payDeposit' })
   const payInFull = useWatch({ control, name: 'payInFull' })
+
+  // Areeba inline lightbox
+  const handleAreebaComplete = useCallback(async () => {
+    if (!areebaSessionRef.current || !bookingId || !sessionId) {
+      return
+    }
+    try {
+      setAreebaProcessing(true)
+      const status = await AreebaService.verifyPayment({
+        bookingId,
+        sessionId,
+        orderId: areebaSessionRef.current.orderId,
+      })
+      if (status === 200) {
+        setVisible(false)
+        setSuccess(true)
+      } else {
+        setPaymentFailed(true)
+      }
+    } catch (err) {
+      helper.error(err)
+      setPaymentFailed(true)
+    } finally {
+      setAreebaProcessing(false)
+      setAreebaReady(false)
+    }
+  }, [bookingId, sessionId])
+
+  useEffect(() => {
+    if (!areebaReady || !areebaSessionRef.current) {
+      return
+    }
+
+    const session = areebaSessionRef.current
+
+    // Define global callbacks before loading the script
+    ;(window as any).areebaErrorCallback = () => {
+      setPaymentFailed(true)
+      setAreebaReady(false)
+    }
+    ;(window as any).areebaCancelCallback = () => {
+      setAreebaReady(false)
+    }
+    ;(window as any).areebaCompleteCallback = () => {
+      handleAreebaComplete()
+    }
+
+    const script = document.createElement('script')
+    script.src = 'https://epayment.areeba.com/checkout/version/60/checkout.js'
+    script.setAttribute('data-error', 'areebaErrorCallback')
+    script.setAttribute('data-cancel', 'areebaCancelCallback')
+    script.setAttribute('data-complete', 'areebaCompleteCallback')
+    script.onload = () => {
+      const CheckoutSDK = (window as any).Checkout
+      if (!CheckoutSDK) {
+        return
+      }
+      CheckoutSDK.configure({
+        merchant: session.merchantId,
+        session: { id: session.sessionId },
+        order: {
+          id: session.orderId,
+          amount: session.amount,
+          currency: session.currency,
+        },
+        interaction: {
+          operation: 'PURCHASE',
+          merchant: {
+            name: env.WEBSITE_NAME,
+            address: { line1: 'HIDE', line2: 'HIDE' },
+          },
+          displayControl: {
+            billingAddress: 'HIDE',
+            customerEmail: 'HIDE',
+            shipping: 'HIDE',
+          },
+        },
+      })
+      CheckoutSDK.showLightbox()
+    }
+    document.body.appendChild(script)
+
+    return () => {
+      if (script.parentNode) {
+        script.parentNode.removeChild(script)
+      }
+      delete (window as any).areebaErrorCallback
+      delete (window as any).areebaCancelCallback
+      delete (window as any).areebaCompleteCallback
+    }
+  }, [areebaReady, handleAreebaComplete])
 
   const getCheckoutSigninReturnTo = () => {
     const state = location.state as {
@@ -282,7 +376,6 @@ const Checkout = () => {
       //
       let _customerId: string | undefined
       let _sessionId: string | undefined
-      let areebaPaymentUrl: string | undefined
       if (!payLater) {
         if (env.PAYMENT_GATEWAY === bookcarsTypes.PaymentGateway.Stripe) {
           const name = bookcarsHelper.truncateString(`${env.WEBSITE_NAME} - ${car.name}`, StripeService.ORDER_NAME_MAX_LENGTH)
@@ -340,25 +433,20 @@ const Checkout = () => {
             finalPrice = price + depositPrice
           }
 
-          const callbackBase = env.API_HOST.replace(/\/$/, '')
-          const successCallback = `${callbackBase}/api/areeba/success/${encodeURIComponent(_bookingId)}/${encodeURIComponent(_sessionId as string)}`
-          const cancelCallback = `${callbackBase}/api/areeba/cancel/${encodeURIComponent(_bookingId)}/${encodeURIComponent(_sessionId as string)}`
-          const errorCallback = `${callbackBase}/api/areeba/error/${encodeURIComponent(_bookingId)}/${encodeURIComponent(_sessionId as string)}`
-
-          areebaPaymentUrl = await AreebaService.createPaymentLink(env.AREEBA_API_HOST, {
-            project_id: env.AREEBA_PROJECT_ID,
-            project_name: env.WEBSITE_NAME,
-            prodact_id: car._id as string,
-            user_id: ((!authenticated ? driver?._id : user?._id) || _bookingId) as string,
-            firstName: ((!authenticated ? driver?.fullName : user?.fullName) || '').split(' ').slice(0, 1).join(' '),
-            lastName: ((!authenticated ? driver?.fullName : user?.fullName) || '').split(' ').slice(1).join(' '),
-            email: ((!authenticated ? driver?.email : user?.email) || '') as string,
-            price: finalPrice,
+          const areebaResult = await AreebaService.createSession({
+            amount: finalPrice,
             currency: PaymentService.getCurrency(),
-            successCallback,
-            cancelCallback,
-            errorCallback,
           })
+
+          areebaSessionRef.current = {
+            ...areebaResult,
+            amount: Number(finalPrice).toFixed(2),
+            currency: PaymentService.getCurrency(),
+          }
+          setBookingId(_bookingId)
+          setSessionId(_sessionId)
+          setAreebaReady(true)
+          return
         }
 
         if (payLater) {
@@ -367,10 +455,6 @@ const Checkout = () => {
         }
         setBookingId(_bookingId)
         setSessionId(_sessionId)
-
-        if (areebaPaymentUrl) {
-          window.location.assign(areebaPaymentUrl)
-        }
       } else {
         helper.error()
       }
@@ -1108,6 +1192,7 @@ const Checkout = () => {
         )}
 
         {payPalProcessing && <Backdrop text={strings.CHECKING} />}
+        {areebaProcessing && <Backdrop text={strings.CHECKING} />}
 
         <MapDialog
           pickupLocation={pickupLocation}

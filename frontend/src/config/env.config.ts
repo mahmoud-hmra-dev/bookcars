@@ -124,8 +124,6 @@ const env = {
   PAYMENT_GATEWAY,
   STRIPE_PUBLISHABLE_KEY: String(import.meta.env.VITE_BC_STRIPE_PUBLISHABLE_KEY),
   PAYPAL_CLIENT_ID: String(import.meta.env.VITE_BC_PAYPAL_CLIENT_ID),
-  AREEBA_API_HOST: String(import.meta.env.VITE_BC_AREEBA_API_HOST || 'http://localhost:8001'),
-  AREEBA_PROJECT_ID: String(import.meta.env.VITE_BC_AREEBA_PROJECT_ID || ''),
   AUTH0_DOMAIN: normalizeAuth0Domain(String(import.meta.env.VITE_BC_AUTH0_DOMAIN || '')),
   AUTH0_CLIENT_ID: String(import.meta.env.VITE_BC_AUTH0_CLIENT_ID || ''),
   AUTH0_CONNECTION_GOOGLE: String(import.meta.env.VITE_BC_AUTH0_CONNECTION_GOOGLE || 'google-oauth2'),

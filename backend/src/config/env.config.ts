@@ -403,6 +403,20 @@ export const PAYPAL_CLIENT_ID = __env__('BC_PAYPAL_CLIENT_ID', false, 'PAYPAL_CL
 export const PAYPAL_CLIENT_SECRET = __env__('BC_PAYPAL_CLIENT_SECRET', false, 'PAYPAL_CLIENT_SECRET')
 
 /**
+ * Areeba merchant ID.
+ *
+ * @type {string}
+ */
+export const AREEBA_MERCHANT_ID = __env__('BC_AREEBA_MERCHANT_ID', false, '')
+
+/**
+ * Areeba API code (secret).
+ *
+ * @type {string}
+ */
+export const AREEBA_API_CODE = __env__('BC_AREEBA_API_CODE', false, '')
+
+/**
  * Booking expiration in seconds.
  * Bookings created from checkout with Stripe are temporary and are automatically deleted if the payment checkout session expires.
  *

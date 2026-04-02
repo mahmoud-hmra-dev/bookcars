@@ -793,6 +793,23 @@ export interface PaymentResult {
   clientSecret: string | null
 }
 
+export interface CreateAreebaSessionPayload {
+  amount: number
+  currency: string
+}
+
+export interface AreebaSessionResult {
+  sessionId: string
+  orderId: string
+  merchantId: string
+}
+
+export interface VerifyAreebaPaymentPayload {
+  bookingId: string
+  sessionId: string
+  orderId: string
+}
+
 export interface SendEmailPayload {
   from: string
   to: string
