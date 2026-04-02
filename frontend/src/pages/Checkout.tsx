@@ -210,8 +210,11 @@ const Checkout = () => {
     script.src = 'https://epayment.areeba.com/checkout/version/60/checkout.js'
     script.setAttribute('data-error', 'areebaErrorCallback')
     script.setAttribute('data-cancel', 'areebaCancelCallback')
-    // data-complete only supports URLs, not function names.
-    // We omit it and detect completion by watching for the lightbox to close.
+    // data-complete requires a URL (not a function name).
+    // The lightbox iframe navigates to this URL on success, then the SDK
+    // detects the navigation and closes the lightbox. Our poll then picks
+    // up the closure and calls verify-payment.
+    script.setAttribute('data-complete', `${window.location.origin}/checkout-complete`)
     script.onload = () => {
       const CheckoutSDK = (window as any).Checkout
       if (!CheckoutSDK) {
