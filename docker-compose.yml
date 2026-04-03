@@ -4,8 +4,8 @@ services:
     command: mongod --quiet --logpath /dev/null
     restart: always
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-changeme}
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
     ports:
       - 27018:27017
     volumes:
@@ -27,7 +27,7 @@ services:
     ports:
       - 8084:8081
     environment:
-      ME_CONFIG_MONGODB_URL: "mongodb://${MONGO_USER:-admin}:${MONGO_PASSWORD:-changeme}@mongo:27017/"
+      ME_CONFIG_MONGODB_URL: "mongodb://admin:admin@mongo:27017/"
       ME_CONFIG_BASICAUTH_USERNAME: admin
       ME_CONFIG_BASICAUTH_PASSWORD: admin
     depends_on:
@@ -123,10 +123,10 @@ services:
     container_name: controtrack-mysql-payment
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_ROOT_PASSWORD: rootpassword
       MYSQL_DATABASE: controtrack_payment
-      MYSQL_USER: ${MYSQL_USER:-controtrack}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-controtrackpass}
+      MYSQL_USER: controtrack
+      MYSQL_PASSWORD: controtrackpass
     ports:
       - "3388:3306"
     volumes:
@@ -161,8 +161,8 @@ services:
       DB_HOST: mysql_payment
       DB_PORT: 3306
       DB_DATABASE: controtrack_payment
-      DB_USERNAME: ${MYSQL_USER:-controtrack}
-      DB_PASSWORD: ${MYSQL_PASSWORD:-controtrackpass}
+      DB_USERNAME: controtrack
+      DB_PASSWORD: controtrackpass
     volumes:
       - payment_storage:/var/www/html/storage
     deploy:
@@ -184,7 +184,7 @@ services:
       - 3100:3100
     environment:
       BC_API_URL: http://bc-backend:4002
-      MCP_MONGO_URI: "mongodb://${MONGO_USER:-admin}:${MONGO_PASSWORD:-changeme}@mongo:27017/mcp_logs?authSource=admin"
+      MCP_MONGO_URI: "mongodb://admin:admin@mongo:27017/mcp_logs?authSource=admin"
     stdin_open: true
     deploy:
       resources:
