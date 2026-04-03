@@ -11,16 +11,22 @@ COPY ./backend/package.json ./backend/package-lock.json ./
 
 RUN npm install
 
-# 2) Copy source code (only this layer rebuilds on code changes)
+# 2) Copy source code
 COPY ./packages /bookcars/packages
 COPY ./backend ./
 COPY ./backend/.env.docker .env
 
+# 3) Build at image build time (not at runtime)
+RUN npm run build
+
+# 4) Setup non-root user
 RUN apk add --no-cache curl
 RUN addgroup --system app && adduser --system --ingroup app app
+RUN chown -R app:app /bookcars
+
 USER app
 
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 CMD curl -f http://localhost:4002/api/health || exit 1
 
-CMD [ "npm", "run", "start:setup"]
+CMD sh -c "node dist/src/setup/setup.js && node --import ./dist/src/monitoring/instrument.js dist/src"
 EXPOSE 4002
