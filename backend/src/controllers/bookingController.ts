@@ -46,7 +46,7 @@ export const create = async (req: Request, res: Response) => {
     res.json(booking)
   } catch (err) {
     logger.error(`[booking.create] ${i18n.t('ERROR')} ${JSON.stringify(req.body)}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -387,7 +387,7 @@ export const checkout = async (req: Request, res: Response) => {
     res.status(200).send({ bookingId: booking._id.toString() })
   } catch (err) {
     logger.error(`[booking.checkout] ${i18n.t('ERROR')}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -623,7 +623,7 @@ export const update = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[booking.update] ${i18n.t('ERROR')} ${JSON.stringify(req.body)}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -656,7 +656,7 @@ export const updateStatus = async (req: Request, res: Response) => {
     res.sendStatus(200)
   } catch (err) {
     logger.error(`[booking.updateStatus] ${i18n.t('ERROR')} ${JSON.stringify(req.body)}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -703,7 +703,7 @@ export const deleteBookings = async (req: Request, res: Response) => {
     res.sendStatus(200)
   } catch (err) {
     logger.error(`[booking.deleteBookings] ${i18n.t('ERROR')} ${JSON.stringify(req.body)}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -728,7 +728,7 @@ export const deleteTempBooking = async (req: Request, res: Response) => {
     res.sendStatus(200)
   } catch (err) {
     logger.error(`[booking.deleteTempBooking] ${i18n.t('ERROR')} ${JSON.stringify({ bookingId, sessionId })}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -802,7 +802,7 @@ export const getBooking = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[booking.getBooking] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -829,7 +829,7 @@ export const getBookingId = async (req: Request, res: Response) => {
     res.json(booking?._id.toString())
   } catch (err) {
     logger.error(`[booking.getBookingId] (sessionId) ${i18n.t('ERROR')} ${sessionId}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -846,7 +846,7 @@ export const getBookings = async (req: Request, res: Response) => {
   try {
     const { body }: { body: bookcarsTypes.GetBookingsPayload } = req
     const page = Number.parseInt(req.params.page, 10)
-    const size = Number.parseInt(req.params.size, 10)
+    const size = Math.min(Number.parseInt(req.params.size, 10), 100)
     let suppliers = body.suppliers.map((id) => new mongoose.Types.ObjectId(id))
     const {
       statuses,
@@ -1065,7 +1065,7 @@ export const getBookings = async (req: Request, res: Response) => {
     res.json(data)
   } catch (err) {
     logger.error(`[booking.getBookings] ${i18n.t('ERROR')} ${JSON.stringify(req.body)}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -1097,7 +1097,7 @@ export const hasBookings = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[booking.hasBookings] ${i18n.t('ERROR')} ${driver}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -1149,7 +1149,7 @@ export const cancelBooking = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[booking.cancelBooking] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -1224,7 +1224,7 @@ export const areebaSuccess = async (req: Request, res: Response) => {
     redirectToFrontendCheckoutResult(res, bookingId, 'success', orderId)
   } catch (err) {
     logger.error(`[booking.areebaSuccess] ${i18n.t('ERROR')} ${bookingId}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 

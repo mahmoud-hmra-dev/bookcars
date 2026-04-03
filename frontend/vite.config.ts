@@ -68,7 +68,7 @@ export default ({ mode }: { mode: string }) => {
       minify: 'terser', // Can also use 'esbuild' which is faster but less optimized
       terserOptions: {
         compress: {
-          drop_console: false, // Keep console.* calls
+          drop_console: true, // Remove console.* calls in production
           drop_debugger: true, // Removes debugger statements
           dead_code: true, // Removes unreachable code
           passes: 3, // Number of compression passes

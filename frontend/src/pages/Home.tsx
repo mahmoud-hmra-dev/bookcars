@@ -110,7 +110,7 @@ const Home = () => {
           <div className="hero-content">
             <span className="hero-badge">
               <GpsFixed style={{ fontSize: 16 }} />
-              GPS Tracked Fleet
+              {strings.GPS_TRACKED_FLEET}
             </span>
             <h1 className="hero-heading">{strings.COVER}</h1>
             <p className="hero-sub">{strings.SUBTITLE || strings.TITLE}</p>
@@ -122,27 +122,27 @@ const Home = () => {
 
         {/* ===== HOW IT WORKS ===== */}
         <section className="how-it-works">
-          <h2 className="section-title">How It Works</h2>
+          <h2 className="section-title">{strings.HOW_IT_WORKS}</h2>
           <div className="steps">
             <div className="step">
               <div className="step-number">1</div>
               <div className="step-icon"><LocationOn /></div>
-              <h3>Choose Location</h3>
-              <p>Pick your preferred pickup and drop-off spots from our wide network.</p>
+              <h3>{strings.STEP_CHOOSE_LOCATION}</h3>
+              <p>{strings.STEP_CHOOSE_LOCATION_DESC}</p>
             </div>
             <div className="step-arrow"><ArrowForward /></div>
             <div className="step">
               <div className="step-number">2</div>
               <div className="step-icon"><DirectionsCar /></div>
-              <h3>Select Your Car</h3>
-              <p>Browse our fleet, compare prices, and find the perfect car for your trip.</p>
+              <h3>{strings.STEP_SELECT_CAR}</h3>
+              <p>{strings.STEP_SELECT_CAR_DESC}</p>
             </div>
             <div className="step-arrow"><ArrowForward /></div>
             <div className="step">
               <div className="step-number">3</div>
               <div className="step-icon"><DriveEta /></div>
-              <h3>Drive Away</h3>
-              <p>Complete your booking, pick up the car, and enjoy the ride!</p>
+              <h3>{strings.STEP_DRIVE_AWAY}</h3>
+              <p>{strings.STEP_DRIVE_AWAY_DESC}</p>
             </div>
           </div>
         </section>
@@ -152,47 +152,47 @@ const Home = () => {
           <div className="trust-item">
             <DirectionsCar className="trust-icon" />
             <div className="trust-number">500+</div>
-            <div className="trust-label">Cars Available</div>
+            <div className="trust-label">{strings.CARS_AVAILABLE}</div>
           </div>
           <div className="trust-item">
             <MapIcon className="trust-icon" />
             <div className="trust-number">50+</div>
-            <div className="trust-label">Locations</div>
+            <div className="trust-label">{strings.TRUST_LOCATIONS}</div>
           </div>
           <div className="trust-item">
             <SupportAgent className="trust-icon" />
             <div className="trust-number">24/7</div>
-            <div className="trust-label">Support</div>
+            <div className="trust-label">{strings.TRUST_SUPPORT}</div>
           </div>
           <div className="trust-item">
             <GpsFixed className="trust-icon" />
             <div className="trust-number">100%</div>
-            <div className="trust-label">GPS Tracked</div>
+            <div className="trust-label">{strings.GPS_TRACKED}</div>
           </div>
         </section>
 
         {/* ===== GPS TRACKING SHOWCASE ===== */}
         <section className="gps-section">
           <div className="gps-content">
-            <span className="gps-badge">Safety First</span>
-            <h2>Real-Time GPS Tracking</h2>
-            <p>Every vehicle in our fleet is equipped with advanced GPS tracking. Monitor your rental in real-time, get peace of mind knowing your car is always secure, and enjoy 24/7 roadside assistance.</p>
+            <span className="gps-badge">{strings.SAFETY_FIRST}</span>
+            <h2>{strings.REALTIME_GPS_TRACKING}</h2>
+            <p>{strings.GPS_DESCRIPTION}</p>
             <div className="gps-features">
               <div className="gps-feature">
                 <CheckCircle className="gps-check" />
-                <span>Live vehicle location</span>
+                <span>{strings.LIVE_VEHICLE_LOCATION}</span>
               </div>
               <div className="gps-feature">
                 <CheckCircle className="gps-check" />
-                <span>Route history</span>
+                <span>{strings.ROUTE_HISTORY}</span>
               </div>
               <div className="gps-feature">
                 <CheckCircle className="gps-check" />
-                <span>Geofence alerts</span>
+                <span>{strings.GEOFENCE_ALERTS}</span>
               </div>
               <div className="gps-feature">
                 <CheckCircle className="gps-check" />
-                <span>24/7 roadside assistance</span>
+                <span>{strings.ROADSIDE_ASSISTANCE}</span>
               </div>
             </div>
           </div>

@@ -64,7 +64,7 @@ const LocationCarrousel = ({
             <div className="location-image">
               {
                 location.image ? (
-                  <img alt="" src={bookcarsHelper.joinURL(env.CDN_LOCATIONS, location.image)} />
+                  <img alt="" src={bookcarsHelper.joinURL(env.CDN_LOCATIONS, location.image)} loading="lazy" />
                 )
                   : <LocationIcon className="location-icon" />
               }

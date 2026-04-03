@@ -83,7 +83,7 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
     res.json(result)
   } catch (err) {
     logger.error(`[stripe.createCheckoutSession] ${i18n.t('ERROR')}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -192,7 +192,7 @@ export const checkCheckoutSession = async (req: Request, res: Response) => {
     res.status(400).send(session.payment_status)
   } catch (err) {
     logger.error(`[stripe.checkCheckoutSession] ${i18n.t('ERROR')}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -261,6 +261,6 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
     res.json(result)
   } catch (err) {
     logger.error(`[stripe.createPaymentIntent] ${i18n.t('ERROR')}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }

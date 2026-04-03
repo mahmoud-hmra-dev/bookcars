@@ -4,26 +4,22 @@ services:
     command: mongod --quiet --logpath /dev/null
     restart: always
     environment:
-      # Provide your credentials here
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: admin
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-changeme}
     ports:
       - 27018:27017
     volumes:
       - mongodb_data:/data/db
       - mongodb_config:/data/configdb
-
-  mongo-express:
-    image: mongo-express:latest
-    restart: always
-    ports:
-      - 8084:8081
-    environment:
-      ME_CONFIG_MONGODB_URL: mongodb://admin:admin@mongo:27017/
-      ME_CONFIG_BASICAUTH_USERNAME: admin
-      ME_CONFIG_BASICAUTH_PASSWORD: admin
-    depends_on:
-      - mongo
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   traccar-db:
     image: postgres:16-alpine
@@ -36,6 +32,10 @@ services:
       - 5433:5432
     volumes:
       - traccar_postgres_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   traccar:
     image: traccar/traccar:latest
@@ -49,9 +49,13 @@ services:
       - ./__config/traccar/traccar.xml:/opt/traccar/conf/traccar.xml:ro
       - traccar_data:/opt/traccar/data
       - traccar_logs:/opt/traccar/logs
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   bc-backend:
-    build: 
+    build:
       context: .
       dockerfile: ./backend/Dockerfile
     env_file: ./backend/.env.docker
@@ -59,22 +63,31 @@ services:
     ports:
       - 4002:4002
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
     volumes:
       - cdn:/var/www/cdn/bookcars
       - backend_logs:/bookcars/backend/logs
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   bc-admin:
-    build: 
+    build:
       context: .
       dockerfile: ./admin/Dockerfile
     depends_on:
       - bc-backend
     ports:
       - 3001:3001
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   bc-frontend:
-    build: 
+    build:
       context: .
       dockerfile: ./frontend/Dockerfile
     depends_on:
@@ -83,24 +96,34 @@ services:
       - 8088:80
     volumes:
       - cdn:/var/www/cdn/bookcars
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
   mysql_payment:
     image: mysql:8.0
     container_name: controtrack-mysql-payment
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
       MYSQL_DATABASE: controtrack_payment
-      MYSQL_USER: controtrack
-      MYSQL_PASSWORD: controtrackpass
+      MYSQL_USER: ${MYSQL_USER:-controtrack}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-controtrackpass}
     ports:
       - "3388:3306"
     volumes:
       - db_payment:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-prootpassword"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
       timeout: 3s
       retries: 20
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
   payment:
     build:
       context: ./payment
@@ -121,10 +144,14 @@ services:
       DB_HOST: mysql_payment
       DB_PORT: 3306
       DB_DATABASE: controtrack_payment
-      DB_USERNAME: controtrack
-      DB_PASSWORD: controtrackpass
+      DB_USERNAME: ${MYSQL_USER:-controtrack}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-controtrackpass}
     volumes:
       - payment_storage:/var/www/html/storage
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
 volumes:
   cdn:

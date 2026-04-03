@@ -67,7 +67,7 @@ export const validate = async (req: Request, res: Response) => {
     }
   } catch (err) {
     logger.error(`[location.validate]  ${i18n.t('ERROR')} ${name}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -213,7 +213,7 @@ export const create = async (req: Request, res: Response) => {
     res.send(location)
   } catch (err) {
     logger.error(`[location.create] ${i18n.t('ERROR')} ${JSON.stringify(req.body)}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -353,7 +353,7 @@ export const update = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[location.update] ${i18n.t('ERROR')} ${JSON.stringify(req.body)}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -409,7 +409,7 @@ export const deleteLocation = async (req: Request, res: Response) => {
     res.sendStatus(200)
   } catch (err) {
     logger.error(`[location.delete] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -486,7 +486,7 @@ export const getLocation = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[location.getLocation] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -502,7 +502,7 @@ export const getLocation = async (req: Request, res: Response) => {
 export const getLocations = async (req: Request, res: Response) => {
   try {
     const page = Number.parseInt(req.params.page, 10)
-    const size = Number.parseInt(req.params.size, 10)
+    const size = Math.min(Number.parseInt(req.params.size, 10), 100)
     const { language } = req.params
     const keyword = escapeStringRegexp(String(req.query.s || ''))
     const options = 'i'
@@ -610,7 +610,7 @@ export const getLocations = async (req: Request, res: Response) => {
     res.json(locations)
   } catch (err) {
     logger.error(`[location.getLocations] ${i18n.t('ERROR')} ${req.query.s}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -674,7 +674,7 @@ export const getLocationsWithPosition = async (req: Request, res: Response) => {
     res.json(locations)
   } catch (err) {
     logger.error(`[location.getLocationsWithPosition] ${i18n.t('ERROR')} ${req.query.s}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -711,7 +711,7 @@ export const checkLocation = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[location.checkLocation] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -739,7 +739,7 @@ export const getLocationId = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[location.getLocationId] ${i18n.t('ERROR')} ${name}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -772,7 +772,7 @@ export const createImage = async (req: Request, res: Response) => {
     res.json(filename)
   } catch (err) {
     logger.error(`[location.createImage] ${i18n.t('ERROR')}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -829,7 +829,7 @@ export const updateImage = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[location.updateImage] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -868,7 +868,7 @@ export const deleteImage = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[location.deleteImage] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -908,6 +908,6 @@ export const deleteTempImage = async (req: Request, res: Response) => {
     res.sendStatus(200)
   } catch (err) {
     logger.error(`[location.deleteTempImage] ${i18n.t('ERROR')} ${image}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }

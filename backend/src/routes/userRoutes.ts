@@ -2,11 +2,12 @@ import express from 'express'
 import multer from 'multer'
 import routeNames from '../config/userRoutes.config'
 import authJwt from '../middlewares/authJwt'
+import { authLimiter } from '../middlewares/rateLimiter'
 import * as userController from '../controllers/userController'
 
 const routes = express.Router()
 
-routes.route(routeNames.signup).post(userController.signup)
+routes.route(routeNames.signup).post(authLimiter, userController.signup)
 // adminSignup route is replaced by src/setup/setup.ts and src/setup/reset.ts
 // routes.route(routeNames.adminSignup).post(userController.adminSignup)
 routes.route(routeNames.create).post(authJwt.verifyToken, authJwt.authSupplier, userController.create)
@@ -14,8 +15,8 @@ routes.route(routeNames.checkToken).get(userController.checkToken)
 routes.route(routeNames.deleteTokens).delete(userController.deleteTokens)
 routes.route(routeNames.resend).post(userController.resend)
 routes.route(routeNames.activate).post(userController.activate)
-routes.route(routeNames.signin).post(userController.signin)
-routes.route(routeNames.socialSignin).post(userController.socialSignin)
+routes.route(routeNames.signin).post(authLimiter, userController.signin)
+routes.route(routeNames.socialSignin).post(authLimiter, userController.socialSignin)
 routes.route(routeNames.signout).post(userController.signout)
 routes.route(routeNames.getPushToken).get(authJwt.verifyToken, userController.getPushToken)
 routes.route(routeNames.createPushToken).post(authJwt.verifyToken, userController.createPushToken)

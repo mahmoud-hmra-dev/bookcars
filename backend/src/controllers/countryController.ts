@@ -63,7 +63,7 @@ export const validate = async (req: Request, res: Response) => {
     }
   } catch (err) {
     logger.error(`[country.validate]  ${i18n.t('ERROR')} ${name}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -96,7 +96,7 @@ export const create = async (req: Request, res: Response) => {
     res.send(country)
   } catch (err) {
     logger.error(`[country.create] ${i18n.t('ERROR')} ${JSON.stringify(req.body)}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -151,7 +151,7 @@ export const update = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[country.update] ${i18n.t('ERROR')} ${JSON.stringify(req.body)}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -190,7 +190,7 @@ export const deleteCountry = async (req: Request, res: Response) => {
     res.sendStatus(200)
   } catch (err) {
     logger.error(`[country.delete] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -227,7 +227,7 @@ export const getCountry = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[country.getCountry] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -243,7 +243,7 @@ export const getCountry = async (req: Request, res: Response) => {
 export const getCountries = async (req: Request, res: Response) => {
   try {
     const page = Number.parseInt(req.params.page, 10)
-    const size = Number.parseInt(req.params.size, 10)
+    const size = Math.min(Number.parseInt(req.params.size, 10), 100)
     const { language } = req.params
     const keyword = escapeStringRegexp(String(req.query.s || ''))
     const options = 'i'
@@ -311,7 +311,7 @@ export const getCountries = async (req: Request, res: Response) => {
     res.json(countries)
   } catch (err) {
     logger.error(`[country.getCountries] ${i18n.t('ERROR')} ${req.query.s}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -418,7 +418,7 @@ export const getCountriesWithLocations = async (req: Request, res: Response) => 
     res.json(countries)
   } catch (err) {
     logger.error(`[country.getCountries] ${i18n.t('ERROR')} ${req.query.s}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -450,7 +450,7 @@ export const checkCountry = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[country.checkCountry] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -478,6 +478,6 @@ export const getCountryId = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[country.getCountryId] ${i18n.t('ERROR')} ${name}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }

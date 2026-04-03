@@ -30,7 +30,7 @@ const SupplierCarrousel = ({ suppliers }: SupplierCarrouselProps) => (
       suppliers.map((supplier) => (
         <div key={supplier._id}>
           <div key={supplier._id} className="supplier-container">
-            <img src={bookcarsHelper.joinURL(env.CDN_USERS, supplier.avatar)} alt={supplier.fullName} title={supplier.fullName} />
+            <img src={bookcarsHelper.joinURL(env.CDN_USERS, supplier.avatar)} alt={supplier.fullName} title={supplier.fullName} loading="lazy" />
           </div>
         </div>
       ))

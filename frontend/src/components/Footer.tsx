@@ -53,10 +53,10 @@ const Footer = () => {
             <a href={`mailto:${env.CONTACT_EMAIL}`}>{env.CONTACT_EMAIL}</a>
           </div>
           <div className="footer-contact">
-            <IconButton href="https://www.facebook.com/" target="_blank" aria-label="Facebook" className="social-icon"><FacebookIcon /></IconButton>
-            <IconButton href="https://x.com/" target="_blank" aria-label="X" className="social-icon"><X /></IconButton>
-            <IconButton href="https://www.linkedin.com/" target="_blank" aria-label="LinkedIn" className="social-icon"><LinkedIn /></IconButton>
-            <IconButton href="https://www.instagram.com/" target="_blank" aria-label="Instagram" className="social-icon"><Instagram /></IconButton>
+            <IconButton href="https://www.facebook.com/" target="_blank" rel="noreferrer noopener" aria-label="Facebook" className="social-icon"><FacebookIcon /></IconButton>
+            <IconButton href="https://x.com/" target="_blank" rel="noreferrer noopener" aria-label="X" className="social-icon"><X /></IconButton>
+            <IconButton href="https://www.linkedin.com/" target="_blank" rel="noreferrer noopener" aria-label="LinkedIn" className="social-icon"><LinkedIn /></IconButton>
+            <IconButton href="https://www.instagram.com/" target="_blank" rel="noreferrer noopener" aria-label="Instagram" className="social-icon"><Instagram /></IconButton>
           </div>
           <div className="newsletter">
             <NewsletterForm />

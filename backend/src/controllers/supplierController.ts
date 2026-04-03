@@ -45,7 +45,7 @@ export const validate = async (req: Request, res: Response) => {
     }
   } catch (err) {
     logger.error(`[supplier.validate] ${i18n.t('ERROR')} ${fullName}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -128,7 +128,7 @@ export const update = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[supplier.update] ${i18n.t('ERROR')} ${_id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -210,7 +210,7 @@ export const deleteSupplier = async (req: Request, res: Response) => {
     res.sendStatus(200)
   } catch (err) {
     logger.error(`[supplier.delete] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -271,7 +271,7 @@ export const getSupplier = async (req: Request, res: Response) => {
     })
   } catch (err) {
     logger.error(`[supplier.getSupplier] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -287,7 +287,7 @@ export const getSupplier = async (req: Request, res: Response) => {
 export const getSuppliers = async (req: Request, res: Response) => {
   try {
     const page = Number.parseInt(req.params.page, 10)
-    const size = Number.parseInt(req.params.size, 10)
+    const size = Math.min(Number.parseInt(req.params.size, 10), 100)
     const keyword = escapeStringRegexp(String(req.query.s || ''))
     const options = 'i'
 
@@ -345,7 +345,7 @@ export const getSuppliers = async (req: Request, res: Response) => {
     res.json(data)
   } catch (err) {
     logger.error(`[supplier.getSuppliers] ${i18n.t('ERROR')} ${req.query.s}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -376,7 +376,7 @@ export const getAllSuppliers = async (req: Request, res: Response) => {
     res.json(data)
   } catch (err) {
     logger.error(`[supplier.getAllSuppliers] ${i18n.t('ERROR')}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -633,7 +633,7 @@ export const getFrontendSuppliers = async (req: Request, res: Response) => {
     res.json(data)
   } catch (err) {
     logger.error(`[supplier.getFrontendSuppliers] ${i18n.t('ERROR')}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -775,7 +775,7 @@ export const getAdminSuppliers = async (req: Request, res: Response) => {
     res.json(data)
   } catch (err) {
     logger.error(`[supplier.getAdminSuppliers] ${i18n.t('ERROR')}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -816,7 +816,7 @@ export const createContract = async (req: Request, res: Response) => {
     res.json(filename)
   } catch (err) {
     logger.error(`[supplier.createContract] ${i18n.t('ERROR')}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -882,7 +882,7 @@ export const updateContract = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[supplier.updateContract] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -924,7 +924,7 @@ export const deleteContract = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[supplier.deleteContract] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -964,6 +964,6 @@ export const deleteTempContract = async (req: Request, res: Response) => {
     res.sendStatus(200)
   } catch (err) {
     logger.error(`[supplier.deleteTempContract] ${i18n.t('ERROR')} ${file}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }

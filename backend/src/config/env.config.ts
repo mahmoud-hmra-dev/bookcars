@@ -193,6 +193,14 @@ export const X_ACCESS_TOKEN = 'x-access-token'
  */
 export const JWT_SECRET = __env__('BC_JWT_SECRET', false, 'bookcars')
 
+if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'bookcars') {
+  throw new Error('SECURITY: BC_JWT_SECRET must be changed from default in production!')
+}
+
+if (process.env.NODE_ENV === 'production' && COOKIE_SECRET === 'bookcars') {
+  throw new Error('SECURITY: BC_COOKIE_SECRET must be changed from default in production!')
+}
+
 /**
  * JWT expiration in seconds. Default is 86400 seconds (1 day).
  *

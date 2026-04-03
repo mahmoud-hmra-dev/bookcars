@@ -9,6 +9,7 @@ import { SettingProvider } from '@/context/SettingContext'
 import { init as initGA } from '@/utils/ga4'
 import ScrollToTop from '@/components/ScrollToTop'
 import NProgressIndicator from '@/components/NProgressIndicator'
+import ErrorBoundary from '@/components/ErrorBoundary'
 
 if (env.GOOGLE_ANALYTICS_ENABLED) {
   initGA()
@@ -104,6 +105,10 @@ const router = createBrowserRouter([
   }
 ])
 
-const App = () => <RouterProvider router={router} />
+const App = () => (
+  <ErrorBoundary>
+    <RouterProvider router={router} />
+  </ErrorBoundary>
+)
 
 export default App

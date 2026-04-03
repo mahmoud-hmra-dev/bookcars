@@ -174,7 +174,7 @@ ${i18n.t('REGARDS')}<br>
     res.json(car)
   } catch (err) {
     logger.error(`[car.create] ${i18n.t('ERROR')} ${JSON.stringify(body)}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -344,7 +344,7 @@ export const update = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[car.update] ${i18n.t('ERROR')} ${_id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -375,7 +375,7 @@ export const checkCar = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[car.check] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -400,7 +400,7 @@ export const validateLicensePlate = async (req: Request, res: Response) => {
     }
   } catch (err) {
     logger.error(`[car.validateLicensePlate] ${i18n.t('ERROR')} ${licensePlate}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -425,7 +425,7 @@ export const validateCarLicensePlate = async (req: Request, res: Response) => {
     }
   } catch (err) {
     logger.error(`[car.validateLicensePlate] ${i18n.t('ERROR')} ${licensePlate}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -474,7 +474,7 @@ export const deleteCar = async (req: Request, res: Response) => {
     res.sendStatus(200)
   } catch (err) {
     logger.error(`[car.delete] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -507,7 +507,7 @@ export const createImage = async (req: Request, res: Response) => {
     res.json(filename)
   } catch (err) {
     logger.error(`[car.createImage] ${i18n.t('ERROR')}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -564,7 +564,7 @@ export const updateImage = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[car.updateImage] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -600,7 +600,7 @@ export const deleteImage = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[car.deleteImage] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -642,7 +642,7 @@ export const deleteTempImage = async (req: Request, res: Response) => {
     res.sendStatus(200)
   } catch (err) {
     logger.error(`[car.deleteTempImage] ${i18n.t('ERROR')} ${image}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -700,7 +700,7 @@ export const getCar = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[car.getCar] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -775,7 +775,7 @@ export const getTracking = async (req: Request, res: Response) => {
     })
   } catch (err) {
     logger.error(`[car.getTracking] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -783,7 +783,7 @@ export const getCars = async (req: Request, res: Response) => {
   try {
     const { body }: { body: bookcarsTypes.GetCarsPayload } = req
     const page = Number.parseInt(req.params.page, 10)
-    const size = Number.parseInt(req.params.size, 10)
+    const size = Math.min(Number.parseInt(req.params.size, 10), 100)
     const suppliers = body.suppliers!.map((id) => new mongoose.Types.ObjectId(id))
     const {
       carType,
@@ -985,7 +985,7 @@ export const getCars = async (req: Request, res: Response) => {
     res.json(data)
   } catch (err) {
     logger.error(`[car.getCars] ${i18n.t('ERROR')} ${req.query.s}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -1006,7 +1006,7 @@ export const getBookingCars = async (req: Request, res: Response) => {
     const keyword = escapeStringRegexp(String(req.query.s || ''))
     const options = 'i'
     const page = Number.parseInt(req.params.page, 10)
-    const size = Number.parseInt(req.params.size, 10)
+    const size = Math.min(Number.parseInt(req.params.size, 10), 100)
 
     const cars = await Car.aggregate(
       [
@@ -1049,7 +1049,7 @@ export const getBookingCars = async (req: Request, res: Response) => {
     res.json(cars)
   } catch (err) {
     logger.error(`[car.getBookingCars] ${i18n.t('ERROR')} ${req.query.s}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -1066,7 +1066,7 @@ export const getFrontendCars = async (req: Request, res: Response) => {
   try {
     const { body }: { body: bookcarsTypes.GetCarsPayload } = req
     const page = Number.parseInt(req.params.page, 10)
-    const size = Number.parseInt(req.params.size, 10)
+    const size = Math.min(Number.parseInt(req.params.size, 10), 100)
     const suppliers = body.suppliers!.map((id) => new mongoose.Types.ObjectId(id))
     const pickupLocation = new mongoose.Types.ObjectId(body.pickupLocation)
     const {
@@ -1387,6 +1387,6 @@ export const getFrontendCars = async (req: Request, res: Response) => {
     res.json(data)
   } catch (err) {
     logger.error(`[car.getFrontendCars] ${i18n.t('ERROR')} ${req.query.s}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }

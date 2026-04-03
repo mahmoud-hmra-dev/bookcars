@@ -3,8 +3,8 @@ name: test
 on:
   push:
     branches: [ main ]
-  # pull_request:
-  #   branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   test:
@@ -100,6 +100,13 @@ jobs:
         BC_PAYPAL_CLIENT_ID: ${{ secrets.BC_PAYPAL_CLIENT_ID }}
         BC_PAYPAL_CLIENT_SECRET: ${{ secrets.BC_PAYPAL_CLIENT_SECRET }}
         BC_ADMIN_EMAIL: ${{ vars.BC_ADMIN_EMAIL }}
+
+    - name: Frontend type check
+      run: |
+           cd ./frontend
+           npm install --force
+           npx tsc --noEmit
+      continue-on-error: true
 
     # - name: Show coverage report content
     #   run: |

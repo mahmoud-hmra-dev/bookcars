@@ -168,8 +168,6 @@ const Car = ({
   if (loading || !language || (!hidePrice && (!days || !totalPrice))) {
     return null
   }
-  // console.log('car')
-
   const fr = language === 'fr'
 
   return (
@@ -190,12 +188,12 @@ const Car = ({
       )}
       <article>
         <div className="car">
-          <img src={bookcarsHelper.joinURL(env.CDN_CARS, car.image)} alt={car.name} className="car-img" />
+          <img src={bookcarsHelper.joinURL(env.CDN_CARS, car.image)} alt={car.name} className="car-img" loading="lazy" />
           <div className="car-row">
             {!hideSupplier && (
               <div className="car-supplier" style={sizeAuto ? { bottom: 10 } : {}} title={car.supplier.fullName}>
                 <span className="car-supplier-logo">
-                  <img src={bookcarsHelper.joinURL(env.CDN_USERS, car.supplier.avatar)} alt={car.supplier.fullName} />
+                  <img src={bookcarsHelper.joinURL(env.CDN_USERS, car.supplier.avatar)} alt={car.supplier.fullName} loading="lazy" />
                 </span>
                 <span className="car-supplier-info">{car.supplier.fullName}</span>
               </div>

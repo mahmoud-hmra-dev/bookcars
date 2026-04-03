@@ -22,6 +22,8 @@ import bankDetailsRoutes from './routes/bankDetailsRoutes'
 import settingRoutes from './routes/settingRoutes'
 import assistantRoutes from './routes/assistantRoutes'
 import traccarRoutes from './routes/traccarRoutes'
+import healthRoutes from './routes/healthRoutes'
+import { apiLimiter } from './middlewares/rateLimiter'
 import * as helper from './utils/helper'
 
 const app = express()
@@ -43,17 +45,19 @@ app.use(helmet.crossOriginOpenerPolicy())
 
 app.use(nocache())
 app.use(compression({ threshold: 0 }))
-app.use(express.urlencoded({ limit: '50mb', extended: true }))
-app.use(express.json({ limit: '50mb' }))
+app.use(express.urlencoded({ limit: '5mb', extended: true }))
+app.use(express.json({ limit: '5mb' }))
 
 app.use(cors())
 // app.options('*', cors())
 app.use(cookieParser(env.COOKIE_SECRET))
 app.use(allowedMethods)
+app.use('/api/', apiLimiter)
 
 // Serve static files from the CDN directory
 app.use('/cdn', express.static(env.CDN_ROOT))
 
+app.use('/', healthRoutes)
 app.use('/', supplierRoutes)
 app.use('/', bookingRoutes)
 app.use('/', locationRoutes)

@@ -24,5 +24,9 @@ WORKDIR /usr/share/nginx/html
 RUN rm -rf -- *
 COPY --from=build /bookcars/admin/build .
 COPY ./admin/nginx.conf /etc/nginx/conf.d/default.conf
+RUN apk add --no-cache curl
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD curl -f http://localhost/ || exit 1
+
 CMD ["nginx", "-g", "daemon off;"]
 EXPOSE 3001

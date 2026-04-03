@@ -16,5 +16,11 @@ COPY ./packages /bookcars/packages
 COPY ./backend ./
 COPY ./backend/.env.docker .env
 
+RUN apk add --no-cache curl
+RUN addgroup --system app && adduser --system --ingroup app app
+USER app
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 CMD curl -f http://localhost:4002/api/health || exit 1
+
 CMD [ "npm", "run", "start:setup"]
 EXPOSE 4002

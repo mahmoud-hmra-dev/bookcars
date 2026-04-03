@@ -7,8 +7,36 @@
   <!-- <link rel="preload" href="/cover.png" as="image" type="image/png" /> -->
   <link rel="preload" href="/cover.webp" as="image" type="image/webp" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="<%= WEBSITE_NAME %> Rental Service" />
-  <title><%= WEBSITE_NAME %> Rental Service</title>
+  <meta name="description" content="<%= WEBSITE_NAME %> - Book your car rental online. Compare prices, choose from a wide fleet of vehicles, and enjoy flexible pickup and drop-off at multiple locations." />
+  <title><%= WEBSITE_NAME %> - Car Rental Service</title>
+
+  <!-- Canonical -->
+  <link rel="canonical" href="https://www.bookcars.com/" />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="<%= WEBSITE_NAME %> - Car Rental Service" />
+  <meta property="og:description" content="Book your car rental online. Compare prices, choose from a wide fleet of vehicles, and enjoy flexible pickup and drop-off at multiple locations." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://www.bookcars.com/" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="<%= WEBSITE_NAME %> - Car Rental Service" />
+  <meta name="twitter:description" content="Book your car rental online. Compare prices, choose from a wide fleet of vehicles, and enjoy flexible pickup and drop-off at multiple locations." />
+
+  <!-- JSON-LD Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "CarRental",
+    "name": "<%= WEBSITE_NAME %>",
+    "description": "Book your car rental online. Compare prices, choose from a wide fleet of vehicles, and enjoy flexible pickup and drop-off at multiple locations.",
+    "url": "https://www.bookcars.com/",
+    "currenciesAccepted": "USD, EUR",
+    "openingHours": "Mo-Su 00:00-23:59",
+    "priceRange": "$$"
+  }
+  </script>
 </head>
 
 <body>

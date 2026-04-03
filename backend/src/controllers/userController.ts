@@ -130,7 +130,7 @@ const _signup = async (req: Request, res: Response, userType: bookcarsTypes.User
     }
   } catch (err) {
     logger.error(`[user.signup] ${i18n.t('ERROR')} ${JSON.stringify(body)}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
     return
   }
 
@@ -175,7 +175,7 @@ const _signup = async (req: Request, res: Response, userType: bookcarsTypes.User
       logger.error(`[user.signup] ${i18n.t('ERROR')} ${JSON.stringify(body)}`, deleteErr)
     }
     logger.error(`[user.signup] ${i18n.t('SMTP_ERROR')}`, err)
-    res.status(400).send(i18n.t('SMTP_ERROR') + err)
+    res.status(400).json({ error: i18n.t('SMTP_ERROR') })
   }
 }
 
@@ -457,7 +457,7 @@ export const create = async (req: Request, res: Response) => {
     res.sendStatus(200)
   } catch (err) {
     logger.error(`[user.create] ${i18n.t('ERROR')} ${JSON.stringify(body)}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -509,7 +509,7 @@ export const checkToken = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[user.checkToken] ${i18n.t('ERROR')} ${JSON.stringify(req.params)}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -538,7 +538,7 @@ export const deleteTokens = async (req: Request, res: Response) => {
     res.sendStatus(400)
   } catch (err) {
     logger.error(`[user.deleteTokens] ${i18n.t('ERROR')} ${userId}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -610,7 +610,7 @@ export const resend = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[user.resend] ${i18n.t('ERROR')} ${email}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -655,7 +655,7 @@ export const activate = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[user.activate] ${i18n.t('ERROR')} ${userId}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -763,7 +763,7 @@ export const signin = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[user.signin] ${i18n.t('ERROR')} ${emailFromBody}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -916,7 +916,7 @@ export const socialSignin = async (req: Request, res: Response) => {
       .send(loggedUser)
   } catch (err) {
     logger.error(`[user.socialSignin] ${i18n.t('ERROR')} ${emailFromBody}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -963,7 +963,7 @@ export const getPushToken = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[user.pushToken] ${i18n.t('ERROR')} ${userId}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -999,7 +999,7 @@ export const createPushToken = async (req: Request, res: Response) => {
     res.status(400).send('Push Token already exists.')
   } catch (err) {
     logger.error(`[user.createPushToken] ${i18n.t('ERROR')} ${userId}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -1024,7 +1024,7 @@ export const deletePushToken = async (req: Request, res: Response) => {
     res.sendStatus(200)
   } catch (err) {
     logger.error(`[user.deletePushToken] ${i18n.t('ERROR')} ${userId}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -1071,7 +1071,7 @@ export const validateEmail = async (req: Request, res: Response) => {
     res.sendStatus(200)
   } catch (err) {
     logger.error(`[user.validateEmail] ${i18n.t('ERROR')} ${email}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -1137,7 +1137,7 @@ export const confirmEmail = async (req: Request, res: Response) => {
     res.status(200).send(getStatusMessage(user.language, i18n.t('ACCOUNT_ACTIVATION_SUCCESS')))
   } catch (err) {
     logger.error(`[user.confirmEmail] ${i18n.t('ERROR')} ${JSON.stringify(req.params)}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -1204,7 +1204,7 @@ export const resendLink = async (req: Request, res: Response) => {
       .send(getStatusMessage(user.language, i18n.t('ACCOUNT_ACTIVATION_EMAIL_SENT_PART_1') + user.email + i18n.t('ACCOUNT_ACTIVATION_EMAIL_SENT_PART_2')))
   } catch (err) {
     logger.error(`[user.resendLink] ${i18n.t('ERROR')} ${email}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -1296,7 +1296,7 @@ export const update = async (req: Request, res: Response) => {
     res.sendStatus(200)
   } catch (err) {
     logger.error(`[user.update] ${i18n.t('ERROR')} ${JSON.stringify(req.body)}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -1334,7 +1334,7 @@ export const updateEmailNotifications = async (req: Request, res: Response) => {
     res.sendStatus(200)
   } catch (err) {
     logger.error(`[user.updateEmailNotifications] ${i18n.t('ERROR')} ${JSON.stringify(body)}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -1398,7 +1398,7 @@ export const updateLanguage = async (req: Request, res: Response) => {
     res.sendStatus(200)
   } catch (err) {
     logger.error(`[user.updateLanguage] ${i18n.t('ERROR')} ${JSON.stringify(req.body)}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -1451,7 +1451,7 @@ export const getUser = async (req: Request, res: Response) => {
     res.json(user)
   } catch (err) {
     logger.error(`[user.getUser] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -1484,7 +1484,7 @@ export const createAvatar = async (req: Request, res: Response) => {
     res.json(filename)
   } catch (err) {
     logger.error(`[user.createAvatar] ${i18n.t('ERROR')}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -1540,7 +1540,7 @@ export const updateAvatar = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[user.updateAvatar] ${i18n.t('ERROR')} ${userId}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -1577,7 +1577,7 @@ export const deleteAvatar = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[user.deleteAvatar] ${i18n.t('ERROR')} ${userId}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -1619,7 +1619,7 @@ export const deleteTempAvatar = async (req: Request, res: Response) => {
     res.sendStatus(200)
   } catch (err) {
     logger.error(`[user.deleteTempAvatar] ${i18n.t('ERROR')} ${avatar}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -1695,7 +1695,7 @@ export const changePassword = async (req: Request, res: Response) => {
     return _changePassword()
   } catch (err) {
     logger.error(`[user.changePassword] ${i18n.t('ERROR')} ${_id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -1738,7 +1738,7 @@ export const checkPassword = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[user.checkPassword] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -1764,7 +1764,7 @@ export const getUsers = async (req: Request, res: Response) => {
     const keyword = escapeStringRegexp(String(req.query.s || ''))
     const options = 'i'
     const page = Number.parseInt(req.params.page, 10)
-    const size = Number.parseInt(req.params.size, 10)
+    const size = Math.min(Number.parseInt(req.params.size, 10), 100)
     const { body }: { body: bookcarsTypes.GetUsersBody } = req
     const { types, user: userId } = body
 
@@ -1829,7 +1829,7 @@ export const getUsers = async (req: Request, res: Response) => {
     res.json(users)
   } catch (err) {
     logger.error(`[user.getUsers] ${i18n.t('ERROR')}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -1930,7 +1930,7 @@ export const deleteUsers = async (req: Request, res: Response) => {
     res.sendStatus(200)
   } catch (err) {
     logger.error(`[user.delete] ${i18n.t('ERROR')} ${JSON.stringify(req.body)}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -1955,7 +1955,7 @@ export const verifyRecaptcha = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[user.delete] ${i18n.t('ERROR')} ${JSON.stringify(req.body)}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -1997,7 +1997,7 @@ export const sendEmail = async (req: Request, res: Response) => {
     res.sendStatus(200)
   } catch (err) {
     logger.error(`[user.sendEmail] ${JSON.stringify(req.body)}`, err)
-    res.status(400).send(err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -2025,7 +2025,7 @@ export const hasPassword = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[user.hasPassword] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -2061,7 +2061,7 @@ export const createLicense = async (req: Request, res: Response) => {
     res.json(filename)
   } catch (err) {
     logger.error(`[user.createLicense] ${i18n.t('ERROR')}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -2120,7 +2120,7 @@ export const updateLicense = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[user.updateLicense] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -2159,7 +2159,7 @@ export const deleteLicense = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[user.deleteLicense] ${i18n.t('ERROR')} ${id}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -2199,6 +2199,6 @@ export const deleteTempLicense = async (req: Request, res: Response) => {
     res.sendStatus(200)
   } catch (err) {
     logger.error(`[user.deleteTempLicense] ${i18n.t('ERROR')} ${file}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }

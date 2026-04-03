@@ -9,8 +9,12 @@
 /**/.env.example
 /**/.env.development
 /**/.env.production
+/**/.env.*
 /**/.dockerignore
 /**/Dockerfile
+/**/__tests__
+/**/*.test.*
+/**/coverage
 mobile/
 .github/
 .vscode/

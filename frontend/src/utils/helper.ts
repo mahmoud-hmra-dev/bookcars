@@ -31,9 +31,6 @@ export const info = (message: string) => {
  * @param {?string} [message]
  */
 export const error = (err?: unknown, message?: string) => {
-  if (err && console?.log) {
-    console.log(err)
-  }
   if (message) {
     toast.error(message)
   } else {
@@ -637,22 +634,9 @@ export const getLocation = async (): Promise<[number, number] | null> => {
       const { latitude, longitude } = position.coords
       return [latitude, longitude]
     }
-    console.log('Geolocation is not supported by this browser.')
-  } catch (err: any) {
-    switch (err.code) {
-      case err.PERMISSION_DENIED:
-        console.log('User denied the request for Geolocation:', err.message)
-        break
-      case err.POSITION_UNAVAILABLE:
-        console.log('Location information is unavailable:', err.message)
-        break
-      case err.TIMEOUT:
-        console.log('The request to get user location timed out:', err.message)
-        break
-      default:
-        console.log('An unknown geolocation error occurred:', err.message)
-        break
-    }
+    // Geolocation is not supported by this browser
+  } catch {
+    // Geolocation error (permission denied, position unavailable, timeout, etc.)
   }
 
   return null

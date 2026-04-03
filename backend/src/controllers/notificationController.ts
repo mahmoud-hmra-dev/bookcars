@@ -28,7 +28,7 @@ export const notificationCounter = async (req: Request, res: Response) => {
     res.json(cnt)
   } catch (err) {
     logger.error(`[notification.notificationCounter] ${i18n.t('ERROR')} ${userId}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -47,7 +47,7 @@ export const getNotifications = async (req: Request, res: Response) => {
   try {
     const userId = new mongoose.Types.ObjectId(_userId)
     const page = Number.parseInt(_page, 10)
-    const size = Number.parseInt(_size, 10)
+    const size = Math.min(Number.parseInt(_size, 10), 100)
 
     const notifications = await Notification.aggregate([
       { $match: { user: userId } },
@@ -66,7 +66,7 @@ export const getNotifications = async (req: Request, res: Response) => {
     res.json(notifications)
   } catch (err) {
     logger.error(`[notification.getNotifications] ${i18n.t('ERROR')} ${_userId}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -114,7 +114,7 @@ export const markAsRead = async (req: Request, res: Response) => {
     res.sendStatus(200)
   } catch (err) {
     logger.error(`[notification.markAsRead] ${i18n.t('ERROR')}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -162,7 +162,7 @@ export const markAsUnRead = async (req: Request, res: Response) => {
     res.sendStatus(200)
   } catch (err) {
     logger.error(`[notification.markAsUnRead] ${i18n.t('ERROR')}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -200,6 +200,6 @@ export const deleteNotifications = async (req: Request, res: Response) => {
     res.sendStatus(200)
   } catch (err) {
     logger.error(`[notification.deleteNotifications] ${i18n.t('ERROR')}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }

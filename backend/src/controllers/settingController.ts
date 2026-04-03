@@ -40,7 +40,7 @@ export const getSettings = async (req: Request, res: Response) => {
     res.json(settings)
   } catch (err) {
     logger.error(`[setting.getSettings] ${i18n.t('ERROR')}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -77,6 +77,6 @@ export const updateSettings = async (req: Request, res: Response) => {
     res.sendStatus(204)
   } catch (err) {
     logger.error(`[setting.updateSettings] ${i18n.t('ERROR')}`, err)
-    res.status(400).send(i18n.t('ERROR') + err)
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }

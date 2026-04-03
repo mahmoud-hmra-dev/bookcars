@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import * as bookcarsTypes from ':bookcars-types'
+import i18n from '../lang/i18n'
 import * as logger from '../utils/logger'
 import * as env from '../config/env.config'
 import Car from '../models/Car'
@@ -237,7 +238,7 @@ export const getDevices = async (_req: Request, res: Response) => {
     res.json(devices)
   } catch (err) {
     logger.error('[traccar.getDevices] Error', err)
-    res.status(400).send(String(err))
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -247,7 +248,7 @@ export const getAllGeofences = async (_req: Request, res: Response) => {
     res.json(geofences)
   } catch (err) {
     logger.error('[traccar.getAllGeofences] Error', err)
-    res.status(400).send(String(err))
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -349,7 +350,7 @@ export const getFleetOverview = async (_req: Request, res: Response) => {
     })
   } catch (err) {
     logger.error('[traccar.getFleetOverview] Error', err)
-    res.status(400).send(String(err))
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -383,7 +384,7 @@ export const linkDevice = async (req: Request, res: Response) => {
     res.json(car.tracking)
   } catch (err) {
     logger.error('[traccar.linkDevice] Error', err)
-    res.status(400).send(String(err))
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -393,7 +394,7 @@ export const createGeofence = async (req: Request, res: Response) => {
     res.json(geofence)
   } catch (err) {
     logger.error('[traccar.createGeofence] Error', err)
-    res.status(400).send(String(err))
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -403,7 +404,7 @@ export const updateGeofence = async (req: Request, res: Response) => {
     res.json(geofence)
   } catch (err) {
     logger.error('[traccar.updateGeofence] Error', err)
-    res.status(400).send(String(err))
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -413,7 +414,7 @@ export const deleteGeofence = async (req: Request, res: Response) => {
     res.status(204).send()
   } catch (err) {
     logger.error('[traccar.deleteGeofence] Error', err)
-    res.status(400).send(String(err))
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -433,7 +434,7 @@ export const unlinkDevice = async (req: Request, res: Response) => {
     res.json(car.tracking)
   } catch (err) {
     logger.error('[traccar.unlinkDevice] Error', err)
-    res.status(400).send(String(err))
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -452,7 +453,7 @@ export const getCurrentPositions = async (req: Request, res: Response) => {
     res.json(positions)
   } catch (err) {
     logger.error('[traccar.getCurrentPositions] Error', err)
-    res.status(400).send(String(err))
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -463,7 +464,7 @@ export const getCommandTypes = async (req: Request, res: Response) => {
     res.json(commandTypes)
   } catch (err) {
     logger.error('[traccar.getCommandTypes] Error', err)
-    res.status(400).send(String(err))
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -482,7 +483,7 @@ export const sendDeviceCommand = async (req: Request, res: Response) => {
     res.json(command)
   } catch (err) {
     logger.error('[traccar.sendDeviceCommand] Error', err)
-    res.status(400).send(String(err))
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -505,7 +506,7 @@ export const getRouteHistory = async (req: Request, res: Response) => {
     res.json(route)
   } catch (err) {
     logger.error('[traccar.getRouteHistory] Error', err)
-    res.status(400).send(String(err))
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -524,7 +525,7 @@ export const getGeofences = async (req: Request, res: Response) => {
     res.json(geofences)
   } catch (err) {
     logger.error('[traccar.getGeofences] Error', err)
-    res.status(400).send(String(err))
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -544,7 +545,7 @@ export const linkGeofence = async (req: Request, res: Response) => {
     res.json(await traccarService.getGeofences(car.tracking?.deviceId as number))
   } catch (err) {
     logger.error('[traccar.linkGeofence] Error', err)
-    res.status(400).send(String(err))
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -564,7 +565,7 @@ export const unlinkGeofence = async (req: Request, res: Response) => {
     res.json(await traccarService.getGeofences(car.tracking?.deviceId as number))
   } catch (err) {
     logger.error('[traccar.unlinkGeofence] Error', err)
-    res.status(400).send(String(err))
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -593,7 +594,7 @@ export const getGeofenceAlerts = async (req: Request, res: Response) => {
     res.json(events)
   } catch (err) {
     logger.error('[traccar.getGeofenceAlerts] Error', err)
-    res.status(400).send(String(err))
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -689,7 +690,7 @@ export const getEventCenter = async (req: Request, res: Response) => {
     res.json(enriched)
   } catch (err) {
     logger.error('[traccar.getEventCenter] Error', err)
-    res.status(400).send(String(err))
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
@@ -720,7 +721,7 @@ export const getVehicleReports = async (req: Request, res: Response) => {
     } satisfies bookcarsTypes.TraccarVehicleReportBundle)
   } catch (err) {
     logger.error('[traccar.getVehicleReports] Error', err)
-    res.status(400).send(String(err))
+    res.status(400).json({ error: i18n.t('ERROR') })
   }
 }
 
