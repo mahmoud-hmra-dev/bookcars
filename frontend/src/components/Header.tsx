@@ -34,7 +34,6 @@ import {
   QuestionAnswer as FaqIcon,
   PersonOutline as SignUpIcon,
   Cookie as CookiePolicyIcon,
-  Sell as SellIcon,
 } from '@mui/icons-material'
 import { toast } from 'react-toastify'
 import { CircleFlag } from 'react-circle-flags'
@@ -408,15 +407,6 @@ const Header = ({
                 </ListItem>
                 <ListItem
                   onClick={() => {
-                    navigate('/buy')
-                    handleSideMenuClose()
-                  }}
-                >
-                  <ListItemIcon><SellIcon /></ListItemIcon>
-                  <ListItemText primary="Buy Cars" />
-                </ListItem>
-                <ListItem
-                  onClick={() => {
                     navigate('/about')
                     handleSideMenuClose()
                   }}
@@ -496,11 +486,6 @@ const Header = ({
 
             {(env.isMobile || !headerTitle) && <div style={classes.grow} />}
             <div className="header-desktop">
-              {isLoaded && (
-                <Button variant="contained" size="medium" startIcon={<SellIcon />} onClick={() => navigate('/buy')} disableElevation className="btn btn-auth" aria-label="Buy cars">
-                  <span className="btn-auth-txt">Buy Cars</span>
-                </Button>
-              )}
               {isLoaded && (
                 <Button variant="contained" onClick={handleCurrencyMenuOpen} disableElevation className="btn bold">
                   {PaymentService.getCurrency()}

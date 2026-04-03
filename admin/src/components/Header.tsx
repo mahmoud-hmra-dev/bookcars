@@ -38,7 +38,6 @@ import {
   MyLocation as TrackingIcon,
   MenuBook as ManualDocumentationIcon,
   IntegrationInstructions as TechnicalDocumentationIcon,
-  Sell as SellIcon,
 } from '@mui/icons-material'
 import { useNavigate } from 'react-router-dom'
 import * as bookcarsTypes from ':bookcars-types'
@@ -360,15 +359,6 @@ const Header = ({
                 >
                   <ListItemIcon><CarsIcon /></ListItemIcon>
                   <ListItemText primary={strings.CARS} />
-                </ListItem>
-                <ListItem
-                  onClick={() => {
-                    navigate('/sale-listings')
-                    handleSideMenuClose()
-                  }}
-                >
-                  <ListItemIcon><SellIcon /></ListItemIcon>
-                  <ListItemText primary="Sale Listings" />
                 </ListItem>
                 <ListItem
                   onClick={() => {

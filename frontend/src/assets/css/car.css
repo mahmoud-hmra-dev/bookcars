@@ -6,14 +6,21 @@ div.car-container {
 
 div.car-container article .btn-book {
   border: 0;
-  border-radius: 5px;
+  border-radius: 12px;
   color: #fff;
-  height: 42px;
+  height: 44px;
   margin: 0;
   white-space: nowrap;
-  /* font-size: 1.5em; */
-  /* font-weight: 400; */
-  padding: 0 20px;
+  padding: 0 24px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #1B6B4A 0%, #2D9D6F 100%) !important;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(27, 107, 74, 0.25);
+}
+
+div.car-container article .btn-book:hover {
+  box-shadow: 0 6px 20px rgba(27, 107, 74, 0.35);
+  transform: translateY(-1px);
 }
 
 div.car-container article span.coming-soon,
@@ -72,15 +79,23 @@ div.car-container {
 
 div.car-container article {
   background: #fff;
-  border: 1px solid #eee;
-  border-radius: 5px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 16px;
   color: #333;
   font-size: 12px;
-  margin-bottom: 10px;
+  margin-bottom: 16px;
   width: 800px;
   display: flex;
   flex-direction: row;
-  padding: 15px;
+  padding: 20px;
+  transition: all 0.25s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+div.car-container article:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+  border-color: rgba(27, 107, 74, 0.15);
 }
 
 div.car-container article div.car {

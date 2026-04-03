@@ -9,7 +9,7 @@
 }
 
 #nprogress .bar {
-  background: #1a1a1a !important;
+  background: #1B6B4A !important;
 }
 
 .buttons button {
@@ -18,8 +18,18 @@
 }
 
 .btn-primary {
-  background-color: #232323 !important;
+  background-color: #1B6B4A !important;
   color: #fff !important;
+  border-radius: 10px !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+  letter-spacing: 0.01em !important;
+  transition: all 0.2s ease !important;
+}
+
+.btn-primary:hover {
+  background-color: #145038 !important;
+  box-shadow: 0 4px 12px rgba(27, 107, 74, 0.3) !important;
 }
 
 .hidden {

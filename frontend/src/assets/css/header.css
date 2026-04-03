@@ -1,10 +1,10 @@
 /* Header */
 .header {
-  /* position: -webkit-sticky !important;
-  position: sticky !important;
-  top: 0; 
-  z-index: 1400; */
   transform: translate3d(0, 0, 0);
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
 }
 
 .menu {
@@ -24,15 +24,18 @@
 }
 
 .menu .menu-lnk {
-  color: #1a1a1a;
+  color: #0F1419;
 }
 
 .side-menu li {
   cursor: pointer;
+  border-radius: 8px;
+  margin: 2px 8px;
+  transition: background-color 0.2s ease;
 }
 
 .side-menu li:hover {
-  background-color: #f1f1f1;
+  background-color: rgba(27, 107, 74, 0.06);
 }
 
 .header-action {
@@ -45,6 +48,7 @@
   flex-grow: 1;
   justify-content: flex-end;
   align-items: center;
+  gap: 4px;
 }
 
 .header-mobile {
@@ -53,12 +57,14 @@
 
 .header .btn {
   background-color: transparent !important;
-  color: #121212 !important;
+  color: #0F1419 !important;
   text-transform: none !important;
+  border-radius: 10px !important;
+  font-weight: 500 !important;
 }
 
 .header .btn:hover {
-  background-color: rgba(0, 0, 0, 0.07) !important;
+  background-color: rgba(27, 107, 74, 0.06) !important;
 }
 
 .header .btn-auth span.btn-auth-txt {
@@ -69,22 +75,21 @@
   text-decoration: none;
   text-transform: none;
   background: transparent;
-  font-size: 18px;
-  font-weight: 500;
-  color: #121212;
+  font-size: 20px;
+  font-weight: 700;
+  color: #1B6B4A;
+  letter-spacing: -0.02em;
 }
 
 /* Device width is greater than or equal to 960px */
-
-@media only screen and (width >=960px) {
+@media only screen and (width >= 960px) {
   .header {
     min-height: 64px;
   }
 }
 
 /* Device width is less than or equal to 960px */
-
-@media only screen and (width <=960px) {
+@media only screen and (width <= 960px) {
   .header {
     min-height: 56px;
   }

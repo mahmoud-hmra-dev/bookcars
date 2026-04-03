@@ -15,7 +15,6 @@ import ParkingSpot from '../models/ParkingSpot'
 import AdditionalDriver from '../models/AdditionalDriver'
 import BankDetails from '../models/BankDetails'
 import DateBasedPrice from '../models/DateBasedPrice'
-import SaleListing from '../models/SaleListing'
 import * as databaseTTLHelper from './databaseTTLHelper'
 import * as databaseLangHelper from './databaseLangHelper'
 import * as settingController from '../controllers/settingController'
@@ -224,7 +223,6 @@ export const models = defineModels([
   NotificationCounter,
   ParkingSpot,
   PushToken,
-  SaleListing,
   Token,
   User,
 ] as const)

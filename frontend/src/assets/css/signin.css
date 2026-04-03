@@ -24,7 +24,7 @@ div.signin::before {
   height: 280px;
   inset-inline-start: -80px;
   top: 60px;
-  background: radial-gradient(circle, rgb(214 235 255 / 95%) 0%, rgb(214 235 255 / 0%) 72%);
+  background: radial-gradient(circle, rgb(200 235 218 / 95%) 0%, rgb(200 235 218 / 0%) 72%);
 }
 
 div.signin::after {
@@ -32,7 +32,7 @@ div.signin::after {
   height: 360px;
   inset-inline-end: -120px;
   bottom: -40px;
-  background: radial-gradient(circle, rgb(253 223 203 / 80%) 0%, rgb(253 223 203 / 0%) 72%);
+  background: radial-gradient(circle, rgb(232 168 56 / 30%) 0%, rgb(232 168 56 / 0%) 72%);
 }
 
 div.signin .signin-shell {

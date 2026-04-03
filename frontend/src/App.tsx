@@ -21,8 +21,6 @@ const Activate = lazy(() => import('@/pages/Activate'))
 const ForgotPassword = lazy(() => import('@/pages/ForgotPassword'))
 const ResetPassword = lazy(() => import('@/pages/ResetPassword'))
 const Home = lazy(() => import('@/pages/Home'))
-const Buy = lazy(() => import('@/pages/Buy'))
-const BuyListing = lazy(() => import('@/pages/BuyListing'))
 const Search = lazy(() => import('@/pages/Search'))
 const Checkout = lazy(() => import('@/pages/Checkout'))
 const CheckoutSession = lazy(() => import('@/pages/CheckoutSession'))
@@ -78,8 +76,6 @@ const router = createBrowserRouter([
     element: <AppLayout />,
     children: [
       { index: true, element: <Home /> },
-      { path: 'buy', element: <Buy /> },
-      { path: 'buy/:id', element: <BuyListing /> },
       { path: 'sign-in', element: <SignIn /> },
       { path: 'sign-up', element: <SignUp /> },
       { path: 'activate', element: <Activate /> },

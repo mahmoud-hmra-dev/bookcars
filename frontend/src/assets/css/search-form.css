@@ -9,10 +9,19 @@ form.home-search-form .btn-cancel {
 form.home-search-form .btn-search {
   color: #fff;
   border: 0;
-  border-radius: 5px;
+  border-radius: 12px;
   margin: 0;
   white-space: nowrap;
-  background: #212121;
+  background: linear-gradient(135deg, #1B6B4A 0%, #2D9D6F 100%);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(27, 107, 74, 0.25);
+}
+
+form.home-search-form .btn-search:hover {
+  box-shadow: 0 6px 20px rgba(27, 107, 74, 0.35);
+  transform: translateY(-1px);
 }
 
 form.home-search-form .btn-search:hover,

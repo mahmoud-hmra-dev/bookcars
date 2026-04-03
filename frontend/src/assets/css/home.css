@@ -1,22 +1,51 @@
+/* ============================================
+   BOOKCARS - Premium Car Rental Homepage
+   Modern, elegant, responsive design
+   ============================================ */
+
+:root {
+  --bc-primary: #1B6B4A;
+  --bc-primary-light: #2D9D6F;
+  --bc-primary-dark: #145038;
+  --bc-accent: #E8A838;
+  --bc-accent-light: #F5C663;
+  --bc-dark: #0F1419;
+  --bc-dark-soft: #1A2332;
+  --bc-gray-900: #1E293B;
+  --bc-gray-700: #334155;
+  --bc-gray-500: #64748B;
+  --bc-gray-300: #CBD5E1;
+  --bc-gray-100: #F1F5F9;
+  --bc-white: #FFFFFF;
+  --bc-gradient-hero: linear-gradient(135deg, #0F1419 0%, #1A2332 50%, #1B3A2E 100%);
+  --bc-gradient-accent: linear-gradient(135deg, #1B6B4A 0%, #2D9D6F 100%);
+  --bc-shadow-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --bc-shadow-md: 0 4px 20px rgba(0,0,0,0.1);
+  --bc-shadow-lg: 0 10px 40px rgba(0,0,0,0.15);
+  --bc-shadow-xl: 0 20px 60px rgba(0,0,0,0.2);
+  --bc-radius-sm: 8px;
+  --bc-radius-md: 16px;
+  --bc-radius-lg: 24px;
+  --bc-radius-xl: 32px;
+}
+
 div.home {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   align-items: center;
   overflow: hidden auto;
-  background-color: #fff;
+  background-color: var(--bc-white);
   transform: translate3d(0, 0, 0);
 }
 
+/* ---- HERO SECTION ---- */
 div.home div.home-content {
   position: relative;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  /* background-image: url('/cover.jpg');
-  background-size: cover;
-  background-position: bottom; */
   width: 100%;
   z-index: 1;
 }
@@ -51,24 +80,6 @@ div.home div.home-content div.video-background {
   z-index: 1;
 }
 
-/* div.home div.home-content div.video-background img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-} */
-
-/* div.home div.home-content::before {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  width: 100%;
-  content: "";
-  background: rgb(27 27 27 / 83%);
-  clear: both;
-  z-index: -1;
-} */
-
 div.home div.home-content::after {
   content: "";
   position: absolute;
@@ -76,36 +87,41 @@ div.home div.home-content::after {
   width: 100%;
   top: 0;
   left: 0;
-  background: #321807;
-  opacity: 0.5;
+  background: linear-gradient(180deg, rgba(15, 20, 25, 0.7) 0%, rgba(15, 20, 25, 0.5) 60%, rgba(27, 107, 74, 0.3) 100%);
   z-index: -1;
 }
 
 div.home-title {
-  color: #F7B644;
-  font-size: 28px;
-  font-weight: 500;
+  color: var(--bc-accent);
+  font-size: 18px;
+  font-weight: 600;
   text-align: center;
   padding: 0 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
 }
 
 div.home div.home-cover {
   z-index: 2;
-  color: #fff;
+  color: var(--bc-white);
   text-align: center;
   -webkit-font-smoothing: antialiased;
-  letter-spacing: .065rem;
+  letter-spacing: -0.02em;
   padding: 0 20px;
+  line-height: 1.1;
 }
 
 div.home-subtitle {
-  color: #fff;
-  font-size: 26px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 20px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
 }
 
+/* ---- SEARCH SECTION ---- */
 div.home div.search {
   z-index: 2;
-  background-color: #fff;
+  background-color: transparent;
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -113,176 +129,168 @@ div.home div.search {
 }
 
 div.home div.search div.home-search {
-  /* box-shadow: 0 3px 5px -1px #0003, 0 1px 18px 0 #0000001F, 0 6px 10px 0 #00000024; */
-  box-shadow: 0px 2px 16px 0px rgba(26, 26, 26, .24);
-  /* box-shadow: 0px 2px 8px 0px rgba(26, 26, 26, .16); */
+  box-shadow: var(--bc-shadow-xl);
   display: flex;
   flex-direction: column;
   align-items: center;
-  border-radius: 5px;
+  border-radius: var(--bc-radius-md);
   z-index: 2;
-  background-color: #fff;
+  background-color: var(--bc-white);
   width: fit-content;
+  border: 1px solid rgba(27, 107, 74, 0.1);
 }
 
-div.home div.buy-showcase {
+/* ---- GPS TRACKING BANNER ---- */
+div.home div.gps-banner {
   width: 100%;
-  display: grid;
-  grid-template-columns: 390px 1fr;
-  gap: 24px;
-  padding: 36px 60px 20px;
-  background:
-    radial-gradient(circle at top left, rgb(197 102 34 / 15%), transparent 25%),
-    linear-gradient(180deg, #0b0b0b 0%, #111 100%);
-}
-
-div.home div.buy-showcase div.buy-showcase-copy {
-  color: #f5f5f5;
-}
-
-div.home div.buy-showcase span.buy-showcase-kicker {
-  color: #d68a4d;
-  text-transform: uppercase;
-  letter-spacing: .12em;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-div.home div.buy-showcase div.buy-showcase-copy h1 {
-  font-size: 42px;
-  line-height: 1.05;
-  margin: 10px 0 16px;
-}
-
-div.home div.buy-showcase div.buy-showcase-copy p {
-  color: #b9b9b9;
-  line-height: 1.8;
-  margin-bottom: 24px;
-}
-
-div.home div.buy-showcase div.buy-showcase-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  background: var(--bc-gradient-accent);
+  padding: 20px 40px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   gap: 16px;
 }
 
-div.home div.buy-showcase div.buy-showcase-card {
-  background-color: #171717;
-  border: 1px solid #252525;
-  border-radius: 24px;
-  overflow: hidden;
-  cursor: pointer;
+div.home div.gps-banner .gps-icon {
+  font-size: 28px;
+  color: var(--bc-white);
 }
 
-div.home div.buy-showcase div.buy-showcase-image {
-  height: 210px;
-  background-size: cover;
-  background-position: center;
+div.home div.gps-banner span {
+  color: var(--bc-white);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
 }
 
-div.home div.buy-showcase div.buy-showcase-body {
-  padding: 18px;
-  color: #f5f5f5;
-}
-
-div.home div.buy-showcase div.buy-showcase-body h3 {
-  margin: 12px 0 8px;
-  font-size: 24px;
-}
-
-div.home div.buy-showcase div.buy-showcase-body p {
-  color: #a9a9a9;
-  margin: 0;
-}
-
-div.home div.buy-showcase span.buy-showcase-price {
-  color: #d97833;
-  font-size: 20px;
-  font-weight: 700;
-}
-
+/* ---- WHY US SECTION ---- */
 div.home div.why {
-  background-color: #fff;
+  background-color: var(--bc-white);
   width: 100%;
-  padding: 40px 0;
+  padding: 80px 40px;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
 div.home div.why h1 {
-  font-weight: 500;
+  font-weight: 700;
   padding: 0 10px;
   text-align: center;
+  color: var(--bc-dark);
+  font-size: 36px;
+  margin-bottom: 16px;
+  letter-spacing: -0.02em;
 }
 
 div.home div.why div.why-boxes {
   display: grid;
-  grid-template-columns: auto auto;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  max-width: 960px;
 }
 
 div.home div.why div.why-boxes div.why-box {
   display: flex;
   flex-direction: row;
-  width: 400px;
-  margin: 10px;
+  width: 100%;
+  padding: 24px;
+  border-radius: var(--bc-radius-md);
+  background: var(--bc-gray-100);
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+}
+
+div.home div.why div.why-boxes div.why-box:hover {
+  border-color: var(--bc-primary-light);
+  box-shadow: var(--bc-shadow-md);
+  transform: translateY(-2px);
 }
 
 div.home div.why div.why-boxes div.why-box div.why-icon-wrapper {
-  padding: 20px;
+  padding: 12px 20px 12px 0;
 }
 
 div.home div.why div.why-boxes div.why-box div.why-icon-wrapper .why-icon {
-  font-size: 48px;
+  font-size: 40px;
+  color: var(--bc-primary);
 }
 
 div.home div.why div.why-boxes div.why-box div.why-text-wrapper {
   display: flex;
   flex-direction: column;
+  justify-content: center;
 }
 
 div.home div.why div.why-boxes div.why-box div.why-text-wrapper span.why-title {
-  font-weight: bold;
-  margin-bottom: 5px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: var(--bc-dark);
+  font-size: 16px;
 }
 
+div.home div.why div.why-boxes div.why-box div.why-text-wrapper span.why-text {
+  color: var(--bc-gray-500);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ---- SERVICES SECTION ---- */
 div.home div.services {
-  background-color: #fff;
+  background: var(--bc-gray-100);
   width: 100%;
-  padding: 40px 0;
+  padding: 80px 40px;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
 div.home div.services h1 {
-  font-weight: 500;
+  font-weight: 700;
   padding: 0 10px;
   text-align: center;
+  color: var(--bc-dark);
+  font-size: 36px;
+  margin-bottom: 16px;
+  letter-spacing: -0.02em;
 }
 
 div.home div.services div.services-boxes {
   display: grid;
-  grid-template-columns: auto auto auto;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  max-width: 1200px;
 }
 
 div.home div.services div.services-boxes div.services-box {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 400px;
-  margin: 20px;
-  background-color: #F9F9F9;
-  padding: 25px;
+  width: 100%;
+  background-color: var(--bc-white);
+  padding: 36px 28px;
   text-align: center;
+  border-radius: var(--bc-radius-lg);
+  box-shadow: var(--bc-shadow-sm);
+  transition: all 0.3s ease;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+div.home div.services div.services-boxes div.services-box:hover {
+  box-shadow: var(--bc-shadow-lg);
+  transform: translateY(-4px);
 }
 
 div.home div.services div.services-boxes div.services-box div.services-icon-wrapper {
-  padding: 20px;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(27, 107, 74, 0.08) 0%, rgba(45, 157, 111, 0.08) 100%);
+  border-radius: 50%;
+  margin-bottom: 8px;
 }
 
 div.home div.services div.services-boxes div.services-box div.services-icon-wrapper .services-icon {
-  font-size: 48px;
+  font-size: 36px;
+  color: var(--bc-primary);
 }
 
 div.home div.services div.services-boxes div.services-box div.services-text-wrapper {
@@ -291,85 +299,131 @@ div.home div.services div.services-boxes div.services-box div.services-text-wrap
 }
 
 div.home div.services div.services-boxes div.services-box div.services-text-wrapper span.services-title {
-  font-weight: bold;
-  margin-bottom: 15px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: var(--bc-dark);
+  font-size: 17px;
 }
 
+div.home div.services div.services-boxes div.services-box div.services-text-wrapper span.services-text {
+  color: var(--bc-gray-500);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* ---- SUPPLIERS SECTION ---- */
 div.home div.home-suppliers {
   width: 80%;
-  margin: 20px 0;
+  margin: 40px 0;
 }
 
 div.home div.home-suppliers h1 {
   text-align: center;
   margin-bottom: 40px;
-  font-weight: 500;
+  font-weight: 700;
+  color: var(--bc-dark);
+  font-size: 36px;
+  letter-spacing: -0.02em;
 }
 
+/* ---- DESTINATIONS ---- */
 div.home div.destinations {
   width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  background-color: #f9f9f9;
-  padding: 50px 0 60px;
+  background: linear-gradient(180deg, var(--bc-white) 0%, var(--bc-gray-100) 100%);
+  padding: 60px 0 70px;
 }
 
 div.home div.destinations h1 {
   width: fit-content;
-  font-weight: 500;
+  font-weight: 700;
+  color: var(--bc-dark);
+  font-size: 36px;
+  letter-spacing: -0.02em;
 }
 
 div.home div.destinations div.tabs {
   width: 100%;
 }
 
+/* ---- CAR SIZE SECTION ---- */
 div.home div.car-size {
   width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  background-color: #F9F9F9;
-  padding: 50px 0;
+  background: var(--bc-white);
+  padding: 80px 40px;
 }
 
 div.home div.car-size h1 {
-  font-weight: 500;
+  font-weight: 700;
   padding: 0 10px;
   text-align: center;
+  color: var(--bc-dark);
+  font-size: 36px;
+  letter-spacing: -0.02em;
 }
 
 div.home div.car-size p {
   max-width: 614px;
   text-align: center;
-  line-height: 30px;
-  color: #717171;
+  line-height: 1.8;
+  color: var(--bc-gray-500);
   margin: 0;
   padding: 0 20px;
+  font-size: 16px;
 }
 
 div.home div.car-size div.boxes {
-  margin: 30px 0;
+  margin: 40px 0;
+  gap: 24px;
 }
 
 div.home div.car-size div.boxes div.box {
   width: 326px;
-  height: 278px;
-  background-color: #fff;
+  height: 290px;
+  background-color: var(--bc-white);
+  border-radius: var(--bc-radius-lg);
+  box-shadow: var(--bc-shadow-sm);
+  overflow: hidden;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+div.home div.car-size div.boxes div.box:hover {
+  box-shadow: var(--bc-shadow-lg);
+  transform: translateY(-4px);
 }
 
 div.home div.car-size div.boxes div.box div.box-img {
   height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--bc-gray-100) 0%, rgba(27, 107, 74, 0.04) 100%);
 }
 
 div.home div.car-size div.boxes div.box img {
   max-width: 100%;
   max-height: 140px;
+  transition: transform 0.3s ease;
+}
+
+div.home div.car-size div.boxes div.box:hover img {
+  transform: scale(1.05);
 }
 
 div.home div.car-size div.boxes div.box div.box-content {
   padding: 0 15px;
   user-select: none;
+}
+
+div.home div.car-size div.boxes div.box div.box-content span {
+  font-weight: 700;
+  color: var(--bc-dark);
 }
 
 div.home div.car-size div.boxes div.box div.box-content ul {
@@ -379,13 +433,15 @@ div.home div.car-size div.boxes div.box div.box-content ul {
 }
 
 div.home div.car-size div.boxes div.box div.box-content span.price {
-  font-size: 14px;
-  font-weight: bold;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--bc-primary);
 }
 
 div.home div.car-size div.boxes div.box div.box-content span.unit {
-  font-size: 14px;
-  color: #696969;
+  font-size: 13px;
+  color: var(--bc-gray-500);
+  font-weight: 400;
 }
 
 div.home div.car-size div.boxes div.box div.car-size-action {
@@ -398,25 +454,30 @@ div.home div.car-size div.boxes div.box div.car-size-action {
 div.home div.car-size div.boxes div.box div.car-size-action .btn-car-size {
   margin: 0 10px;
   width: 100%;
+  border-radius: var(--bc-radius-sm) !important;
 }
 
+/* ---- MAP SECTION ---- */
 div.home div.home-map {
   width: 80%;
-  margin: 15px 0 30px;
+  margin: 30px 0 40px;
 }
 
+/* ---- FAQ SECTION ---- */
 div.home div.faq {
   width: 100%;
-  background-color: #f9f9f9;
+  background: linear-gradient(180deg, var(--bc-gray-100) 0%, var(--bc-white) 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
+  padding: 40px 0;
 }
 
+/* ---- CUSTOMER CARE SECTION ---- */
 div.home div.customer-care {
-  background-color: #f9f9f9;
+  background: var(--bc-gradient-hero);
   width: 100%;
-  padding: 140px 0;
+  padding: 100px 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -424,23 +485,41 @@ div.home div.customer-care {
 
 div.home div.customer-care div.customer-care-wrapper {
   width: 1200px;
+  max-width: 100%;
   display: flex;
   flex-direction: row;
 }
 
 div.home div.customer-care div.customer-care-text {
-  padding: 0 160px;
+  padding: 0 80px;
   width: 900px;
+}
+
+div.home div.customer-care div.customer-care-text h1 {
+  color: var(--bc-white);
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+div.home div.customer-care div.customer-care-text h2 {
+  color: var(--bc-accent);
+  font-size: 20px;
+  font-weight: 500;
 }
 
 div.home div.customer-care div.customer-care-text div.customer-care-content {
   margin-bottom: 30px;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.8;
+  font-size: 16px;
 }
 
 div.home div.customer-care div.customer-care-text div.customer-care-boxes {
   display: grid;
   grid-template-columns: auto auto;
   margin-bottom: 40px;
+  gap: 8px;
 }
 
 div.home div.customer-care div.customer-care-text div.customer-care-boxes div.customer-care-box {
@@ -449,10 +528,13 @@ div.home div.customer-care div.customer-care-text div.customer-care-boxes div.cu
   justify-content: flex-start;
   align-items: center;
   margin: 5px 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 15px;
 }
 
 div.home div.customer-care div.customer-care-text div.customer-care-boxes .customer-care-icon {
   margin-right: 10px;
+  color: var(--bc-accent) !important;
 }
 
 div.home div.customer-care div.customer-care-img {
@@ -469,61 +551,100 @@ div.home div.customer-care div.customer-care-img img {
   display: none;
 }
 
-@media only screen and (width <=960px) {
+/* ---- MOBILE RESPONSIVE (<= 960px) ---- */
+@media only screen and (width <= 960px) {
   div.home div.home-content {
-    padding: 85px 0;
+    padding: 100px 0 85px;
     justify-content: flex-start !important;
-    height: 560px;
+    height: 580px;
   }
 
   div.home div.home-title {
-    font-size: 22px;
-    font-weight: 500;
-    margin-bottom: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 16px;
   }
 
   div.home div.home-cover {
-    font-size: 40px;
+    font-size: 36px;
     font-weight: 800;
-    padding: 0 10px;
+    padding: 0 16px;
+    line-height: 1.15;
   }
 
   div.home div.search div.home-search {
-    padding: 20px 10px;
-    margin: -187px 20px 0 20px;
-    width: calc(100% - 20px);
+    padding: 20px 12px;
+    margin: -187px 16px 0 16px;
+    width: calc(100% - 32px);
     max-width: 480px;
+    border-radius: var(--bc-radius-md);
+  }
+
+  div.home div.gps-banner {
+    padding: 16px 20px;
+    flex-direction: column;
+    text-align: center;
+    gap: 8px;
+  }
+
+  div.home div.why {
+    padding: 60px 16px;
+  }
+
+  div.home div.why h1,
+  div.home div.services h1,
+  div.home div.car-size h1,
+  div.home div.destinations h1,
+  div.home div.home-suppliers h1 {
+    font-size: 28px;
   }
 
   div.home div.why div.why-boxes,
-  div.home div.services div.services-boxes,
-  div.home div.buy-showcase,
-  div.home div.buy-showcase div.buy-showcase-grid {
+  div.home div.services div.services-boxes {
     display: flex;
     flex-direction: column;
+    gap: 12px;
   }
 
-  div.home div.buy-showcase {
-    padding: 32px 20px;
+  div.home div.why div.why-boxes div.why-box {
+    padding: 20px;
+  }
+
+  div.home div.services {
+    padding: 60px 16px;
+  }
+
+  div.home div.car-size {
+    padding: 60px 16px;
   }
 
   div.home div.car-size div.boxes {
     display: flex;
     flex-direction: column;
+    align-items: center;
   }
 
   div.home div.car-size div.boxes div.box {
-    margin-bottom: 30px;
+    margin-bottom: 20px;
+    width: 100%;
+    max-width: 340px;
   }
 
   div.home div.home-map {
     width: 100%;
-    padding: 5px;
+    padding: 0 8px;
+    margin: 15px 0;
   }
 
   div.home div.home-map .map {
     min-height: 0;
     height: 340px;
+    border-radius: var(--bc-radius-md);
+    overflow: hidden;
+  }
+
+  div.home div.customer-care {
+    padding: 60px 0;
   }
 
   div.home div.customer-care div.customer-care-wrapper {
@@ -533,30 +654,45 @@ div.home div.customer-care div.customer-care-img img {
   }
 
   div.home div.customer-care div.customer-care-text {
-    padding: 0 20px;
+    padding: 0 24px;
     width: 100%;
+  }
+
+  div.home div.customer-care div.customer-care-text h1 {
+    font-size: 28px;
+  }
+
+  div.home div.customer-care div.customer-care-text div.customer-care-boxes {
+    grid-template-columns: 1fr;
   }
 
   div.home div.customer-care div.customer-care-img img {
     height: 160px;
     margin-left: 0;
   }
+
+  div.home div.home-suppliers {
+    width: 95%;
+  }
 }
 
-@media only screen and (width >=960px) {
+/* ---- DESKTOP (>= 960px) ---- */
+@media only screen and (width >= 960px) {
   div.home div.home-content {
-    height: 365px;
+    height: 440px;
   }
 
   div.home div.home-cover {
-    font-size: 47px;
-    font-weight: 700;
+    font-size: 52px;
+    font-weight: 800;
     margin-bottom: 5px;
+    max-width: 800px;
   }
 
   div.home div.search div.home-search {
-    padding: 20px;
+    padding: 24px;
     margin-top: -75px;
+    border-radius: var(--bc-radius-md);
   }
 
   div.home div.car-size div.boxes {
@@ -566,6 +702,21 @@ div.home div.customer-care div.customer-care-img img {
   }
 
   div.home div.car-size div.boxes div.box {
-    margin-right: 30px;
+    margin-right: 0;
+  }
+}
+
+/* ---- LARGE DESKTOP (>= 1280px) ---- */
+@media only screen and (width >= 1280px) {
+  div.home div.home-content {
+    height: 500px;
+  }
+
+  div.home div.home-cover {
+    font-size: 58px;
+  }
+
+  div.home div.customer-care div.customer-care-text {
+    padding: 0 120px;
   }
 }
