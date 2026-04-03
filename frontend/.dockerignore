@@ -4,6 +4,7 @@ __tests__
 *.test.*
 .env
 .env.*
+!.env.docker
 coverage
 dist
 .dockerignore
