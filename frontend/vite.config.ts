@@ -1,7 +1,8 @@
 import path from 'node:path'
 import { defineConfig, loadEnv } from 'vite'
-import react from '@vitejs/plugin-react'
+import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import { createHtmlPlugin } from 'vite-plugin-html'
+import babelPlugin from '@rolldown/plugin-babel'
 
 // https://vitejs.dev/config/
 export default ({ mode }: { mode: string }) => {
@@ -9,14 +10,14 @@ export default ({ mode }: { mode: string }) => {
 
   return defineConfig({
     plugins: [
-      react({
-        // Babel optimizations
-        babel: {
-          plugins: [
-            ['@babel/plugin-transform-runtime'],
-            ['babel-plugin-react-compiler', { optimize: true }],
-          ],
-        },
+      react(),
+      babelPlugin({
+        plugins: [
+          ['@babel/plugin-transform-runtime']
+        ],
+        presets: [
+          reactCompilerPreset()
+        ],
       }),
       createHtmlPlugin({
         inject: {
@@ -92,12 +93,23 @@ export default ({ mode }: { mode: string }) => {
       chunkSizeWarningLimit: 1000, // Warn if a chunk exceeds 1000kb
 
       // Chunk splitting strategy
-      rollupOptions: {
+      rolldownOptions: {
         treeshake: true, // Enable Tree Shaking: Ensure unused code is removed by leveraging ES modules and proper imports
         output: {
-          manualChunks: {
-            vendor: ['react', 'react-dom'], // Create a separate vendor chunk
-            router: ['react-router-dom'], // Create a separate router chunk
+          codeSplitting: {
+            groups: [
+              {
+                name: 'vendor',
+                test: /[\\/]node_modules[\\/](react|react-dom)[\\/]/,
+                priority: 10,
+              },
+              {
+                name: 'router',
+                test: /[\\/]node_modules[\\/]react-router(-dom)?[\\/]/,
+                priority: 20,
+                minSize: 0,
+              },
+            ],
           },
           // Generate chunk names
           assetFileNames: 'assets/[name]-[hash][extname]',

@@ -1,5 +1,22 @@
 # Releases
 
+## [BookCars 8.7](https://github.com/aelassas/bookcars/releases/tag/v8.7) – 2026-03-18
+
+* fix(backend): optimize mailer with transporter pooling
+* fix(backend): enable secure connection for implicit TLS SMTP server
+* fix(admin,frontend): Spanish locale not applied correctly to dates
+* fix(frontend): resolve location carrousel responsive layout on mobile
+* chore(admin,frontend): upgrade to Vite 8
+* chore(deps): update dependencies
+
+### Assets
+- [bookcars-8.7.apk](https://github.com/aelassas/bookcars/releases/download/v8.7/bookcars-8.7.apk) (114.45 MB)
+- [bookcars-db.zip](https://github.com/aelassas/bookcars/releases/download/v8.7/bookcars-db.zip) (8.64 MB)
+
+### Source Code
+- [Source code (zip)](https://api.github.com/repos/aelassas/bookcars/zipball/v8.7)
+- [Source code (tar)](https://api.github.com/repos/aelassas/bookcars/tarball/v8.7)
+
 ## [BookCars 8.6](https://github.com/aelassas/bookcars/releases/tag/v8.6) – 2026-03-03
 
 * chore(mobile): upgrade to Expo SDK 55
