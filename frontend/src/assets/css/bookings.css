@@ -1,3 +1,7 @@
+/* ============================================
+   BOOKINGS PAGE - Modern Card Layout
+   ============================================ */
+
 div.bookings {
   display: flex;
   flex-direction: column;
@@ -5,44 +9,42 @@ div.bookings {
   position: absolute;
   inset: 64px 0 0;
   transform: translate3d(0, 0, 0);
+  background: #F8FAFB;
 }
 
+/* Filter Sidebar */
 div.bookings div.col-1 {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
-  width: 336px;
-  padding: 12px 0 0 12px;
-  background-color: #FAFAFA;
+  width: 320px;
+  padding: 16px;
+  background-color: #FFFFFF;
   overflow: auto;
+  border-right: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 div.bookings div.col-1 .cl-supplier-filter,
 div.bookings div.col-1 .cl-status-filter,
 div.bookings div.col-1 .cl-booking-filter {
-  margin: 10px 10px 10px 0;
+  margin: 8px 0;
 }
 
 div.bookings div.col-1 .cl-booking-filter div.panel,
 div.bookings div.col-1 .cl-booking-filter div.panel-collapse {
-  padding-right: 15px;
-  padding-left: 15px;
+  padding-right: 12px;
+  padding-left: 12px;
 }
 
-div.bookings div.col-1 .cl-status-filter,
-div.bookings div.col-1 .cl-booking-filter {
-  margin-bottom: 10px;
-}
-
+/* Results */
 div.bookings div.col-2 {
   position: absolute;
-  inset: 0 0 0 336px;
+  inset: 0 0 0 320px;
 }
 
-/* Device width is lower than or equal to 960px */
-
-@media only screen and (width <=960px) {
+/* Mobile */
+@media (max-width: 960px) {
   div.bookings {
     position: relative;
     top: 0;
@@ -52,13 +54,15 @@ div.bookings div.col-2 {
   div.bookings div.col-1,
   div.bookings div.col-2 {
     width: 100%;
-    max-width: 480px;
+    max-width: 520px;
   }
 
   div.bookings div.col-1 {
     position: relative;
     inset: 0;
-    padding-top: 15px;
+    padding: 12px;
+    border-right: none;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   }
 
   div.bookings div.col-2 {
@@ -76,19 +80,13 @@ div.bookings div.col-2 {
   div.bookings div.col-1 .cl-status-filter,
   div.bookings div.col-1 .cl-booking-filter {
     background-color: #fff;
-    width: calc(100% - 10px);
-    max-width: 480px;
-  }
-
-  div.bookings div.col-1 .cl-booking-filter div.panel,
-  div.bookings div.col-1 .cl-booking-filter div.panel-collapse {
-    padding-right: 15px;
-    padding-left: 15px;
+    width: 100%;
+    max-width: 520px;
   }
 
   div.bookings div.col-1 .cl-new-booking {
-    width: calc(100% - 20px);
-    max-width: 480px;
-    margin: 15px 10px 5px;
+    width: 100%;
+    max-width: 520px;
+    margin: 12px 0;
   }
 }

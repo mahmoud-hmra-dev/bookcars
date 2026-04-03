@@ -1,49 +1,58 @@
+/* ============================================
+   CAR LIST - Results Display
+   ============================================ */
+
 section.car-list {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-bottom: 80px;
+  padding-bottom: 60px;
+  width: 100%;
 }
 
 section.car-list .empty-list {
-  margin-top: 15px;
+  margin-top: 40px;
   text-align: center;
-  width: 250px;
+  width: 300px;
+  color: var(--bc-gray-500, #64748B);
 }
 
 section.car-list div.title {
   text-align: left;
   width: 100%;
-  margin-bottom: 5px;
-  font-weight: 400;
+  max-width: 860px;
+  margin-bottom: 16px;
+  padding: 16px 0 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 section.car-list div.title div.bookcars {
-  font-size: 22px;
+  font-size: 20px;
 }
 
 section.car-list div.title div.bookcars span.title-bookcars {
-  color: #212121;
-  font-weight: 500;
+  color: var(--bc-dark, #0F1419);
+  font-weight: 700;
 }
 
 section.car-list div.title div.car-count {
-  color: #717171;
+  color: var(--bc-gray-500, #64748B);
   font-size: 14px;
+  margin-top: 4px;
 }
 
-@media only screen and (width <=960px) {
+@media (max-width: 960px) {
   section.car-list .empty-list {
     width: calc(100% - 20px);
   }
 
   section.car-list div.title {
-    max-width: 600px;
-    padding-left: 10px;
+    padding-left: 8px;
+    padding-right: 8px;
   }
 }
 
-@media only screen and (width >=960px) {
+@media (min-width: 961px) {
   section.car-list div.title {
     min-width: 800px;
   }

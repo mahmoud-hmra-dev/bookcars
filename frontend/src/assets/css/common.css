@@ -2,6 +2,42 @@
   --toastify-color-progress-info: #fff !important;
   --toastify-color-progress-bgo: .6 !important;
   --toastify-icon-color-info: #fff !important;
+
+  /* Design System */
+  --bc-primary: #1B6B4A;
+  --bc-primary-light: #2D9D6F;
+  --bc-primary-dark: #145038;
+  --bc-accent: #E8A838;
+  --bc-accent-light: #F5C663;
+  --bc-dark: #0F1419;
+  --bc-dark-soft: #1A2332;
+  --bc-gray-900: #1E293B;
+  --bc-gray-700: #334155;
+  --bc-gray-500: #64748B;
+  --bc-gray-300: #CBD5E1;
+  --bc-gray-100: #F1F5F9;
+  --bc-white: #FFFFFF;
+
+  /* Gradients */
+  --bc-gradient-hero: linear-gradient(135deg, #0F1419 0%, #1A2332 50%, #1B3A2E 100%);
+  --bc-gradient-primary: linear-gradient(135deg, #1B6B4A 0%, #2D9D6F 100%);
+
+  /* Shadows */
+  --bc-shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --bc-shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+  --bc-shadow-lg: 0 12px 40px rgba(0,0,0,0.12);
+  --bc-shadow-xl: 0 20px 60px rgba(0,0,0,0.18);
+
+  /* Radius */
+  --bc-radius-sm: 8px;
+  --bc-radius-md: 12px;
+  --bc-radius-lg: 16px;
+  --bc-radius-xl: 24px;
+
+  /* Typography */
+  --bc-font-body: 16px;
+  --bc-font-sm: 14px;
+  --bc-font-xs: 12px;
 }
 
 .grecaptcha-badge {

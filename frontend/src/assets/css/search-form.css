@@ -1,60 +1,67 @@
+/* ============================================
+   SEARCH FORM - Modern Card Layout
+   ============================================ */
+
 form.home-search-form .btn-search,
 form.home-search-form .btn-cancel {
-  font-size: 18px;
-  font-weight: 400;
+  font-size: 16px;
+  font-weight: 600;
   height: 52px;
-  min-width: 190px;
+  min-width: 160px;
+  border-radius: var(--bc-radius-md, 12px);
+  text-transform: none;
+  letter-spacing: 0.01em;
 }
 
 form.home-search-form .btn-search {
   color: #fff;
   border: 0;
-  border-radius: 12px;
   margin: 0;
   white-space: nowrap;
-  background: linear-gradient(135deg, #1B6B4A 0%, #2D9D6F 100%);
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(27, 107, 74, 0.25);
+  background: var(--bc-gradient-primary, linear-gradient(135deg, #1B6B4A 0%, #2D9D6F 100%));
+  box-shadow: 0 4px 14px rgba(27, 107, 74, 0.3);
+  transition: all 0.25s ease;
 }
 
 form.home-search-form .btn-search:hover {
-  box-shadow: 0 6px 20px rgba(27, 107, 74, 0.35);
+  box-shadow: 0 6px 24px rgba(27, 107, 74, 0.4);
   transform: translateY(-1px);
 }
 
-form.home-search-form .btn-search:hover,
-form.home-search-form .btn-cancel:hover {
-  opacity: 0.95;
+form.home-search-form .btn-cancel {
+  background: transparent;
+  border: 1px solid var(--bc-gray-300, #CBD5E1);
+  color: var(--bc-gray-700, #334155);
 }
 
 form.home-search-form .chk-same-location {
-  display: table-row;
-  color: rgb(0 0 0 / 70%);
-  font-weight: 400;
-  line-height: 1.4em;
-  font-size: 0.9em;
+  display: flex;
+  align-items: center;
+  color: var(--bc-gray-500, #64748B);
+  font-weight: 500;
+  font-size: 13px;
   user-select: none;
+  margin-top: 4px;
 }
 
 form.home-search-form .chk-same-location label {
   cursor: pointer;
   padding: 2px;
-  vertical-align: top;
 }
 
 form.home-search-form .chk-same-location input[type='checkbox'] {
   cursor: pointer;
+  accent-color: var(--bc-primary, #1B6B4A);
 }
 
-@media only screen and (width <=960px) {
+/* Mobile */
+@media (max-width: 960px) {
   form.home-search-form {
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
     width: 100%;
-    max-width: 480px;
+    gap: 4px;
   }
 
   form.home-search-form .pickup-location,
@@ -62,17 +69,17 @@ form.home-search-form .chk-same-location input[type='checkbox'] {
   form.home-search-form .from,
   form.home-search-form .to {
     width: 100%;
-    padding: 10px;
+    padding: 6px 0;
   }
 
   form.home-search-form .chk-same-location {
-    align-self: flex-start;
-    margin-left: 10px;
+    margin: 4px 0 8px;
   }
 
   form.home-search-form .btn-search,
   form.home-search-form .btn-cancel {
-    width: calc(100% - 20px);
+    width: 100%;
+    height: 50px;
   }
 
   form.home-search-form .btn-search {
@@ -80,45 +87,55 @@ form.home-search-form .chk-same-location input[type='checkbox'] {
   }
 
   form.home-search-form .btn-cancel {
-    margin: 5px 0;
+    margin: 4px 0;
   }
 }
 
-@media only screen and (width >=960px) {
+/* Desktop */
+@media (min-width: 961px) {
   form.home-search-form {
-    display: table;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 8px;
     width: 100%;
   }
 
   form.home-search-form .pickup-location {
-    display: table-cell;
-    width: 350px;
-    padding-right: 2px;
-    padding-bottom: 10px;
+    flex: 1 1 200px;
+    min-width: 200px;
+    padding-bottom: 0;
   }
 
   form.home-search-form .drop-off-location {
-    display: table-row;
-    width: 350px;
-    height: 66px;
+    flex: 1 1 200px;
+    min-width: 200px;
   }
 
-  form.home-search-form .drop-off-location>.multiple-select {
-    width: 348px;
+  form.home-search-form .drop-off-location > .multiple-select {
+    width: 100%;
   }
 
   form.home-search-form .from,
   form.home-search-form .to {
-    display: table-cell;
-    width: 235px;
-    padding: 0 2px;
+    flex: 0 1 200px;
+    min-width: 170px;
   }
 
   form.home-search-form .btn-search {
-    margin: 0 4px;
+    flex: 0 0 auto;
+    min-width: 140px;
+    margin-bottom: 1px;
   }
 
   form.home-search-form .btn-cancel {
-    margin: 0 2px;
+    flex: 0 0 auto;
+    min-width: 100px;
+    margin-bottom: 1px;
+  }
+
+  form.home-search-form .chk-same-location {
+    width: 100%;
+    margin: 2px 0 0;
   }
 }

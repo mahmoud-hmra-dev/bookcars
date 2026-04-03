@@ -1,62 +1,96 @@
+/* ============================================
+   SEARCH RESULTS PAGE - Modern Layout
+   ============================================ */
+
 div.search {
   display: flex;
   flex: 1 0 auto;
   transform: translate3d(0, 0, 0);
+  background: #F8FAFB;
+  min-height: calc(100vh - 64px);
 }
 
+/* Left Column - Filters */
 div.search div.col-1 {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 5px;
+  padding: 16px 12px 16px 16px;
+  background: #FFFFFF;
+  border-right: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 div.search div.col-1 .map {
-  margin-top: 20px;
+  margin-top: 8px;
   min-height: 0;
   height: 180px;
-  margin-bottom: 3px;
+  margin-bottom: 8px;
+  border-radius: var(--bc-radius-md, 12px);
+  overflow: hidden;
 }
 
 div.search div.col-1 .filter {
-  margin: 5px 0;
+  margin: 6px 0;
   width: 100%;
   max-width: 480px;
 }
 
+/* Filter Toggle Button */
 div.search .btn-filters {
   max-width: 480px;
-  margin-top: 5px;
+  margin-top: 8px;
+  border-radius: var(--bc-radius-sm, 8px) !important;
+  text-transform: none !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  height: 40px;
+  border-color: var(--bc-gray-300, #CBD5E1) !important;
+  color: var(--bc-gray-700, #334155) !important;
 }
 
-/* Device width is less than or equal to 960px */
+div.search .btn-filters:hover {
+  background: rgba(27, 107, 74, 0.04) !important;
+  border-color: var(--bc-primary, #1B6B4A) !important;
+}
 
-@media only screen and (width <=960px) {
+/* Right Column - Results */
+div.search div.col-2 {
+  flex: 1;
+  padding: 16px;
+}
+
+/* Mobile */
+@media (max-width: 960px) {
   div.search {
     flex: 0 1 auto;
     flex-direction: column;
   }
 
   div.search div.col-1 {
-    padding: 5px;
-    margin-bottom: 5px;
+    padding: 8px;
+    margin-bottom: 0;
+    border-right: none;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   }
 
   div.search div.col-2 {
-    padding: 1px;
+    padding: 8px;
   }
 }
 
-/* Device width is greater than or equal to 960px */
-
-@media only screen and (width >=960px) {
+/* Desktop */
+@media (min-width: 961px) {
   div.search {
     flex-direction: row;
   }
 
   div.search div.col-1 {
     width: 300px;
-    margin-left: 20px;
+    min-width: 300px;
+    position: sticky;
+    top: 64px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
   }
 
   div.search div.col-2 {

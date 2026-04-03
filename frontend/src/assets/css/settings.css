@@ -1,36 +1,41 @@
-/* Create settings */
+/* ============================================
+   SETTINGS PAGE - Card-based Sections
+   ============================================ */
+
 div.settings {
   display: flex;
   flex-direction: column;
   flex: 1 0 auto;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
-  margin: 45px 0;
   transform: translate3d(0, 0, 0);
-  margin: 80px 0 200px 0;
+  margin: 40px 0 80px 0;
   min-height: 100vh;
+  background: #F8FAFB;
 }
 
 div.settings .settings-form-wrapper {
-  margin: 32px 0;
+  margin: 24px 0;
 }
 
 div.settings .settings-form-title {
   text-align: center;
-  text-transform: capitalize;
-  color: #232323;
+  color: var(--bc-dark, #0F1419);
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
 }
 
 div.settings .settings-net-wrapper {
-  margin: 32px 0;
+  margin: 24px 0;
 }
 
-/* Device width is less than or equal to 960px */
-
-@media only screen and (width <=960px) {
+@media (max-width: 960px) {
   div.settings .settings-form {
-    width: 360px;
-    padding: 30px;
+    width: 100%;
+    max-width: 400px;
+    padding: 24px;
   }
 
   div.settings .settings-ctn {
@@ -38,18 +43,21 @@ div.settings .settings-net-wrapper {
   }
 
   div.settings .settings-net {
-    width: 360px;
+    width: 100%;
+    max-width: 400px;
     height: 200px;
-    padding: 30px;
+    padding: 24px;
   }
 }
 
-/* Device width is greater than or equal to 960px */
-
-@media only screen and (width >=960px) {
+@media (min-width: 961px) {
   div.settings .settings-form {
-    width: 550px;
-    padding: 30px;
+    width: 560px;
+    padding: 32px;
+    background: #FFFFFF;
+    border-radius: var(--bc-radius-lg, 16px);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: var(--bc-shadow-sm, 0 1px 3px rgba(0,0,0,0.06));
   }
 
   div.settings .settings-ctn {
@@ -57,8 +65,12 @@ div.settings .settings-net-wrapper {
   }
 
   div.settings .settings-net {
-    width: 550px;
+    width: 560px;
     height: 200px;
-    padding: 30px;
+    padding: 32px;
+    background: #FFFFFF;
+    border-radius: var(--bc-radius-lg, 16px);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: var(--bc-shadow-sm, 0 1px 3px rgba(0,0,0,0.06));
   }
 }
