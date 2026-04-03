@@ -56,7 +56,7 @@ server.tool(
   { email: z.string().describe('Admin email'), password: z.string().describe('Admin password') },
   async ({ email, password }) => {
     try {
-      const res = await api<{ accessToken?: string }>('POST', '/api/sign-in/admin', { email, password })
+      const res = await api<{ accessToken?: string }>('POST', '/api/sign-in/admin', { email, password, mobile: true })
       if (res.accessToken) {
         setAuthToken(res.accessToken)
         return { content: [{ type: 'text' as const, text: `Logged in successfully. Token stored.` }] }

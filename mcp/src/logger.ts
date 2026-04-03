@@ -15,8 +15,12 @@ let db: Db | null = null
 let logs: Collection<RequestLog> | null = null
 
 export async function connectLogger(): Promise<void> {
-  const uri = process.env.MCP_MONGO_URI || 'mongodb://admin:admin@mongo:27017/mcp_logs?authSource=admin'
-  const client = new MongoClient(uri)
+  const uri = process.env.MCP_MONGO_URI
+  if (!uri) {
+    console.error('[MCP Logger] No MCP_MONGO_URI set, logging disabled')
+    return
+  }
+  const client = new MongoClient(uri, { serverSelectionTimeoutMS: 5000 })
   await client.connect()
   db = client.db()
   logs = db.collection<RequestLog>('request_logs')

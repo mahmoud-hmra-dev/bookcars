@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "bookcars": {
+      "command": "node",
+      "args": ["mcp/dist/index.js"],
+      "env": {
+        "BC_API_URL": "https://api.carbook.controtrack.com",
+        "MCP_MONGO_URI":""
+      }
+    }
+  }
+}
