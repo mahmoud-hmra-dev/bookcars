@@ -4,11 +4,47 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { api, setAuthToken, getAuthToken, getApiUrl } from './api.js'
+import { connectLogger, logRequest, getLogsCollection } from './logger.js'
 
 const server = new McpServer({
   name: 'bookcars-admin',
   version: '1.0.0',
 })
+
+// Monkey-patch server.tool to auto-log all tool calls
+const originalTool = server.tool.bind(server)
+const patchedTool = function (...args: [any, ...any[]]) {
+  const handler = args[args.length - 1]
+  const toolName = args[0] as string
+
+  args[args.length - 1] = async (params: any, extra: any) => {
+    const start = Date.now()
+    try {
+      const result = await handler(params, extra)
+      const text = result?.content?.[0]?.text || ''
+      await logRequest({
+        tool: toolName,
+        params,
+        status: 'success',
+        response: text.length > 2000 ? text.slice(0, 2000) + '...' : text,
+        duration: Date.now() - start,
+      })
+      return result
+    } catch (e: any) {
+      await logRequest({
+        tool: toolName,
+        params,
+        status: 'error',
+        error: e.message,
+        duration: Date.now() - start,
+      })
+      throw e
+    }
+  }
+
+  return originalTool(...(args as [any, any, any, any]))
+}
+server.tool = patchedTool as typeof server.tool
 
 // ============================================================
 // AUTH TOOLS
@@ -1043,12 +1079,89 @@ server.tool(
 )
 
 // ============================================================
+// REQUEST LOGS (query the MCP logs database)
+// ============================================================
+
+server.tool(
+  'logs_query',
+  'Query MCP request logs. Filter by tool name, status, or date range.',
+  {
+    tool: z.string().optional().describe('Filter by tool name'),
+    status: z.enum(['success', 'error']).optional(),
+    limit: z.number().default(20).describe('Max results'),
+    from: z.string().optional().describe('From date ISO string'),
+    to: z.string().optional().describe('To date ISO string'),
+  },
+  async ({ tool: toolFilter, status, limit, from, to }) => {
+    const col = getLogsCollection()
+    if (!col) {
+      return { content: [{ type: 'text' as const, text: 'Logging not connected.' }] }
+    }
+    const filter: Record<string, unknown> = {}
+    if (toolFilter) filter.tool = toolFilter
+    if (status) filter.status = status
+    if (from || to) {
+      filter.timestamp = {}
+      if (from) (filter.timestamp as any).$gte = new Date(from)
+      if (to) (filter.timestamp as any).$lte = new Date(to)
+    }
+    const docs = await col.find(filter).sort({ timestamp: -1 }).limit(limit).toArray()
+    return { content: [{ type: 'text' as const, text: JSON.stringify(docs, null, 2) }] }
+  },
+)
+
+server.tool(
+  'logs_stats',
+  'Get summary statistics of MCP usage (total calls, errors, top tools)',
+  { days: z.number().default(7).describe('Number of days to look back') },
+  async ({ days }) => {
+    const col = getLogsCollection()
+    if (!col) {
+      return { content: [{ type: 'text' as const, text: 'Logging not connected.' }] }
+    }
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+    const [stats] = await col.aggregate([
+      { $match: { timestamp: { $gte: since } } },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          errors: { $sum: { $cond: [{ $eq: ['$status', 'error'] }, 1, 0] } },
+          avgDuration: { $avg: '$duration' },
+        },
+      },
+    ]).toArray()
+    const topTools = await col.aggregate([
+      { $match: { timestamp: { $gte: since } } },
+      { $group: { _id: '$tool', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 10 },
+    ]).toArray()
+    return {
+      content: [{
+        type: 'text' as const,
+        text: JSON.stringify({ period: `${days} days`, ...stats, topTools }, null, 2),
+      }],
+    }
+  },
+)
+
+// ============================================================
 // START SERVER
 // ============================================================
 
 async function main() {
+  // Connect to MongoDB for request logging
+  try {
+    await connectLogger()
+    console.error('[MCP] Request logging enabled')
+  } catch (e) {
+    console.error('[MCP] Warning: Could not connect to MongoDB for logging, continuing without logging:', e)
+  }
+
   const transport = new StdioServerTransport()
   await server.connect(transport)
+  console.error(`[MCP] Server running (API: ${getApiUrl()})`)
 }
 
 main().catch((err) => {
