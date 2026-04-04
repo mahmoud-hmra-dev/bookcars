@@ -1,39 +1,34 @@
 import LocalizedStrings from 'localized-strings'
 import * as langHelper from '@/utils/langHelper'
-import env from '@/config/env.config'
 
 const strings = new LocalizedStrings({
   fr: {
-    CONGRATULATIONS: 'Félicitation!',
-    SUCCESS: 'Votre paiement a été effectué avec succès. Nous vous avons envoyé un e-mail de confirmation.',
-    SUCCESS_PAY_LATER: 'Votre réservation a été effectuée avec succès. Nous vous avons envoyé un e-mail de confirmation.',
+    CONGRATULATIONS: 'Felicitations!',
+    SUCCESS: 'Votre paiement a ete effectue avec succes.',
+    SUCCESS_PAY_LATER: 'Votre reservation a ete effectuee avec succes.',
     ERROR: 'Something went wrong! Try again later',
-    STATUS_TITLE: `${env.WEBSITE_NAME} Confirmation de réservation`,
-    STATUS_MESSAGE: "Vérifiez votre boîte mail et suivez les étapes décrites dans l'e-mail de confirmation de réservation pour réserver votre voiture.",
+    GO_TO_BOOKINGS: 'Voir mes reservations',
   },
   en: {
     CONGRATULATIONS: 'Congratulations!',
-    SUCCESS: 'Your payment was successfully done. We sent you a confirmation email.',
-    SUCCESS_PAY_LATER: 'Your booking was successfully done. We sent you a confirmation email.',
+    SUCCESS: 'Your payment was successfully done.',
+    SUCCESS_PAY_LATER: 'Your booking was successfully done.',
     ERROR: 'Something went wrong! Try again later',
-    STATUS_TITLE: `${env.WEBSITE_NAME} Booking Confirmation`,
-    STATUS_MESSAGE: 'Check your mailbox and follow the steps described in the booking confirmation email to book your car.',
+    GO_TO_BOOKINGS: 'Go to bookings',
   },
   ar: {
-    CONGRATULATIONS: 'تهانينا!',
-    SUCCESS: 'تمت عملية الدفع بنجاح. لقد أرسلنا لك رسالة تأكيد عبر البريد الإلكتروني.',
-    SUCCESS_PAY_LATER: 'تم إتمام حجزك بنجاح. لقد أرسلنا لك رسالة تأكيد عبر البريد الإلكتروني.',
-    ERROR: 'حدث خطأ ما. حاول مرة أخرى لاحقًا.',
-    STATUS_TITLE: `${env.WEBSITE_NAME} تأكيد الحجز`,
-    STATUS_MESSAGE: 'تحقق من بريدك الإلكتروني واتبع الخطوات الموضحة في رسالة تأكيد الحجز لإكمال حجز سيارتك.',
+    CONGRATULATIONS: 'ØªÙ‡Ø§Ù†ÙŠÙ†Ø§!',
+    SUCCESS: 'ØªÙ…Øª Ø¹Ù…Ù„ÙŠØ© Ø§Ù„Ø¯ÙØ¹ Ø¨Ù†Ø¬Ø§Ø­.',
+    SUCCESS_PAY_LATER: 'ØªÙ… Ø¥ØªÙ…Ø§Ù… Ø­Ø¬Ø²Ùƒ Ø¨Ù†Ø¬Ø§Ø­.',
+    ERROR: 'Ø­Ø¯Ø« Ø®Ø·Ø£ Ù…Ø§. Ø­Ø§ÙˆÙ„ Ù…Ø±Ø© Ø£Ø®Ø±Ù‰ Ù„Ø§Ø­Ù‚Ù‹Ø§.',
+    GO_TO_BOOKINGS: 'Ø§Ù„Ø¹ÙˆØ¯Ø© Ø¥Ù„Ù‰ Ø§Ù„Ø­Ø¬ÙˆØ²Ø§Øª',
   },
   es: {
-    CONGRATULATIONS: '¡Felicitaciones!',
-    SUCCESS: 'Tu pago se realizó con éxito. Te hemos enviado un correo de confirmación.',
-    SUCCESS_PAY_LATER: 'Tu reserva se ha realizado con éxito. Te hemos enviado un correo de confirmación.',
-    ERROR: '¡Algo salió mal! Inténtelo nuevamente más tarde',
-    STATUS_TITLE: `${env.WEBSITE_NAME} Confirmación de reserva`,
-    STATUS_MESSAGE: 'Revise su buzón de correo y siga los pasos descritos en el correo electrónico de confirmación de reserva para reservar su vehículo.',
+    CONGRATULATIONS: 'Felicitaciones!',
+    SUCCESS: 'Tu pago se realizo con exito.',
+    SUCCESS_PAY_LATER: 'Tu reserva se ha realizado con exito.',
+    ERROR: 'Algo salio mal. Intentalo de nuevo mas tarde',
+    GO_TO_BOOKINGS: 'Ir a reservas',
   },
 })
 

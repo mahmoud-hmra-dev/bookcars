@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
+import { Button } from '@mui/material'
 import { DirectionsCar as CarIcon } from '@mui/icons-material'
 import { format } from 'date-fns'
+import { useNavigate } from 'react-router-dom'
 import * as bookcarsTypes from ':bookcars-types'
 import * as bookcarsHelper from ':bookcars-helper'
 import * as helper from '@/utils/helper'
@@ -31,6 +33,7 @@ const CheckoutStatus = (
     className,
   }: CheckoutStatusProps
 ) => {
+  const navigate = useNavigate()
   const [booking, setBooking] = useState<bookcarsTypes.Booking>()
   const [price, setPrice] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -104,11 +107,15 @@ const CheckoutStatus = (
                 <div className="status-detail-value status-price">{bookcarsHelper.formatPrice(price, commonStrings.CURRENCY, language)}</div>
               </div>
             </div>
-          </div>
-
-          <div className="side-panel">
-            <h1>{strings.STATUS_TITLE}</h1>
-            <p>{strings.STATUS_MESSAGE}</p>
+            <div className="status-actions">
+              <Button
+                variant="contained"
+                className="btn-primary"
+                onClick={() => navigate('/bookings')}
+              >
+                {strings.GO_TO_BOOKINGS}
+              </Button>
+            </div>
           </div>
         </div>
       )}
