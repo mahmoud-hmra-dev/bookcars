@@ -514,30 +514,25 @@ const Checkout = () => {
                         </Map>
                       )}
 
-                    {/* ── Supplier Office Location Map ─────────────────────── */}
+                    {/* ── Supplier Office Info Card (no extra map to avoid race condition) ── */}
                     {!env.HIDE_SUPPLIERS && car.supplier.latitude && car.supplier.longitude && (
-                      <div className="supplier-office-map-section">
-                        <div className="supplier-office-map-header">
-                          <StoreIcon className="supplier-office-map-header-icon" />
-                          <div className="supplier-office-map-header-info">
-                            <div className="supplier-office-map-header-title">Supplier Office Location</div>
-                            <div className="supplier-office-map-header-name">{car.supplier.fullName}</div>
-                          </div>
+                      <div className="supplier-office-info-card">
+                        <div className="supplier-office-info-icon">
+                          <StoreIcon fontSize="inherit" />
                         </div>
-                        <div className="supplier-office-map-body">
-                          <Map
-                            position={[car.supplier.latitude, car.supplier.longitude]}
-                            initialZoom={14}
-                            className="map"
-                          />
+                        <div className="supplier-office-info-body">
+                          <div className="supplier-office-info-title">Supplier Office</div>
+                          <div className="supplier-office-info-name">{car.supplier.fullName}</div>
                         </div>
-                        <div className="supplier-office-map-coords">
-                          <LocationOnIcon sx={{ fontSize: 14, color: '#1B6B4A' }} />
-                          <span>Office coordinates:</span>
-                          <span className="supplier-office-map-coords-badge">
-                            {car.supplier.latitude.toFixed(5)}, {car.supplier.longitude.toFixed(5)}
-                          </span>
-                        </div>
+                        <a
+                          className="supplier-office-info-link"
+                          href={`https://maps.google.com/?q=${car.supplier.latitude},${car.supplier.longitude}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <LocationOnIcon sx={{ fontSize: 15 }} />
+                          View on map
+                        </a>
                       </div>
                     )}
 
