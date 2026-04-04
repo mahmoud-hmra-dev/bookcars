@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import * as bookcarsTypes from ':bookcars-types'
 import * as bookcarsHelper from ':bookcars-helper'
 import env from '@/config/env.config'
+import * as helper from '@/utils/helper'
 import { strings as commonStrings } from '@/lang/common'
 import Accordion from './Accordion'
 
@@ -135,7 +136,7 @@ const SupplierFilter = ({
                   className="supplier"
                 >
                   <img
-                    src={bookcarsHelper.joinURL(env.CDN_USERS, supplier.avatar)}
+                    src={helper.supplierImageURL(supplier.avatar)}
                     alt={supplier.fullName}
                     title={supplier.fullName}
                   />

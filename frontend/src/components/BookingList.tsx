@@ -299,7 +299,7 @@ const BookingList = ({
         flex: 1,
         renderCell: ({ row, value }: GridRenderCellParams<bookcarsTypes.Booking, string>) => (
           <div className="cell-supplier">
-            <img src={bookcarsHelper.joinURL(env.CDN_USERS, (row.supplier as bookcarsTypes.User).avatar)} alt={value} />
+            <img src={helper.supplierImageURL((row.supplier as bookcarsTypes.User).avatar)} alt={value} />
           </div>
         ),
         valueGetter: (value: bookcarsTypes.User) => value?.fullName,
@@ -426,7 +426,7 @@ const BookingList = ({
                     <span className="booking-detail-title">{commonStrings.SUPPLIER}</span>
                     <div className="booking-detail-value">
                       <div className="car-supplier">
-                        <img src={bookcarsHelper.joinURL(env.CDN_USERS, bookingSupplier.avatar)} alt={bookingSupplier.fullName} />
+                        <img src={helper.supplierImageURL(bookingSupplier.avatar)} alt={bookingSupplier.fullName} />
                         <span className="car-supplier-name">{bookingSupplier.fullName}</span>
                       </div>
                     </div>

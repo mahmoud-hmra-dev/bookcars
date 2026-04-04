@@ -3,6 +3,32 @@ import * as bookcarsTypes from ':bookcars-types'
 import * as bookcarsHelper from ':bookcars-helper'
 import { strings } from '@/lang/cars'
 import { strings as commonStrings } from '@/lang/common'
+
+// SVG placeholders (URL-encoded inline data URIs)
+const PERSON_PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdbdbd'%3E%3Cpath d='M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z'/%3E%3C/svg%3E"
+const CAR_PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdbdbd'%3E%3Cpath d='M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z'/%3E%3C/svg%3E"
+
+/**
+ * Returns a user/supplier avatar URL, or a person placeholder SVG if avatar is missing.
+ * Prevents joinURL from throwing "[joinURL] part undefined".
+ */
+export const supplierImageURL = (avatar: string | undefined | null): string => {
+  if (avatar) {
+    return bookcarsHelper.joinURL(env.CDN_USERS, avatar)
+  }
+  return PERSON_PLACEHOLDER
+}
+
+/**
+ * Returns a car image URL, or a car placeholder SVG if image is missing.
+ * Prevents joinURL from throwing "[joinURL] part undefined".
+ */
+export const carImageURL = (image: string | undefined | null): string => {
+  if (image) {
+    return bookcarsHelper.joinURL(env.CDN_CARS, image)
+  }
+  return CAR_PLACEHOLDER
+}
 import env from '@/config/env.config'
 import * as PaymentService from '@/services/PaymentService'
 import * as UserService from '@/services/UserService'
@@ -712,3 +738,4 @@ export const getCarRange = (range: bookcarsTypes.CarRange) => {
       return ''
   }
 }
+

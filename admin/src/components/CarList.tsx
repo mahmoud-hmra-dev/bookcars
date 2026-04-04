@@ -406,7 +406,7 @@ const CarList = ({
               return (
                 <article key={car._id}>
                   <div className="car">
-                    <img src={bookcarsHelper.joinURL(env.CDN_CARS, car.image)} alt={car.name} className="car-img" />
+                    <img src={helper.carImageURL(car.image)} alt={car.name} className="car-img" />
                     <div className="car-footer">
                       <div className="car-footer-row1">
                         <div className="rating">

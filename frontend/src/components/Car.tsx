@@ -220,7 +220,7 @@ const Car = ({
       )}
       <article>
         <div className="car">
-          <img src={bookcarsHelper.joinURL(env.CDN_CARS, car.image)} alt={car.name} className="car-img" loading="lazy" />
+          <img src={helper.carImageURL(car.image)} alt={car.name} className="car-img" loading="lazy" />
           <div className="car-row">
             {/* Supplier info now shown in banner above - hidden here */}
             <div className="car-footer">

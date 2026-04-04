@@ -672,7 +672,7 @@ const Checkout = () => {
                             <span className="checkout-detail-title">{commonStrings.SUPPLIER}</span>
                             <div className="checkout-detail-value">
                               <div className="car-supplier">
-                                <img src={bookcarsHelper.joinURL(env.CDN_USERS, car.supplier.avatar)} alt={car.supplier.fullName} style={{ height: env.SUPPLIER_IMAGE_HEIGHT }} />
+                                <img src={helper.supplierImageURL(car.supplier.avatar)} alt={car.supplier.fullName} style={{ height: env.SUPPLIER_IMAGE_HEIGHT }} />
                                 <span className="car-supplier-name">{car.supplier.fullName}</span>
                               </div>
                             </div>

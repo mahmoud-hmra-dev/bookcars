@@ -18,6 +18,7 @@ import {
 import * as bookcarsTypes from ':bookcars-types'
 import * as bookcarsHelper from ':bookcars-helper'
 import env from '@/config/env.config'
+import * as helper from '@/utils/helper'
 
 import '@/assets/css/multiple-select.css'
 
@@ -187,7 +188,7 @@ const MultipleSelect = ({
                       <>
                         <InputAdornment position="start">
                           <div className="supplier-ia">
-                            <img src={bookcarsHelper.joinURL(env.CDN_USERS, option.image)} alt={option.name} />
+                            <img src={helper.supplierImageURL(option.image)} alt={option.name} />
                           </div>
                         </InputAdornment>
                         {params.InputProps.startAdornment}
@@ -263,7 +264,7 @@ const MultipleSelect = ({
                       <>
                         <InputAdornment position="start">
                           <img
-                            src={bookcarsHelper.joinURL(env.CDN_CARS, option.image)}
+                            src={helper.carImageURL(option.image)}
                             alt={option.name}
                             style={{
                               height: env.SELECTED_CAR_OPTION_IMAGE_HEIGHT,
@@ -319,7 +320,7 @@ const MultipleSelect = ({
             return (
               <li {..._props} key={option._id} className={`${props.className} ms-option`}>
                 <span className="option-image supplier-ia">
-                  <img src={bookcarsHelper.joinURL(env.CDN_USERS, option.image)} alt={option.name} />
+                  <img src={helper.supplierImageURL(option.image)} alt={option.name} />
                 </span>
                 <span className="option-name">{option.name}</span>
               </li>
@@ -353,7 +354,7 @@ const MultipleSelect = ({
               <li {..._props} key={option._id} className={`${props.className} ms-option`}>
                 <span className="option-image car-ia">
                   <img
-                    src={bookcarsHelper.joinURL(env.CDN_CARS, option.image)}
+                    src={helper.carImageURL(option.image)}
                     alt={option.name}
                     style={{
                       height: env.CAR_OPTION_IMAGE_HEIGHT,
