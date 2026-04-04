@@ -24,7 +24,7 @@ div.social-login div.separator span {
 
 div.social-login div.login-buttons {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 12px;
   margin: 0;
 }
@@ -70,18 +70,6 @@ div.social-login img.social {
   width: 30px;
   height: 30px;
   object-fit: contain;
-}
-
-div.social-login span.social-x {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  color: #101826;
-  font-size: 1.2rem;
-  font-weight: 800;
-  line-height: 1;
 }
 
 div.social-login span.social-label {

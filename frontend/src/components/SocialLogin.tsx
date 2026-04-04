@@ -5,7 +5,6 @@ import env from '@/config/env.config'
 import { buildAuth0LoginOptions } from '@/utils/auth0'
 import type { Auth0FlowMode } from '@/utils/auth0'
 
-import FacebookIcon from '@/assets/img/facebook-icon.png'
 import GoogleIcon from '@/assets/img/google-icon.png'
 
 import '@/assets/css/social-login.css'
@@ -26,19 +25,9 @@ const SocialLogin = ({
   const { loginWithRedirect } = useAuth0()
   const providers = [
     {
-      connection: env.AUTH0_CONNECTION_FACEBOOK,
-      label: 'Facebook',
-      icon: <img alt="Facebook" src={FacebookIcon} className="social" />,
-    },
-    {
       connection: env.AUTH0_CONNECTION_GOOGLE,
       label: 'Google',
       icon: <img alt="Google" src={GoogleIcon} className="social" />,
-    },
-    {
-      connection: env.AUTH0_CONNECTION_TWITTER,
-      label: 'X',
-      icon: <span className="social-x">X</span>,
     },
   ]
 
