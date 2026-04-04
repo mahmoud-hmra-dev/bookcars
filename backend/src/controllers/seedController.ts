@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express'
 import bcrypt from 'bcrypt'
 import * as bookcarsTypes from ':bookcars-types'
+import * as env from '../config/env.config'
 import Car from '../models/Car'
 import User from '../models/User'
 import Location from '../models/Location'
@@ -77,7 +78,7 @@ const suppliers = [
   {
     fullName: 'Tyre Road Rentals',
     email: 'info@tyreroad.lb',
-    phone: '+96182234567',
+    phone: '+96179123456',
     location: { name: 'Tyre (Sour)', lat: 33.2705, lng: 35.2038 },
     bio: 'Discover the beautiful South with our vehicles.',
   },
@@ -256,7 +257,7 @@ const carTemplates = [
     multimedia: [bookcarsTypes.CarMultimedia.Bluetooth], rating: 3, co2: 145,
   },
   {
-    name: 'Chevrolet Spark 2024', licenseSuffix: 'CS24', minimumAge: 18, dailyPrice: 28, discountedDailyPrice: 24,
+    name: 'Chevrolet Spark 2024', licenseSuffix: 'CS24', minimumAge: 21, dailyPrice: 28, discountedDailyPrice: 24,
     weeklyPrice: 168, discountedWeeklyPrice: 150, monthlyPrice: 620, discountedMonthlyPrice: 558,
     deposit: 250, available: true, type: bookcarsTypes.CarType.Gasoline, gearbox: bookcarsTypes.GearboxType.Manual,
     aircon: true, seats: 4, doors: 4, fuelPolicy: bookcarsTypes.FuelPolicy.LikeForLike, mileage: -1,
@@ -393,6 +394,7 @@ export const seedLebanon = async (req: Request, res: Response) => {
         const { licenseSuffix: _ls, ...carData } = template
         await new Car({
           ...carData,
+          minimumAge: Math.max(carData.minimumAge, env.MINIMUM_AGE),
           licensePlate,
           supplier: supplierUser._id,
           locations: [locationDoc._id],
