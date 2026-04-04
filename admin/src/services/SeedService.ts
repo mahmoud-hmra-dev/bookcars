@@ -5,6 +5,6 @@ import axiosInstance from './axiosInstance'
  * Returns { success, log, message? }
  */
 export const seedLebanon = async (): Promise<{ success: boolean; log: string[]; message?: string }> => {
-  const { data } = await axiosInstance.post('/api/seed-lebanon')
+  const { data } = await axiosInstance.post('/api/seed-lebanon', null, { withCredentials: true })
   return data
 }
