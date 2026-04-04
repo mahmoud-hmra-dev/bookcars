@@ -14,70 +14,70 @@ const suppliers = [
   {
     fullName: 'Cedar Drive Lebanon',
     email: 'info@cedardrive.lb',
-    phone: '+9611234567',
+    phone: '+96170123456',
     location: { name: 'Beirut - Hamra', lat: 33.8938, lng: 35.5018 },
     bio: 'Premium car rental in the heart of Hamra, Beirut.',
   },
   {
     fullName: 'Phoenicia Car Rental',
     email: 'rent@phoeniciacars.lb',
-    phone: '+9611345678',
+    phone: '+96171234567',
     location: { name: 'Beirut - Achrafieh', lat: 33.8869, lng: 35.5208 },
     bio: 'Reliable fleet serving Achrafieh and Gemmayzeh.',
   },
   {
     fullName: 'Mount Lebanon Rent',
     email: 'contact@mountlebanonrent.lb',
-    phone: '+9614111222',
+    phone: '+96172345678',
     location: { name: 'Jounieh', lat: 33.9808, lng: 35.6179 },
     bio: 'Best rates in Jounieh and the Keserwan district.',
   },
   {
     fullName: 'Bekaa Valley Cars',
     email: 'info@bekaacars.lb',
-    phone: '+9618222333',
+    phone: '+96173456789',
     location: { name: 'Zahlé', lat: 33.8460, lng: 35.9023 },
     bio: 'Serving the Bekaa Valley with competitive prices.',
   },
   {
     fullName: 'North Star Rental',
     email: 'rent@northstarlb.com',
-    phone: '+9616333444',
+    phone: '+96176123456',
     location: { name: 'Tripoli', lat: 34.4367, lng: 35.8497 },
     bio: 'Top car rental agency in Tripoli, North Lebanon.',
   },
   {
     fullName: 'South Coast Autos',
     email: 'cars@southcoastautos.lb',
-    phone: '+9617444555',
+    phone: '+96177234567',
     location: { name: 'Sidon (Saida)', lat: 33.5632, lng: 35.3717 },
     bio: 'Serving Sidon and the South Lebanon coast.',
   },
   {
     fullName: 'Baalbek Heritage Rentals',
     email: 'info@baalbek-rentals.lb',
-    phone: '+9618555666',
+    phone: '+96178345678',
     location: { name: 'Baalbek', lat: 34.0043, lng: 36.2060 },
     bio: 'Explore the ancient city and beyond with our fleet.',
   },
   {
     fullName: 'Metn Premium Cars',
     email: 'contact@metnpremium.lb',
-    phone: '+9614666777',
+    phone: '+96179456789',
     location: { name: 'Dbayeh - Metn', lat: 33.9154, lng: 35.5895 },
     bio: 'Luxury and economy vehicles in the Metn district.',
   },
   {
     fullName: 'Airport Express Rental',
     email: 'rent@airportexpress.lb',
-    phone: '+9611777888',
+    phone: '+96181123456',
     location: { name: 'Khalde - Beirut Airport Area', lat: 33.8208, lng: 35.4888 },
     bio: 'Conveniently located near Beirut Rafic Hariri Airport.',
   },
   {
     fullName: 'Tyre Road Rentals',
     email: 'info@tyreroad.lb',
-    phone: '+9617888999',
+    phone: '+96182234567',
     location: { name: 'Tyre (Sour)', lat: 33.2705, lng: 35.2038 },
     bio: 'Discover the beautiful South with our vehicles.',
   },
@@ -275,30 +275,29 @@ export const seedLebanon = async (req: Request, res: Response) => {
   const log: string[] = []
 
   try {
-    // 1. Lebanon country
-    let countryValue = await (LocationValue as any).findOne({ language: 'en', value: 'Lebanon' })
+    // 1. Lebanon country — find or create
     let countryDoc: any
 
-    if (!countryValue) {
+    // First try: find by a LocationValue with value 'Lebanon'
+    const lebValueEn = await (LocationValue as any).findOne({ language: 'en', value: 'Lebanon' })
+    if (lebValueEn) {
+      countryDoc = await (Country as any).findOne({ values: { $in: [lebValueEn._id] } })
+    }
+
+    // Second try: just grab any country (single-country setups)
+    if (!countryDoc) {
+      countryDoc = await (Country as any).findOne({})
+    }
+
+    // Last resort: create Lebanon country from scratch
+    if (!countryDoc) {
       const cvEn = await new LocationValue({ language: 'en', value: 'Lebanon' }).save()
       const cvAr = await new LocationValue({ language: 'ar', value: 'لبنان' }).save()
       const cvFr = await new LocationValue({ language: 'fr', value: 'Liban' }).save()
       countryDoc = await new Country({ values: [cvEn._id, cvAr._id, cvFr._id] }).save()
       log.push('Created country: Lebanon')
     } else {
-      // Search all countries and find the one containing this LocationValue id
-      countryDoc = await (Country as any).findOne({ values: { $in: [countryValue._id] } })
-      if (!countryDoc) {
-        countryDoc = await new Country({ values: [countryValue._id] }).save()
-        log.push('Linked existing Lebanon LocationValue to new Country doc')
-      } else {
-        log.push('Found existing country: Lebanon')
-      }
-    }
-
-    if (!countryDoc) {
-      res.status(500).json({ success: false, message: 'Could not find or create Lebanon country document.', log })
-      return
+      log.push(`Using country: ${lebValueEn?.value || countryDoc._id}`)
     }
 
     const adminUser = await User.findOne({ type: bookcarsTypes.UserType.Admin })
