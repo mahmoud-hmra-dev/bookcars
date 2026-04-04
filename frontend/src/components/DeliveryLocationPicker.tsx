@@ -121,7 +121,7 @@ const DeliveryLocationPicker: React.FC<Props> = ({
     }
     const google = googleRef.current
 
-    const map = new google.maps.Map(mapContainerRef.current, {
+    const map = new google.Map(mapContainerRef.current, {
       center: { lat: initialLat, lng: initialLng },
       zoom: 12,
       mapTypeControl: false,
@@ -132,21 +132,21 @@ const DeliveryLocationPicker: React.FC<Props> = ({
       ],
     })
     mapRef.current = map
-    geocoderRef.current = new google.maps.Geocoder()
+    geocoderRef.current = new google.Geocoder()
 
     // Supplier office marker (green pin)
-    supplierMarkerRef.current = new google.maps.Marker({
+    supplierMarkerRef.current = new google.Marker({
       position: { lat: supplierLat, lng: supplierLng },
       map,
       title: supplierName,
       icon: {
         url: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
-        scaledSize: new google.maps.Size(40, 40),
+        scaledSize: new google.Size(40, 40),
       },
       zIndex: 2,
     })
 
-    const infoWindow = new google.maps.InfoWindow({
+    const infoWindow = new google.InfoWindow({
       content: `<div style="font-weight:700;font-size:13px;max-width:180px">${supplierName}<br/><span style="font-weight:400;color:#555">Supplier Office</span></div>`,
     })
     supplierMarkerRef.current.addListener('click', () => {
@@ -176,21 +176,21 @@ const DeliveryLocationPicker: React.FC<Props> = ({
         polylineRef.current.setMap(null)
       }
 
-      userMarkerRef.current = new google.maps.Marker({
+      userMarkerRef.current = new google.Marker({
         position: { lat, lng },
         map,
         title: 'Pickup / Delivery point',
-        animation: google.maps.Animation.DROP,
+        animation: google.Animation.DROP,
         icon: {
           url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
-          scaledSize: new google.maps.Size(40, 40),
+          scaledSize: new google.Size(40, 40),
         },
         zIndex: 3,
         draggable: true,
       })
 
       // Draw dashed line between supplier and pickup
-      polylineRef.current = new google.maps.Polyline({
+      polylineRef.current = new google.Polyline({
         path: [
           { lat: supplierLat, lng: supplierLng },
           { lat, lng },
