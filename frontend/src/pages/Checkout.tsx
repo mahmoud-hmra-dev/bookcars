@@ -626,6 +626,7 @@ const Checkout = () => {
                       from={from}
                       to={to}
                       language={language}
+                      allowAdditionalDriver={!authenticated}
                       clientSecret={clientSecret}
                       payPalLoaded={payPalLoaded}
                       onPriceChange={(value) => setPrice(value)}
