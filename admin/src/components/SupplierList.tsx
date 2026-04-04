@@ -201,7 +201,7 @@ const SupplierList = ({
               <article key={supplier._id}>
                 <div className="supplier-item">
                   <div className="supplier-item-avatar">
-                    <img src={bookcarsHelper.joinURL(env.CDN_USERS, supplier.avatar)} alt={supplier.fullName} />
+                    <img src={helper.supplierImageURL(supplier.avatar)} alt={supplier.fullName} />
                   </div>
                   <span className="supplier-item-title">{supplier.fullName}</span>
                   {

@@ -800,3 +800,15 @@ export const verifyReCaptcha = async (token: string): Promise<boolean> => {
     return false
   }
 }
+
+/**
+ * Returns the supplier avatar URL, or a safe placeholder SVG if no avatar is set.
+ * Prevents joinURL from throwing "[joinURL] part undefined" when avatar is missing.
+ */
+export const supplierImageURL = (avatar: string | undefined | null): string => {
+  if (avatar) {
+    return bookcarsHelper.joinURL(env.CDN_USERS, avatar)
+  }
+  // Inline SVG placeholder — a simple person silhouette circle
+  return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdbdbd'%3E%3Cpath d='M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z'/%3E%3C/svg%3E"
+}
