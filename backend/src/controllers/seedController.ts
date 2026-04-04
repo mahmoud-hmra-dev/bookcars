@@ -14,70 +14,70 @@ const suppliers = [
   {
     fullName: 'Cedar Drive Lebanon',
     email: 'info@cedardrive.lb',
-    phone: '+961 1 234 567',
+    phone: '+9611234567',
     location: { name: 'Beirut - Hamra', lat: 33.8938, lng: 35.5018 },
     bio: 'Premium car rental in the heart of Hamra, Beirut.',
   },
   {
     fullName: 'Phoenicia Car Rental',
     email: 'rent@phoeniciacars.lb',
-    phone: '+961 1 345 678',
+    phone: '+9611345678',
     location: { name: 'Beirut - Achrafieh', lat: 33.8869, lng: 35.5208 },
     bio: 'Reliable fleet serving Achrafieh and Gemmayzeh.',
   },
   {
     fullName: 'Mount Lebanon Rent',
     email: 'contact@mountlebanonrent.lb',
-    phone: '+961 4 111 222',
+    phone: '+9614111222',
     location: { name: 'Jounieh', lat: 33.9808, lng: 35.6179 },
     bio: 'Best rates in Jounieh and the Keserwan district.',
   },
   {
     fullName: 'Bekaa Valley Cars',
     email: 'info@bekaacars.lb',
-    phone: '+961 8 222 333',
+    phone: '+9618222333',
     location: { name: 'Zahlé', lat: 33.8460, lng: 35.9023 },
     bio: 'Serving the Bekaa Valley with competitive prices.',
   },
   {
     fullName: 'North Star Rental',
     email: 'rent@northstarlb.com',
-    phone: '+961 6 333 444',
+    phone: '+9616333444',
     location: { name: 'Tripoli', lat: 34.4367, lng: 35.8497 },
     bio: 'Top car rental agency in Tripoli, North Lebanon.',
   },
   {
     fullName: 'South Coast Autos',
     email: 'cars@southcoastautos.lb',
-    phone: '+961 7 444 555',
+    phone: '+9617444555',
     location: { name: 'Sidon (Saida)', lat: 33.5632, lng: 35.3717 },
     bio: 'Serving Sidon and the South Lebanon coast.',
   },
   {
     fullName: 'Baalbek Heritage Rentals',
     email: 'info@baalbek-rentals.lb',
-    phone: '+961 8 555 666',
+    phone: '+9618555666',
     location: { name: 'Baalbek', lat: 34.0043, lng: 36.2060 },
     bio: 'Explore the ancient city and beyond with our fleet.',
   },
   {
     fullName: 'Metn Premium Cars',
     email: 'contact@metnpremium.lb',
-    phone: '+961 4 666 777',
+    phone: '+9614666777',
     location: { name: 'Dbayeh - Metn', lat: 33.9154, lng: 35.5895 },
     bio: 'Luxury and economy vehicles in the Metn district.',
   },
   {
     fullName: 'Airport Express Rental',
     email: 'rent@airportexpress.lb',
-    phone: '+961 1 777 888',
+    phone: '+9611777888',
     location: { name: 'Khalde - Beirut Airport Area', lat: 33.8208, lng: 35.4888 },
     bio: 'Conveniently located near Beirut Rafic Hariri Airport.',
   },
   {
     fullName: 'Tyre Road Rentals',
     email: 'info@tyreroad.lb',
-    phone: '+961 7 888 999',
+    phone: '+9617888999',
     location: { name: 'Tyre (Sour)', lat: 33.2705, lng: 35.2038 },
     bio: 'Discover the beautiful South with our vehicles.',
   },
@@ -286,11 +286,19 @@ export const seedLebanon = async (req: Request, res: Response) => {
       countryDoc = await new Country({ values: [cvEn._id, cvAr._id, cvFr._id] }).save()
       log.push('Created country: Lebanon')
     } else {
-      countryDoc = await (Country as any).findOne({ values: countryValue._id })
+      // Search all countries and find the one containing this LocationValue id
+      countryDoc = await (Country as any).findOne({ values: { $in: [countryValue._id] } })
       if (!countryDoc) {
         countryDoc = await new Country({ values: [countryValue._id] }).save()
+        log.push('Linked existing Lebanon LocationValue to new Country doc')
+      } else {
+        log.push('Found existing country: Lebanon')
       }
-      log.push('Found existing country: Lebanon')
+    }
+
+    if (!countryDoc) {
+      res.status(500).json({ success: false, message: 'Could not find or create Lebanon country document.', log })
+      return
     }
 
     const adminUser = await User.findOne({ type: bookcarsTypes.UserType.Admin })
