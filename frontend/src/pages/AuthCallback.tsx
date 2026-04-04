@@ -8,10 +8,11 @@ import * as UserService from '@/services/UserService'
 import { useUserContext, UserContextType } from '@/context/UserContext'
 import { consumeAuth0ReturnTo } from '@/utils/auth0'
 import { strings as commonStrings } from '@/lang/common'
+import env from '@/config/env.config'
 
 const AuthCallback = () => {
   const navigate = useNavigate()
-  const { isLoading, isAuthenticated, user, error, getIdTokenClaims } = useAuth0()
+  const { isLoading, isAuthenticated, user, error, getIdTokenClaims, getAccessTokenSilently } = useAuth0()
   const { setUser, setUserLoaded } = useUserContext() as UserContextType
   const [callbackError, setCallbackError] = React.useState('')
   const doneRef = React.useRef(false)
@@ -37,9 +38,43 @@ const AuthCallback = () => {
       try {
         const claims = await getIdTokenClaims()
         const idToken = claims?.__raw
-        const email = String(claims?.email || user?.email || '')
-        const fullName = String(claims?.name || user?.name || email)
-        const avatar = String(claims?.picture || user?.picture || '') || undefined
+
+        let email = String(claims?.email || user?.email || '')
+        let fullName = String(claims?.name || user?.name || '')
+        let avatar = String(claims?.picture || user?.picture || '') || undefined
+
+        let auth0AT: string | undefined
+        try {
+          auth0AT = await getAccessTokenSilently()
+        } catch (e) {
+          // access token may not be available
+        }
+
+        // Fallback: fetch from /userinfo endpoint when email is missing (Facebook, Auth0 DB connections)
+        if (idToken && !email && auth0AT) {
+          try {
+            const domain = env.AUTH0_DOMAIN.replace(/^https?:\/\//, '')
+            const res = await fetch(`https://${domain}/userinfo`, {
+              headers: { Authorization: `Bearer ${auth0AT}` },
+            })
+            if (res.ok) {
+              const info = await res.json()
+              email = String(info.email || '')
+              if (!fullName) {
+                fullName = String(info.name || '')
+              }
+              if (!avatar) {
+                avatar = String(info.picture || '') || undefined
+              }
+            }
+          } catch (e) {
+            console.warn('Auth0 /userinfo fallback failed:', e)
+          }
+        }
+
+        if (!fullName) {
+          fullName = email
+        }
 
         if (!idToken || !email) {
           throw new globalThis.Error('Auth0 id token or email missing')
@@ -48,6 +83,7 @@ const AuthCallback = () => {
         const res = await UserService.socialSignin({
           socialSignInType: bookcarsTypes.SocialSignInType.Auth0,
           accessToken: idToken,
+          auth0AccessToken: auth0AT,
           email,
           fullName,
           avatar,
@@ -76,7 +112,7 @@ const AuthCallback = () => {
     }
 
     syncAuth0User()
-  }, [error, getIdTokenClaims, isAuthenticated, isLoading, navigate, setUser, setUserLoaded, user])
+  }, [error, getAccessTokenSilently, getIdTokenClaims, isAuthenticated, isLoading, navigate, setUser, setUserLoaded, user])
 
   return callbackError
     ? <ErrorView message={callbackError} homeLink />

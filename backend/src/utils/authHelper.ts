@@ -111,7 +111,8 @@ export const hashPassword = async (password: string): Promise<string> => {
 export const validateAccessToken = async (
   socialSignInType: bookcarsTypes.SocialSignInType,
   token: string,
-  email: string
+  email: string,
+  auth0AccessToken?: string,
 ): Promise<boolean> => {
   if (!token) {
     return false
@@ -129,7 +130,7 @@ export const validateAccessToken = async (
         return await verifyFacebookToken(token, email)
 
       case bookcarsTypes.SocialSignInType.Auth0:
-        return await verifyAuth0Token(token, email)
+        return await verifyAuth0Token(token, email, auth0AccessToken)
 
       default:
         return false
@@ -229,7 +230,7 @@ export async function verifyFacebookToken(token: string, email: string): Promise
   return emailMatches
 }
 
-export async function verifyAuth0Token(token: string, email: string): Promise<boolean> {
+export async function verifyAuth0Token(token: string, email: string, auth0AccessToken?: string): Promise<boolean> {
   if (!env.AUTH0_DOMAIN || !env.AUTH0_CLIENT_ID) {
     return false
   }
@@ -251,10 +252,11 @@ export async function verifyAuth0Token(token: string, email: string): Promise<bo
   let payloadEmail = String(payload.email || '').toLowerCase()
   let isVerified = payload.email_verified === true || payload.email_verified === 'true'
 
-  // Some Auth0 access tokens do not include email claims, so fall back to /userinfo.
-  if (!payloadEmail) {
+  // Some Auth0 id tokens do not include email claims (e.g. Facebook, Auth0 DB connections).
+  // Fall back to /userinfo using the real access token.
+  if (!payloadEmail && auth0AccessToken) {
     const userInfoRes = await axios.get(`https://${auth0Domain}/userinfo`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${auth0AccessToken}` },
     })
 
     payloadEmail = String(userInfoRes.data.email || '').toLowerCase()

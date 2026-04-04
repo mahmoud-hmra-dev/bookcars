@@ -778,7 +778,7 @@ export const signin = async (req: Request, res: Response) => {
  */
 export const socialSignin = async (req: Request, res: Response) => {
   const { body }: { body: bookcarsTypes.SignInPayload } = req
-  const { socialSignInType, accessToken, email: emailFromBody, fullName, avatar, language: languageFromBody, stayConnected, mobile } = body
+  const { socialSignInType, accessToken, auth0AccessToken, email: emailFromBody, fullName, avatar, language: languageFromBody, stayConnected, mobile } = body
 
   try {
     if (!socialSignInType) {
@@ -799,7 +799,7 @@ export const socialSignin = async (req: Request, res: Response) => {
       throw new Error('body.accessToken not found')
     }
 
-    if (!(await authHelper.validateAccessToken(socialSignInType, accessToken, email))) {
+    if (!(await authHelper.validateAccessToken(socialSignInType, accessToken, email, auth0AccessToken))) {
       throw new Error('body.accessToken is not valid')
     }
 

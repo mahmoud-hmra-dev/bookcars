@@ -548,6 +548,7 @@ export interface SignInPayload {
   avatar?: string
   language?: string
   accessToken?: string
+  auth0AccessToken?: string
   socialSignInType?: SocialSignInType
 }
 
