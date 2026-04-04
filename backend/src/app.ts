@@ -23,6 +23,7 @@ import settingRoutes from './routes/settingRoutes'
 import assistantRoutes from './routes/assistantRoutes'
 import traccarRoutes from './routes/traccarRoutes'
 import healthRoutes from './routes/healthRoutes'
+import seedRoutes from './routes/seedRoutes'
 import { apiLimiter } from './middlewares/rateLimiter'
 import * as helper from './utils/helper'
 
@@ -72,6 +73,7 @@ app.use('/', bankDetailsRoutes)
 app.use('/', settingRoutes)
 app.use('/', assistantRoutes)
 app.use('/', traccarRoutes)
+app.use('/', seedRoutes)
 
 if (env.ENABLE_SENTRY) {
   Sentry.setupExpressErrorHandler(app)

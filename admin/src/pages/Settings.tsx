@@ -8,8 +8,17 @@ import {
   FormControlLabel,
   Switch,
   Button,
-  Paper
+  Paper,
+  CircularProgress,
+  Alert,
+  Collapse,
 } from '@mui/material'
+import {
+  Science as SeedIcon,
+  CheckCircle as CheckIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+} from '@mui/icons-material'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as bookcarsTypes from ':bookcars-types'
@@ -20,6 +29,7 @@ import { strings } from '@/lang/settings'
 import * as UserService from '@/services/UserService'
 import * as BankDetailsService from '@/services/BankDetailsService'
 import * as SettingService from '@/services/SettingService'
+import * as SeedService from '@/services/SeedService'
 import Backdrop from '@/components/SimpleBackdrop'
 import Avatar from '@/components/Avatar'
 import * as helper from '@/utils/helper'
@@ -41,6 +51,9 @@ const Settings = () => {
   const [enableEmailNotifications, setEnableEmailNotifications] = useState(false)
   const [bankDetails, setBankDetails] = useState<bookcarsTypes.BankDetails | null>(null)
   const [settings, setSettings] = useState<bookcarsTypes.Setting | null>(null)
+  const [seeding, setSeeding] = useState(false)
+  const [seedResult, setSeedResult] = useState<{ success: boolean; log: string[]; message?: string } | null>(null)
+  const [showSeedLog, setShowSeedLog] = useState(false)
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, clearErrors, setValue } = useForm<FormFields>({
     resolver: zodResolver(schema),
@@ -113,6 +126,20 @@ const Settings = () => {
     }
   }
 
+
+  const handleSeedLebanon = async () => {
+    try {
+      setSeeding(true)
+      setSeedResult(null)
+      const result = await SeedService.seedLebanon()
+      setSeedResult(result)
+      setShowSeedLog(true)
+    } catch (err: any) {
+      setSeedResult({ success: false, log: [], message: err?.response?.data?.message || err.message || 'Seed failed' })
+    } finally {
+      setSeeding(false)
+    }
+  }
 
   const onLoad = async (_user?: bookcarsTypes.User) => {
     if (_user) {
@@ -230,6 +257,78 @@ const Settings = () => {
               bankDetails={bankDetails}
               onSubmit={(data) => setBankDetails(data)}
             />
+          )}
+
+          {user.type === bookcarsTypes.UserType.Admin && (
+            <Paper className="settings-net settings-net-wrapper" elevation={10} style={{ marginTop: 20 }}>
+              <h1 className="settings-form-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <SeedIcon color="success" />
+                Demo Data
+              </h1>
+              <p style={{ color: '#64748b', fontSize: 14, marginBottom: 16 }}>
+                Populate the database with 10 Lebanese car rental suppliers and 200 demo cars (20 per supplier).
+                Safe to run multiple times — skips existing records.
+              </p>
+
+              <Button
+                variant="contained"
+                color="success"
+                size="small"
+                disabled={seeding}
+                startIcon={seeding ? <CircularProgress size={16} color="inherit" /> : <SeedIcon />}
+                onClick={handleSeedLebanon}
+                style={{ marginBottom: 16 }}
+              >
+                {seeding ? 'Seeding...' : 'Seed Lebanon Demo Data'}
+              </Button>
+
+              {seedResult && (
+                <Alert
+                  severity={seedResult.success ? 'success' : 'error'}
+                  icon={seedResult.success ? <CheckIcon /> : undefined}
+                  action={(
+                    <Button
+                      size="small"
+                      color="inherit"
+                      onClick={() => setShowSeedLog((v) => !v)}
+                      endIcon={showSeedLog ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                    >
+                      Log
+                    </Button>
+                  )}
+                >
+                  {seedResult.success
+                    ? seedResult.log[seedResult.log.length - 1] || 'Seed completed!'
+                    : seedResult.message || 'Seed failed'}
+                </Alert>
+              )}
+
+              {seedResult && (
+                <Collapse in={showSeedLog}>
+                  <div style={{
+                    marginTop: 8,
+                    padding: '12px 16px',
+                    background: '#0f172a',
+                    borderRadius: 8,
+                    maxHeight: 260,
+                    overflowY: 'auto',
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    color: '#94a3b8',
+                    lineHeight: 1.7,
+                  }}>
+                    {seedResult.log.map((line, i) => (
+                      <div key={i} style={{ color: line.startsWith('✅') ? '#4ade80' : '#94a3b8' }}>
+                        {line}
+                      </div>
+                    ))}
+                    {seedResult.message && !seedResult.success && (
+                      <div style={{ color: '#f87171' }}>{seedResult.message}</div>
+                    )}
+                  </div>
+                </Collapse>
+              )}
+            </Paper>
           )}
         </div>
       )}
