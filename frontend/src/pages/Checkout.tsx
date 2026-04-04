@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useRef, useState, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   OutlinedInput,
@@ -20,7 +20,11 @@ import {
   Settings as PaymentOptionsIcon,
   Payment as LicenseIcon,
   AssignmentTurnedIn as ChecklistIcon,
+  LocalShipping as DeliveryIcon,
+  Store as StoreIcon,
+  LocationOn as LocationOnIcon,
 } from '@mui/icons-material'
+import Switch from '@mui/material/Switch'
 import { format } from 'date-fns'
 import {
   EmbeddedCheckoutProvider,
@@ -65,6 +69,7 @@ import ViewOnMapButton from '@/components/ViewOnMapButton'
 import MapDialog from '@/components/MapDialog'
 import Backdrop from '@/components/SimpleBackdrop'
 import Unauthorized from '@/components/Unauthorized'
+import DeliveryLocationPicker, { DeliveryLocationInfo } from '@/components/DeliveryLocationPicker'
 
 import '@/assets/css/checkout.css'
 
@@ -107,6 +112,8 @@ const Checkout = () => {
   const [licenseRequired, setLicenseRequired] = useState(false)
   const [license, setLicense] = useState<string | null>(null)
   const [openMapDialog, setOpenMapDialog] = useState(false)
+  const [deliveryInfo, setDeliveryInfo] = useState<DeliveryLocationInfo | null>(null)
+  const [wantDelivery, setWantDelivery] = useState(false)
   const [payPalLoaded, setPayPalLoaded] = useState(false)
   const [payPalInit, setPayPalInit] = useState(false)
   const [payPalProcessing, setPayPalProcessing] = useState(false)
@@ -507,6 +514,108 @@ const Checkout = () => {
                         </Map>
                       )}
 
+                    {/* ── Supplier Office Location Map ─────────────────────── */}
+                    {!env.HIDE_SUPPLIERS && car.supplier.latitude && car.supplier.longitude && (
+                      <div className="supplier-office-map-section">
+                        <div className="supplier-office-map-header">
+                          <StoreIcon className="supplier-office-map-header-icon" />
+                          <div className="supplier-office-map-header-info">
+                            <div className="supplier-office-map-header-title">Supplier Office Location</div>
+                            <div className="supplier-office-map-header-name">{car.supplier.fullName}</div>
+                          </div>
+                        </div>
+                        <div className="supplier-office-map-body">
+                          <Map
+                            position={[car.supplier.latitude, car.supplier.longitude]}
+                            initialZoom={14}
+                            className="map"
+                          />
+                        </div>
+                        <div className="supplier-office-map-coords">
+                          <LocationOnIcon sx={{ fontSize: 14, color: '#1B6B4A' }} />
+                          <span>Office coordinates:</span>
+                          <span className="supplier-office-map-coords-badge">
+                            {car.supplier.latitude.toFixed(5)}, {car.supplier.longitude.toFixed(5)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── Delivery Option Toggle ───────────────────────────── */}
+                    <div className="delivery-option-section">
+                      <div
+                        className="delivery-option-toggle"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          const next = !wantDelivery
+                          setWantDelivery(next)
+                          if (!next) {
+                            setDeliveryInfo(null)
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            const next = !wantDelivery
+                            setWantDelivery(next)
+                            if (!next) {
+                              setDeliveryInfo(null)
+                            }
+                          }
+                        }}
+                      >
+                        <div className="delivery-option-toggle-left">
+                          <div className="delivery-option-toggle-icon">
+                            <DeliveryIcon fontSize="inherit" />
+                          </div>
+                          <div className="delivery-option-toggle-text">
+                            <div className="delivery-option-toggle-title">Deliver to my location</div>
+                            <div className="delivery-option-toggle-subtitle">
+                              {wantDelivery
+                                ? 'Pin your address on the map below'
+                                : 'Optional — additional fee may apply based on distance'}
+                            </div>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={wantDelivery}
+                          color="success"
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            const next = e.target.checked
+                            setWantDelivery(next)
+                            if (!next) {
+                              setDeliveryInfo(null)
+                            }
+                          }}
+                        />
+                      </div>
+
+                      {wantDelivery && (
+                        <>
+                          <hr className="delivery-option-divider" />
+                          <div className="delivery-picker-section">
+                            <DeliveryLocationPicker
+                              supplierLat={car.supplier.latitude || 33.8938}
+                              supplierLng={car.supplier.longitude || 35.5018}
+                              supplierName={car.supplier.fullName}
+                              initialLat={car.supplier.latitude || 33.8938}
+                              initialLng={car.supplier.longitude || 35.5018}
+                              currency="$"
+                              onChange={(info) => setDeliveryInfo(info)}
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {!wantDelivery && (
+                        <div className="delivery-self-pickup-notice">
+                          <LocationOnIcon sx={{ fontSize: 16, color: '#94a3b8' }} />
+                          <span>You will pick up the car from the supplier&apos;s office.</span>
+                        </div>
+                      )}
+                    </div>
+
                     <CarList
                       cars={[car]}
                       // pickupLocationName={pickupLocation.name}
@@ -573,6 +682,27 @@ const Checkout = () => {
                           <span className="checkout-detail-title">{strings.COST}</span>
                           <div className="checkout-detail-value booking-price">{bookcarsHelper.formatPrice(price, commonStrings.CURRENCY, language)}</div>
                         </div>
+                        {deliveryInfo && (
+                          <div className="checkout-detail delivery-fee-row" style={{ height: bookingDetailHeight }}>
+                            <span className="checkout-detail-title">
+                              🚗 Delivery Fee
+                              <span className="delivery-distance-badge">{deliveryInfo.distanceKm.toFixed(1)} km away</span>
+                            </span>
+                            <div className={`checkout-detail-value ${deliveryInfo.deliveryFee === 0 ? 'delivery-free' : 'delivery-paid'}`}>
+                              {deliveryInfo.deliveryFee === 0
+                                ? '🎉 Free Delivery!'
+                                : `$${deliveryInfo.deliveryFee}`}
+                            </div>
+                          </div>
+                        )}
+                        {deliveryInfo && (
+                          <div className="checkout-detail" style={{ height: bookingDetailHeight }}>
+                            <span className="checkout-detail-title">📍 Pickup Address</span>
+                            <div className="checkout-detail-value" style={{ fontSize: 12, color: '#64748b' }}>
+                              {deliveryInfo.address}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -957,13 +1087,17 @@ const Checkout = () => {
                         {
                           payDeposit ? strings.DEPOSIT : `${strings.PRICE_FOR} ${days} ${days > 1 ? strings.DAYS : strings.DAY}`
                         }
+                        {deliveryInfo && deliveryInfo.deliveryFee > 0 && (
+                          <span className="payment-info-delivery"> + ${deliveryInfo.deliveryFee} delivery</span>
+                        )}
                       </div>
                       <div className="payment-info-price">
                         {
                           bookcarsHelper.formatPrice(
-                            payDeposit ? depositPrice
+                            (payDeposit ? depositPrice
                               : payInFull ? (price + depositPrice)
-                                : price
+                                : price)
+                            + (deliveryInfo?.deliveryFee || 0)
                             , commonStrings.CURRENCY, language)
                         }
                       </div>

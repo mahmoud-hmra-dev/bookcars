@@ -8,9 +8,11 @@ import {
   Button,
   Paper,
   FormControlLabel,
-  Switch
+  Switch,
+  Divider,
+  Typography,
 } from '@mui/material'
-import { Info as InfoIcon } from '@mui/icons-material'
+import { Info as InfoIcon, LocationOn as LocationOnIcon, Lock as LockIcon } from '@mui/icons-material'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as bookcarsTypes from ':bookcars-types'
@@ -25,6 +27,8 @@ import Backdrop from '@/components/SimpleBackdrop'
 import Avatar from '@/components/Avatar'
 import * as helper from '@/utils/helper'
 import ContractList from '@/components/ContractList'
+import OfficeLocationPicker, { OfficeLocationInfo } from '@/components/OfficeLocationPicker'
+import PasswordInput from '@/components/PasswordInput'
 import { UserContextType, useUserContext } from '@/context/UserContext'
 import { schema, FormFields } from '@/models/SupplierForm'
 
@@ -41,6 +45,7 @@ const CreateSupplier = () => {
   const [avatar, setAvatar] = useState('')
   const [avatarError, setAvatarError] = useState(false)
   const [contracts, setContracts] = useState<bookcarsTypes.Contract[]>([])
+  const [officeLocation, setOfficeLocation] = useState<OfficeLocationInfo | null>(null)
 
   const {
     control,
@@ -58,9 +63,12 @@ const CreateSupplier = () => {
     defaultValues: {
       fullName: '',
       email: '',
+      password: '',
       phone: '',
       location: '',
       bio: '',
+      officeLat: '',
+      officeLng: '',
       payLater: false,
       licenseRequired: false,
       minimumRentalDays: '',
@@ -151,6 +159,10 @@ const CreateSupplier = () => {
         priceChangeRate: data.priceChangeRate ? Number(data.priceChangeRate) : undefined,
         supplierCarLimit: data.supplierCarLimit ? Number(data.supplierCarLimit) : undefined,
         notifyAdminOnNewCar: data.notifyAdminOnNewCar,
+        // office map coordinates
+        ...(officeLocation ? { latitude: officeLocation.lat, longitude: officeLocation.lng } : {}),
+        // optional password set by admin
+        ...(data.password ? { password: data.password } : {}),
       }
 
       status = await UserService.create(payload)
@@ -367,6 +379,42 @@ const CreateSupplier = () => {
                 type="text"
                 autoComplete="off"
               />
+            </FormControl>
+
+            {/* ── Office location on map ─────────────────── */}
+            <Divider sx={{ my: 2 }}>
+              <Typography variant="caption" sx={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <LocationOnIcon sx={{ fontSize: 14 }} /> Office Map Location
+              </Typography>
+            </Divider>
+
+            <FormControl fullWidth margin="dense">
+              <OfficeLocationPicker
+                onChange={(info) => {
+                  setOfficeLocation(info)
+                  setValue('officeLat', info ? String(info.lat) : '')
+                  setValue('officeLng', info ? String(info.lng) : '')
+                }}
+              />
+            </FormControl>
+
+            {/* ── Password (set by admin) ─────────────────── */}
+            <Divider sx={{ my: 2 }}>
+              <Typography variant="caption" sx={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <LockIcon sx={{ fontSize: 14 }} /> Account Password
+              </Typography>
+            </Divider>
+
+            <FormControl fullWidth margin="dense">
+              <PasswordInput
+                {...register('password')}
+                label="Password (leave blank to auto-generate)"
+                variant="standard"
+                autoComplete="new-password"
+              />
+              <FormHelperText>
+                If left blank, an activation email with a password-reset link will be sent.
+              </FormHelperText>
             </FormControl>
 
             <FormControl fullWidth margin="dense">

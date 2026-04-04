@@ -184,6 +184,9 @@ export interface UpdateSupplierPayload {
   supplierCarLimit?: number
   notifyAdminOnNewCar?: boolean
   blacklisted?: boolean
+  /** Office GPS coordinates */
+  latitude?: number
+  longitude?: number
 }
 
 export interface TraccarCarTracking {
@@ -501,6 +504,9 @@ export interface CreateUserPayload {
   priceChangeRate?: number
   supplierCarLimit?: number
   notifyAdminOnNewCar?: boolean
+  /** Office GPS coordinates for supplier accounts */
+  latitude?: number
+  longitude?: number
 }
 
 export interface UpdateUserPayload extends CreateUserPayload {
@@ -608,6 +614,9 @@ export interface User {
   priceChangeRate?: number
   supplierCarLimit?: number
   notifyAdminOnNewCar?: boolean
+  /** Geographic coordinates of the supplier's office */
+  latitude?: number
+  longitude?: number
 }
 
 export interface Option {

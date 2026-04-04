@@ -1,0 +1,164 @@
+/* ============================================================
+   OFFICE LOCATION PICKER - Admin panel map component
+   ============================================================ */
+
+.olp-wrapper {
+  border-radius: 12px;
+  border: 1px solid rgba(27, 107, 74, 0.18);
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+/* Header */
+.olp-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 18px 12px;
+  background: linear-gradient(135deg, #1B6B4A 0%, #2D9D6F 100%);
+  color: #fff;
+}
+
+.olp-header-icon {
+  font-size: 24px !important;
+  opacity: 0.9;
+  margin-top: 2px;
+}
+
+.olp-header-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.olp-header-sub {
+  font-size: 11px;
+  opacity: 0.8;
+  margin-top: 2px;
+}
+
+/* Loading state */
+.olp-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 200px;
+  color: #64748b;
+  font-size: 13px;
+  background: #f8fafb;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+/* Map container */
+.olp-map-container {
+  position: relative;
+}
+
+/* Controls overlay */
+.olp-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.olp-geo-btn {
+  background: #1B6B4A !important;
+  min-width: 0 !important;
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 50% !important;
+  padding: 0 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22) !important;
+}
+
+.olp-geo-btn:hover {
+  background: #155c3e !important;
+}
+
+.olp-clear-btn {
+  background: #e53935 !important;
+  min-width: 0 !important;
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 50% !important;
+  padding: 0 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22) !important;
+}
+
+.olp-clear-btn:hover {
+  background: #c62828 !important;
+}
+
+/* Coordinates display */
+.olp-coords {
+  padding: 12px 16px;
+  background: #F0F9F4;
+  border-top: 1px solid rgba(27, 107, 74, 0.12);
+}
+
+.olp-coords-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.olp-coords-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+}
+
+.olp-coords-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1B6B4A;
+  font-family: monospace;
+}
+
+.olp-coords-sep {
+  width: 1px;
+  height: 14px;
+  background: rgba(0,0,0,0.15);
+  margin: 0 4px;
+}
+
+.olp-coords-address {
+  display: flex;
+  align-items: flex-start;
+  font-size: 12px;
+  color: #475569;
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+.olp-coords-hint {
+  padding: 12px 16px;
+  font-size: 12px;
+  color: #94a3b8;
+  background: #fafafa;
+  border-top: 1px solid rgba(0,0,0,0.06);
+  text-align: center;
+}
+
+/* Error */
+.olp-error {
+  padding: 20px;
+  text-align: center;
+  color: #e53935;
+  font-size: 13px;
+  background: #fff5f5;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+}

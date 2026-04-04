@@ -275,3 +275,206 @@ div.checkout div.payment-info div.payment-info-price {
     width: 390px;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   SUPPLIER OFFICE MAP SECTION
+   Shows the supplier's office location on the map inside booking details
+   ══════════════════════════════════════════════════════════════ */
+
+.supplier-office-map-section {
+  background: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: var(--bc-radius-lg, 16px);
+  overflow: hidden;
+  margin-bottom: 20px;
+  box-shadow: var(--bc-shadow-sm, 0 1px 3px rgba(0,0,0,0.06));
+}
+
+.supplier-office-map-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 20px 14px;
+  background: linear-gradient(135deg, #1B6B4A 0%, #2D9D6F 100%);
+  color: #fff;
+}
+
+.supplier-office-map-header-icon {
+  font-size: 24px !important;
+  opacity: 0.9;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.supplier-office-map-header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.supplier-office-map-header-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.supplier-office-map-header-name {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.supplier-office-map-body {
+  height: 280px;
+  position: relative;
+}
+
+.supplier-office-map-body .map {
+  height: 280px !important;
+  border-radius: 0 !important;
+}
+
+.supplier-office-map-coords {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #F0F9F4;
+  border-top: 1px solid rgba(27, 107, 74, 0.12);
+  font-size: 12px;
+  color: #475569;
+  flex-wrap: wrap;
+}
+
+.supplier-office-map-coords-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background: rgba(27, 107, 74, 0.1);
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1B6B4A;
+  font-family: monospace;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DELIVERY OPTION SECTION
+   Toggle + conditional delivery map picker
+   ══════════════════════════════════════════════════════════════ */
+
+.delivery-option-section {
+  background: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: var(--bc-radius-lg, 16px);
+  overflow: hidden;
+  margin-bottom: 20px;
+  box-shadow: var(--bc-shadow-sm, 0 1px 3px rgba(0,0,0,0.06));
+}
+
+.delivery-option-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+
+.delivery-option-toggle:hover {
+  background: #f8fafb;
+}
+
+.delivery-option-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.delivery-option-toggle-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1B6B4A 0%, #2D9D6F 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.delivery-option-toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.delivery-option-toggle-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0F1419;
+}
+
+.delivery-option-toggle-subtitle {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.delivery-option-divider {
+  border: none;
+  border-top: 1px solid rgba(0,0,0,0.06);
+  margin: 0;
+}
+
+.delivery-picker-section {
+  padding: 16px;
+  background: #f8fafb;
+}
+
+/* ── Delivery fee display in details ─────────────────────────── */
+
+.delivery-fee-row .checkout-detail-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.delivery-distance-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  background: rgba(27, 107, 74, 0.1);
+  color: #1B6B4A;
+  border-radius: 100px;
+}
+
+.delivery-free {
+  color: #1B6B4A !important;
+  font-weight: 800 !important;
+}
+
+.delivery-paid {
+  color: #d97706 !important;
+  font-weight: 800 !important;
+}
+
+.payment-info-delivery {
+  font-size: 13px;
+  font-weight: 500;
+  color: #d97706;
+  margin-left: 8px;
+}
+
+/* ── Delivery self-pickup notice ─────────────────────────────── */
+
+.delivery-self-pickup-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  font-size: 13px;
+  color: #64748b;
+  background: #f8fafb;
+}

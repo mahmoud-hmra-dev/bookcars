@@ -172,7 +172,39 @@ const Car = ({
 
   return (
     <div key={car._id} className="car-container">
-      {pickupLocationName && (
+      {/* Supplier banner with location */}
+      {!hideSupplier && (
+        <div className="car-supplier-banner">
+          <div className="car-supplier-banner-left">
+            {car.supplier.avatar && (
+              <div className="car-supplier-banner-logo">
+                <img
+                  src={bookcarsHelper.joinURL(env.CDN_USERS, car.supplier.avatar)}
+                  alt={car.supplier.fullName}
+                  loading="lazy"
+                />
+              </div>
+            )}
+            <div className="car-supplier-banner-info">
+              <div className="car-supplier-banner-name">{car.supplier.fullName}</div>
+              {pickupLocationName && (
+                <div className="car-supplier-banner-location">
+                  <LocationIcon style={{ fontSize: 13 }} />
+                  <span>{pickupLocationName}</span>
+                </div>
+              )}
+            </div>
+          </div>
+          {distance && (
+            <div className="distance">
+              <img alt="Distance" src={DistanceIcon} />
+              <Badge backgroundColor="#E8F5F0" color="#1B6B4A" text={`${distance} ${strings.FROM_YOU}`} />
+            </div>
+          )}
+        </div>
+      )}
+      {/* Fallback header without supplier */}
+      {hideSupplier && pickupLocationName && (
         <div className="car-header">
           <div className="location">
             <LocationIcon />
@@ -190,14 +222,7 @@ const Car = ({
         <div className="car">
           <img src={bookcarsHelper.joinURL(env.CDN_CARS, car.image)} alt={car.name} className="car-img" loading="lazy" />
           <div className="car-row">
-            {!hideSupplier && (
-              <div className="car-supplier" style={sizeAuto ? { bottom: 10 } : {}} title={car.supplier.fullName}>
-                <span className="car-supplier-logo">
-                  <img src={bookcarsHelper.joinURL(env.CDN_USERS, car.supplier.avatar)} alt={car.supplier.fullName} loading="lazy" />
-                </span>
-                <span className="car-supplier-info">{car.supplier.fullName}</span>
-              </div>
-            )}
+            {/* Supplier info now shown in banner above - hidden here */}
             <div className="car-footer">
               <div className="rating">
                 {car.rating && car.rating >= 1 && (

@@ -8,9 +8,11 @@ import {
   Button,
   Paper,
   FormControlLabel,
-  Switch
+  Switch,
+  Divider,
+  Typography,
 } from '@mui/material'
-import { Info as InfoIcon } from '@mui/icons-material'
+import { Info as InfoIcon, LocationOn as LocationOnIcon } from '@mui/icons-material'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as bookcarsTypes from ':bookcars-types'
@@ -27,6 +29,7 @@ import Backdrop from '@/components/SimpleBackdrop'
 import NoMatch from './NoMatch'
 import Avatar from '@/components/Avatar'
 import ContractList from '@/components/ContractList'
+import OfficeLocationPicker, { OfficeLocationInfo } from '@/components/OfficeLocationPicker'
 import { schema, FormFields } from '@/models/SupplierForm'
 
 import '@/assets/css/update-supplier.css'
@@ -42,6 +45,7 @@ const UpdateSupplier = () => {
   const [noMatch, setNoMatch] = useState(false)
   const [avatar, setAvatar] = useState('')
   const [avatarError, setAvatarError] = useState(false)
+  const [officeLocation, setOfficeLocation] = useState<OfficeLocationInfo | null>(null)
 
   const {
     control,
@@ -152,6 +156,12 @@ const UpdateSupplier = () => {
               setValue('supplierCarLimit', _supplier.supplierCarLimit?.toString() || '')
               setValue('notifyAdminOnNewCar', !!_supplier.notifyAdminOnNewCar)
               setValue('blacklisted', !!_supplier.blacklisted)
+              // Load existing office coordinates
+              if (_supplier.latitude && _supplier.longitude) {
+                setValue('officeLat', String(_supplier.latitude))
+                setValue('officeLng', String(_supplier.longitude))
+                setOfficeLocation({ lat: _supplier.latitude, lng: _supplier.longitude, address: _supplier.location || '' })
+              }
               setVisible(true)
               setLoading(false)
             } else {
@@ -211,6 +221,10 @@ const UpdateSupplier = () => {
         supplierCarLimit: data.supplierCarLimit ? Number(data.supplierCarLimit) : undefined,
         notifyAdminOnNewCar: data.notifyAdminOnNewCar,
         blacklisted: !!data.blacklisted,
+        // office map coordinates (only update if the user touched the map)
+        ...(officeLocation ? { latitude: officeLocation.lat, longitude: officeLocation.lng }
+          : supplier.latitude && supplier.longitude ? { latitude: supplier.latitude, longitude: supplier.longitude }
+            : {}),
       }
 
       const res = await SupplierService.update(payload)
@@ -443,6 +457,25 @@ const UpdateSupplier = () => {
                   {...register('bio')}
                   type="text"
                   autoComplete="off" />
+              </FormControl>
+
+              {/* ── Office location on map ─────────────────── */}
+              <Divider sx={{ my: 2 }}>
+                <Typography variant="caption" sx={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <LocationOnIcon sx={{ fontSize: 14 }} /> Office Map Location
+                </Typography>
+              </Divider>
+
+              <FormControl fullWidth margin="dense">
+                <OfficeLocationPicker
+                  initialLat={supplier?.latitude}
+                  initialLng={supplier?.longitude}
+                  onChange={(info) => {
+                    setOfficeLocation(info)
+                    setValue('officeLat', info ? String(info.lat) : '')
+                    setValue('officeLng', info ? String(info.lng) : '')
+                  }}
+                />
               </FormControl>
 
               <FormControl fullWidth margin="dense">
