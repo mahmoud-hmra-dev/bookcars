@@ -2,8 +2,6 @@ import React, { useState } from 'react'
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { GoogleSignin, isErrorWithCode, statusCodes } from '@react-native-google-signin/google-signin'
-import * as AppleAuthentication from 'expo-apple-authentication'
-import { AccessToken, GraphRequest, GraphRequestManager, LoginManager, Profile } from 'react-native-fbsdk-next'
 import { Paragraph, Dialog, Portal, Button as NativeButton } from 'react-native-paper'
 import * as bookcarsTypes from ':bookcars-types'
 
@@ -99,12 +97,6 @@ const SocialLogin = (
     }
   }
 
-  const getEmail = (jwtToken: string) => {
-    const jwt = UserService.parseJwt(jwtToken)
-    const { email } = jwt
-    return email
-  }
-
   return (
     <View style={styles.view}>
       <View style={styles.or}>
@@ -178,132 +170,6 @@ const SocialLogin = (
           <Image source={require('@/assets/google-icon.png')} style={styles.google} />
         </Pressable>
 
-        {/* APPLE */}
-        {helper.ios() && (
-          <Pressable
-            onPress={async () => {
-              let error = false
-
-              try {
-                const credential = await AppleAuthentication.signInAsync({
-                  requestedScopes: [
-                    AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-                    AppleAuthentication.AppleAuthenticationScope.EMAIL,
-                  ],
-                })
-
-                // 1. Get the email from the credential OR decode it from the identityToken
-                const email = credential.email || getEmail(String(credential.identityToken))
-
-                // 2. Build the name (will be null on repeat logins)
-                const firstName = credential.fullName?.givenName || ''
-                const lastName = credential.fullName?.familyName || ''
-                const name = (firstName || lastName) ? `${firstName} ${lastName}`.trim() : email
-
-                if (email) {
-                  // Use identityToken instead of authorizationCode for consistency with your web logic
-                  await loginSuccess(
-                    bookcarsTypes.SocialSignInType.Apple, credential.identityToken || '',
-                    email,
-                    name,
-                    '')
-                } else {
-                  error = true
-                }
-                // signed in
-              } catch (err: any) {
-                if (err.code === 'ERR_REQUEST_CANCELED') {
-                  // handle that the user canceled the sign-in flow
-                  console.log('Apple login cancelled')
-                } else {
-                  console.error('Apple login error:', err.message)
-                  error = true
-                }
-              }
-
-              if (error) {
-                longinError()
-              }
-            }}>
-            <Image source={require('@/assets/apple-icon.png')} style={styles.apple} />
-          </Pressable>
-        )}
-
-        {/* FACEBOOK */}
-        <Pressable
-          // style={{ display: 'none' }}
-          onPress={async () => {
-            LoginManager.logInWithPermissions(['public_profile', 'email'])
-              .then(
-                async (result: any) => {
-                  if (result.isCancelled) {
-                    console.log('Facebook login cancelled')
-                  } else {
-                    let error = false
-                    const currentAccessToken = await AccessToken.getCurrentAccessToken()
-                    if (currentAccessToken) {
-                      const req = new GraphRequest('/me', {
-                        httpMethod: 'GET',
-                        version: 'v20.0',
-                        accessToken: currentAccessToken.accessToken,
-                        parameters: {
-                          fields: {
-                            string: 'email,name,picture'
-                          }
-                        }
-                      }, async (err: any, res: any) => {
-                        let fbError = false
-                        if (err) {
-                          console.log(err)
-                          fbError = true
-                        } else {
-                          const currentProfile = await Profile.getCurrentProfile()
-
-                          if (res && currentProfile) {
-                            const email = res.email as string
-                            const imageURL = (res.picture as any).data.url as string
-                            const { name } = currentProfile
-                            // const { name, imageURL } = currentProfile
-                            // console.log('email', email)
-                            // console.log('name', name)
-                            // console.log('imageURL', imageURL)
-
-                            if (email && name) {
-                              await loginSuccess(bookcarsTypes.SocialSignInType.Facebook, currentAccessToken.accessToken, email, name || email, imageURL || '')
-                            } else {
-                              fbError = true
-                            }
-                          } else {
-                            fbError = true
-                          }
-                        }
-
-                        if (fbError) {
-                          console.error('Facebook GraphRequest error')
-                          longinError()
-                        }
-                      })
-                      new GraphRequestManager().addRequest(req).start()
-                    } else {
-                      error = true
-                    }
-
-                    if (error) {
-                      console.error('Facebook login error')
-                      longinError()
-                    }
-                  }
-                },
-                (error: any) => {
-                  console.error(`Facebook login fail with error: ${error}`)
-
-                  longinError()
-                }
-              )
-          }}>
-          <Image source={require('@/assets/facebook-blue-icon.png')} style={styles.facebook} />
-        </Pressable>
-
         <Portal>
           <Dialog style={styles.dialog} visible={openErrorDialog} dismissable={false}>
             <Dialog.Title style={styles.dialogTitleContent}>{i18n.t('ERROR')}</Dialog.Title>
@@ -364,14 +230,6 @@ const styles = StyleSheet.create({
   },
   google: {
     height: 55,
-    resizeMode: 'contain',
-  },
-  apple: {
-    height: 48,
-    resizeMode: 'contain',
-  },
-  facebook: {
-    height: 48,
     resizeMode: 'contain',
   },
   dialog: {

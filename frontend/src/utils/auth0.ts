@@ -32,6 +32,6 @@ export const buildAuth0LoginOptions = (mode: Auth0FlowMode, connection?: string,
   },
   authorizationParams: {
     ...(connection ? { connection } : {}),
-    ...(mode === 'signup' ? { screen_hint: 'signup' as const } : {}),
+    ...(!connection && mode === 'signup' ? { screen_hint: 'signup' as const } : {}),
   },
 })
